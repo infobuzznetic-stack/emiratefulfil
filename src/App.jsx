@@ -788,8 +788,9 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
         setBusy(false); return;
       }
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
-      onAuthed({ email, name: profile?.name || email, company: profile?.company, country: profile?.country });
-      notify("Welcome back, " + (profile?.name || email).split(" ")[0] + ".");
+      const displayName = profile?.name || email.split("@")[0];
+      onAuthed({ email, name: displayName, company: profile?.company, country: profile?.country });
+      notify("Welcome back, " + displayName.split(" ")[0] + ".");
     }
     setBusy(false);
   };
@@ -1419,7 +1420,7 @@ export default function EmirateFulfilApp() {
       const authUser = data.session?.user;
       if (!authUser) return;
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
-      setSession({ email: authUser.email, name: profile?.name || authUser.email, company: profile?.company, country: profile?.country });
+      setSession({ email: authUser.email, name: profile?.name || authUser.email.split("@")[0], company: profile?.company, country: profile?.country });
       setView("dashboard");
     });
   }, []);
