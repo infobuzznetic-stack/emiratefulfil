@@ -737,6 +737,7 @@ async function fetchOrders(email) {
     id: o.id, productId: o.product_id, productName: o.product_name, qty: o.qty,
     sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price), buyer: o.buyer, city: o.city, status: o.status,
     customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address,
+    trackingNumber: o.tracking_number,
     createdAt: o.created_at,
   }));
 }
@@ -926,9 +927,10 @@ function Dashboard({ session, onLogout, notify }) {
       customer_email: newOrder.customerEmail || null, customer_phone: newOrder.customerPhone || null, customer_address: newOrder.customerAddress || null,
       status: "pending",
     });
-    if (error) { notify("Could not save order."); return; }
+    if (error) { notify("Could not save order."); return null; }
     setOrders([newOrder, ...orders]);
     notify("Order added — tracking as Pending.");
+    return newOrder;
   };
   const setOrderStatus = async (id, status) => {
     await supabase.from("orders").update({ status }).eq("id", id);
@@ -1057,7 +1059,7 @@ function Dashboard({ session, onLogout, notify }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} />}
+          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} />}
           {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
           {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
           {tab === "orders" && (
@@ -1569,12 +1571,13 @@ function CheckoutForm({ items, onBack, onSubmit }) {
   );
 }
 
-function CatalogTab({ catalog, onAdd, onPlaceOrder, notify }) {
-  const [view, setView] = useState("list"); // list | detail | cart | checkout
+function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
+  const [view, setView] = useState("list"); // list | detail | cart | checkout | success
   const [activeProduct, setActiveProduct] = useState(null);
   const [cart, setCart] = useState([]);
   const [checkoutItems, setCheckoutItems] = useState([]);
   const [checkoutFrom, setCheckoutFrom] = useState("detail"); // where "Back" should return to
+  const [placedOrders, setPlacedOrders] = useState([]);
 
   const addToCart = (product, qty) => {
     setCart((prev) => {
@@ -1603,20 +1606,47 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify }) {
   };
 
   const placeOrder = async (customer) => {
+    const created = [];
     for (const item of checkoutItems) {
-      await onPlaceOrder({
+      const result = await onPlaceOrder({
         productId: item.id, productName: item.name, qty: item.qty,
         sellPrice: item.sell, costPrice: item.cost,
         buyer: customer.name, city: customer.emirate,
         customerEmail: customer.email, customerPhone: customer.phone, customerAddress: customer.address,
       });
+      if (result) created.push(result);
     }
     if (checkoutFrom === "cart") setCart([]);
     setCheckoutItems([]);
     setActiveProduct(null);
-    setView("list");
-    notify && notify("Order placed! Track it under Orders.");
+    setPlacedOrders(created);
+    setView(created.length > 0 ? "success" : "list");
   };
+
+  if (view === "success") {
+    return (
+      <div className="max-w-xl mx-auto text-center py-14" style={{ animation: "dashTabIn 0.3s ease-out both" }}>
+        <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center" style={{ background: "rgba(0,200,150,0.12)" }}>
+          <CheckCircle2 className="w-8 h-8" style={{ color: "#00C896" }} />
+        </div>
+        <h1 className="mt-5 text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Order placed!</h1>
+        <p className="mt-2 text-sm text-gray-500">It's saved as Pending, and will also show up for the Admin to fulfill.</p>
+        <div className="mt-6 rounded-2xl bg-white text-left divide-y" style={{ border: "1px solid #E5E7EB" }}>
+          {placedOrders.map((o) => (
+            <div key={o.id} className="px-5 py-3 flex items-center justify-between text-sm">
+              <span className="text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</span>
+              <span className="font-semibold" style={{ color: "#111827" }}>{o.productName} <span className="text-gray-400 font-normal">×{o.qty}</span></span>
+              <StatusPill status="pending" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button onClick={onViewOrders} className="text-sm font-semibold px-6 py-3 rounded-full text-white" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>View in Orders</button>
+          <button onClick={() => setView("list")} className="text-sm font-semibold px-6 py-3 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Continue shopping</button>
+        </div>
+      </div>
+    );
+  }
 
   if (view === "detail" && activeProduct) {
     return <ProductLandingPage product={activeProduct} onBack={() => setView("list")} onAddToCart={(qty) => addToCart(activeProduct, qty)} onBuyNow={(qty) => buyNow(activeProduct, qty)} />;
@@ -1857,7 +1887,7 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
               <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
-              <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th>
             </tr></thead>
             <tbody>
               {orders.map((o) => (
@@ -1867,21 +1897,8 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
                   <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
                   <td className="px-4 py-3" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.costPrice) * o.qty}</td>
-                  <td className="px-4 py-3">
-                    <select value={o.status} onChange={(e) => onSetStatus(o.id, e.target.value)} className="text-xs rounded-full px-2 py-1 font-semibold border-0" style={
-                      o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
-                      o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
-                      o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
-                      o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
-                      { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
-                    }>
-                      <option value="pending">Pending</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="returned">Returned</option>
-                    </select>
-                  </td>
+                  <td className="px-4 py-3"><StatusPill status={o.status} /></td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{o.trackingNumber || <span className="text-gray-300">Not assigned yet</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -1957,6 +1974,14 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const setAdminOrderStatus = async (id, status) => {
     await supabase.from("orders").update({ status }).eq("id", id);
     setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
+  };
+
+  const [trackingDrafts, setTrackingDrafts] = useState({});
+  const saveTracking = async (id) => {
+    const value = trackingDrafts[id] ?? "";
+    await supabase.from("orders").update({ tracking_number: value }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, tracking_number: value } : o)));
+    notify("Tracking number saved.");
   };
 
   const addProduct = async (e) => {
@@ -2035,6 +2060,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                 <th className="px-4 py-3">Address / Emirate</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Tracking #</th>
               </tr>
             </thead>
             <tbody>
@@ -2072,6 +2098,18 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                       <option value="cancelled">Cancelled</option>
                       <option value="returned">Returned</option>
                     </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        defaultValue={o.tracking_number || ""}
+                        onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
+                        placeholder="e.g. AWB123456"
+                        className="w-28 rounded-lg px-2 py-1.5 text-xs"
+                        style={{ border: "1px solid #E5E7EB" }}
+                      />
+                      <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                    </div>
                   </td>
                 </tr>
               ))}
