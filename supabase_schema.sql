@@ -59,6 +59,9 @@ alter table orders add column if not exists customer_phone text;
 alter table orders add column if not exists customer_address text;
 -- Tracking number: set by Admin, visible to the seller on their Orders tab.
 alter table orders add column if not exists tracking_number text;
+-- Payment status: 'unpaid' until Admin reviews & approves the invoice, then 'paid'.
+-- Sellers cannot set this themselves — only Admin can approve it.
+alter table orders add column if not exists payment_status text not null default 'unpaid';
 
 -- Enable Row Level Security
 alter table profiles enable row level security;
