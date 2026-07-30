@@ -869,12 +869,25 @@ function Field({ label, type = "text", value, onChange, placeholder, required })
   );
 }
 
+/* ---------------- Region helpers: classify a buyer city as UAE or KSA ---------------- */
+const UAE_CITIES = ["dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "ras al khaimah", "rak", "umm al quwain", "al ain"];
+const KSA_CITIES = ["riyadh", "jeddah", "jedda", "mecca", "makkah", "medina", "madinah", "dammam", "khobar", "al khobar", "jubail", "taif", "abha", "tabuk", "jizan"];
+function isUAECity(city) {
+  const c = (city || "").trim().toLowerCase();
+  return UAE_CITIES.some((u) => c.includes(u));
+}
+function isKSACity(city) {
+  const c = (city || "").trim().toLowerCase();
+  return KSA_CITIES.some((k) => c.includes(k));
+}
+
 /* ============================================================
    SELLER DASHBOARD
 ============================================================ */
 function Dashboard({ session, onLogout, notify }) {
   const isAdmin = ADMIN_EMAILS.includes(session.email);
   const [tab, setTab] = useState("overview");
+  const [region, setRegion] = useState("UAE"); // UAE | KSA — which country's dashboard is showing
   const [catalog, setCatalog] = useState([]);
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -928,8 +941,19 @@ function Dashboard({ session, onLogout, notify }) {
   const deliveredRevenue = delivered.reduce((s, o) => s + o.sellPrice * o.qty, 0);
   const totalInvoice = orders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
 
+  // Split orders by country so the Dashboard tab can show a UAE-only or KSA-only view
+  const regionOrders = orders.filter((o) => (region === "UAE" ? isUAECity(o.city) : isKSACity(o.city)));
+  const regionDelivered = regionOrders.filter((o) => o.status === "delivered");
+  const regionPending = regionOrders.filter((o) => o.status === "pending");
+  const regionShipped = regionOrders.filter((o) => o.status === "shipped");
+  const regionCancelled = regionOrders.filter((o) => o.status === "cancelled");
+  const regionReturned = regionOrders.filter((o) => o.status === "returned");
+  const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
+  const regionTotalInvoice = regionOrders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const regionDeliveredRevenue = regionDelivered.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+
   const NAV = [
-    { id: "overview", label: "Overview", icon: Boxes },
+    { id: "overview", label: "Dashboard", icon: Boxes },
     { id: "products", label: "Products", icon: Package },
     { id: "catalog", label: "Catalog", icon: ClipboardCheck },
     { id: "categories", label: "Categories", icon: Layers },
@@ -1018,7 +1042,16 @@ function Dashboard({ session, onLogout, notify }) {
       <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
         <div key={tab} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
           {tab === "overview" && (
-            <OverviewTab session={session} orders={orders} listings={listings} catalog={catalog} confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice} pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned} />
+            <OverviewTab
+              session={session} orders={orders} listings={listings} catalog={catalog}
+              confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice}
+              pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned}
+              region={region} setRegion={setRegion}
+              regionOrders={regionOrders} regionConfirmedProfit={regionConfirmedProfit}
+              regionTotalInvoice={regionTotalInvoice} regionDeliveredRevenue={regionDeliveredRevenue}
+              regionPending={regionPending} regionShipped={regionShipped} regionDelivered={regionDelivered}
+              regionCancelled={regionCancelled} regionReturned={regionReturned}
+            />
           )}
           {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} />}
           {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
@@ -1091,27 +1124,32 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
   );
 }
 
-function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deliveredRevenue, totalInvoice, pending, shipped, delivered, cancelled, returned }) {
+function OverviewTab({
+  session, orders, listings, catalog,
+  region, setRegion,
+  regionOrders, regionConfirmedProfit, regionTotalInvoice,
+  regionPending, regionShipped, regionDelivered, regionCancelled, regionReturned,
+}) {
   const topListing = catalog.find((p) => p.id === listings[0]);
   const cards = [
-    { label: "Total orders", value: orders.length, color: "#0B1F3A", icon: Boxes },
-    { label: "Pending", value: pending.length, color: "#F8B400", icon: ClipboardCheck },
-    { label: "Shipped", value: shipped.length, color: "#3B82F6", icon: Truck },
-    { label: "Delivered", value: delivered.length, color: "#00C896", icon: CheckCircle2 },
-    { label: "Cancelled", value: cancelled.length, color: "#9CA3AF", icon: X },
-    { label: "Returned", value: returned.length, color: "#EF4444", icon: RotateCcw },
-    { label: "Confirmed profit", value: confirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
-    { label: "Total invoice", value: totalInvoice, prefix: "AED ", color: "#0B1F3A", icon: PackageCheck },
+    { label: "Total orders", value: regionOrders.length, color: "#0B1F3A", icon: Boxes },
+    { label: "Pending", value: regionPending.length, color: "#F8B400", icon: ClipboardCheck },
+    { label: "Shipped", value: regionShipped.length, color: "#3B82F6", icon: Truck },
+    { label: "Delivered", value: regionDelivered.length, color: "#00C896", icon: CheckCircle2 },
+    { label: "Cancelled", value: regionCancelled.length, color: "#9CA3AF", icon: X },
+    { label: "Returned", value: regionReturned.length, color: "#EF4444", icon: RotateCcw },
+    { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
+    { label: "Total invoice", value: regionTotalInvoice, prefix: "AED ", color: "#0B1F3A", icon: PackageCheck },
   ];
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   const breakdown = [
-    { label: "Pending", count: pending.length, color: "#F8B400" },
-    { label: "Shipped", count: shipped.length, color: "#3B82F6" },
-    { label: "Delivered", count: delivered.length, color: "#00C896" },
-    { label: "Cancelled", count: cancelled.length, color: "#9CA3AF" },
-    { label: "Returned", count: returned.length, color: "#EF4444" },
+    { label: "Pending", count: regionPending.length, color: "#F8B400" },
+    { label: "Shipped", count: regionShipped.length, color: "#3B82F6" },
+    { label: "Delivered", count: regionDelivered.length, color: "#00C896" },
+    { label: "Cancelled", count: regionCancelled.length, color: "#9CA3AF" },
+    { label: "Returned", count: regionReturned.length, color: "#EF4444" },
   ];
-  const totalForBar = orders.length || 1;
+  const totalForBar = regionOrders.length || 1;
 
   return (
     <div>
@@ -1124,12 +1162,29 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
             <h1 className="mt-2 text-3xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               Welcome back, {session.name.split(" ")[0]}
             </h1>
-            <p className="mt-1.5 text-sm text-white/60 max-w-md">Here's how your store is doing today — {orders.length} order{orders.length === 1 ? "" : "s"} logged so far.</p>
+            <p className="mt-1.5 text-sm text-white/60 max-w-md">Here's how your {region} store is doing today — {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {/* UAE / KSA region switch */}
+            <div className="flex items-center rounded-full p-1 relative" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
+              {["UAE", "KSA"].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRegion(r)}
+                  className="relative z-10 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 ease-out hover:scale-[1.04] active:scale-95"
+                  style={
+                    region === r
+                      ? { background: "#00C896", color: "#04140f", boxShadow: "0 4px 14px rgba(0,200,150,0.35)" }
+                      : { color: "rgba(255,255,255,0.55)" }
+                  }
+                >
+                  {r === "UAE" ? "🇦🇪 UAE" : "🇸🇦 KSA"}
+                </button>
+              ))}
+            </div>
             <div className="text-right">
               <div className="text-xs text-white/50">Confirmed profit</div>
-              <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {confirmedProfit.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
             </div>
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.18)" }}>
               <Sparkles className="w-5 h-5" style={{ color: "#00e0aa" }} />
@@ -1138,7 +1193,7 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div key={region} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
         {cards.map((c, i) => (
           <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} icon={c.icon} delay={i * 60} />
         ))}
@@ -1146,15 +1201,15 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
 
       <div className="grid lg:grid-cols-3 gap-5 mt-6">
         <div className="lg:col-span-2 rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-          <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent orders</div>
-          {orders.length === 0 ? (
-            <div className="text-sm text-gray-400">No orders yet — add one from Orders &amp; COD.</div>
+          <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent {region} orders</div>
+          {regionOrders.length === 0 ? (
+            <div className="text-sm text-gray-400">No {region} orders yet — log one from Orders with a buyer city in {region === "UAE" ? "Dubai, Abu Dhabi, Sharjah…" : "Riyadh, Jeddah, Dammam…"}</div>
           ) : (
-            orders.slice(0, 5).map((o) => (
+            regionOrders.slice(0, 5).map((o) => (
               <div key={o.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
                 <div>
                   <div className="font-semibold text-sm" style={{ color: "#111827" }}>{o.productName}</div>
-                  <div className="text-xs text-gray-400">{o.id} · {o.buyer || "Unnamed buyer"}</div>
+                  <div className="text-xs text-gray-400">{o.id} · {o.buyer || "Unnamed buyer"}{o.city ? ", " + o.city : ""}</div>
                 </div>
                 <StatusPill status={o.status} />
               </div>
@@ -1176,7 +1231,7 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
       </div>
 
       <div className="rounded-2xl p-6 bg-white mt-5" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Order status breakdown</div>
+        <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{region} order status breakdown</div>
         <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
           {breakdown.map((b) => (
             <div key={b.label} className="h-full transition-all duration-700" style={{ width: `${(b.count / totalForBar) * 100}%`, background: b.color }} />
