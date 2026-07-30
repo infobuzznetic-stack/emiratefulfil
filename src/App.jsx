@@ -874,7 +874,7 @@ function Field({ label, type = "text", value, onChange, placeholder, required })
 ============================================================ */
 function Dashboard({ session, onLogout, notify }) {
   const isAdmin = ADMIN_EMAILS.includes(session.email);
-  const [tab, setTab] = useState("products");
+  const [tab, setTab] = useState("overview");
   const [catalog, setCatalog] = useState([]);
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -929,8 +929,9 @@ function Dashboard({ session, onLogout, notify }) {
   const totalInvoice = orders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
 
   const NAV = [
+    { id: "overview", label: "Overview", icon: Boxes },
     { id: "products", label: "Products", icon: Package },
-    { id: "catalog", label: "Catalog", icon: Boxes },
+    { id: "catalog", label: "Catalog", icon: ClipboardCheck },
     { id: "categories", label: "Categories", icon: Layers },
     { id: "orders", label: "Orders", icon: Truck },
     { id: "invoices", label: "Invoices", icon: Receipt },
@@ -1016,6 +1017,9 @@ function Dashboard({ session, onLogout, notify }) {
       {/* Main */}
       <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
         <div key={tab} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
+          {tab === "overview" && (
+            <OverviewTab session={session} orders={orders} listings={listings} catalog={catalog} confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice} pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned} />
+          )}
           {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} />}
           {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
           {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
