@@ -52,6 +52,8 @@ The **Products** tab is now a mini storefront instead of just a browse grid:
 - **Add to Cart** builds a cart (with a cart icon + badge); **Buy Now** skips straight to checkout for just that item.
 - Checkout collects the customer's **name, email, phone, emirate, and address**, then places the order(s).
 - The **Admin** tab's order table now shows the customer's name, email, phone, and address/emirate for every order, from any seller.
+- **Order confirmation**: after checkout, the seller sees a confirmation screen with the order ID(s) and a "View in Orders" button — no more wondering where the order went.
+- **Tracking numbers**: Admin can set a tracking number per order (saved in the same table). Sellers see it read-only in their Orders tab. Status (Pending/Shipped/Delivered/Cancelled/Returned) is now also controlled from Admin only — sellers see it as a read-only badge in their own Orders tab.
 
 ### If you already ran `supabase_schema.sql` before
 You don't need to redo the whole file — it's safe to re-run entirely (it uses
@@ -62,6 +64,7 @@ alter table products add column if not exists description text;
 alter table orders add column if not exists customer_email text;
 alter table orders add column if not exists customer_phone text;
 alter table orders add column if not exists customer_address text;
+alter table orders add column if not exists tracking_number text;
 ```
 
 ## What's new
