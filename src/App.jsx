@@ -736,6 +736,7 @@ async function fetchOrders(email) {
   return data.map((o) => ({
     id: o.id, productId: o.product_id, productName: o.product_name, qty: o.qty,
     sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price), buyer: o.buyer, city: o.city, status: o.status,
+    createdAt: o.created_at,
   }));
 }
 
@@ -1043,7 +1044,7 @@ function Dashboard({ session, onLogout, notify }) {
         <div key={tab} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
           {tab === "overview" && (
             <OverviewTab
-              session={session} orders={orders} listings={listings} catalog={catalog}
+              session={session} orders={orders} listings={listings} catalog={catalog} setTab={setTab}
               confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice}
               pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned}
               region={region} setRegion={setRegion}
@@ -1124,13 +1125,52 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
   );
 }
 
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const dateLabel = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const timeLabel = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  return { dateLabel, timeLabel, greeting };
+}
+
+function ComingSoonPanel({ region }) {
+  const info = {
+    KSA: { flag: "🇸🇦", name: "Saudi Arabia" },
+    QATAR: { flag: "🇶🇦", name: "Qatar" },
+  }[region];
+  return (
+    <div
+      className="rounded-3xl p-14 flex flex-col items-center justify-center text-center bg-white mt-2"
+      style={{ border: "1px dashed #D1D5DB", animation: "dashTabIn 0.4s ease-out both" }}
+    >
+      <div className="text-6xl mb-4 transition-transform duration-500 hover:scale-110">{info.flag}</div>
+      <h2 className="text-xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        {info.name} dashboard — Coming soon
+      </h2>
+      <p className="text-sm text-gray-500 mt-2 max-w-sm">
+        We're setting up fulfillment and COD tracking for {info.name}. This tab will light up the moment it's ready — stay tuned!
+      </p>
+      <span className="mt-5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(248,180,0,0.15)", color: "#b07d00" }}>🚧 In progress</span>
+    </div>
+  );
+}
+
 function OverviewTab({
-  session, orders, listings, catalog,
+  session, orders, listings, catalog, setTab,
   region, setRegion,
   regionOrders, regionConfirmedProfit, regionTotalInvoice,
   regionPending, regionShipped, regionDelivered, regionCancelled, regionReturned,
 }) {
   const topListing = catalog.find((p) => p.id === listings[0]);
+  const { dateLabel, timeLabel, greeting } = LiveClock();
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const ordersThisWeek = orders.filter((o) => o.createdAt && new Date(o.createdAt).getTime() >= sevenDaysAgo).length;
+
   const cards = [
     { label: "Total orders", value: regionOrders.length, color: "#0B1F3A", icon: Boxes },
     { label: "Pending", value: regionPending.length, color: "#F8B400", icon: ClipboardCheck },
@@ -1141,7 +1181,6 @@ function OverviewTab({
     { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
     { label: "Total invoice", value: regionTotalInvoice, prefix: "AED ", color: "#0B1F3A", icon: PackageCheck },
   ];
-  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   const breakdown = [
     { label: "Pending", count: regionPending.length, color: "#F8B400" },
     { label: "Shipped", count: regionShipped.length, color: "#3B82F6" },
@@ -1150,6 +1189,18 @@ function OverviewTab({
     { label: "Returned", count: regionReturned.length, color: "#EF4444" },
   ];
   const totalForBar = regionOrders.length || 1;
+  const regions = [
+    { id: "UAE", flag: "🇦🇪", live: true },
+    { id: "KSA", flag: "🇸🇦", live: false },
+    { id: "QATAR", flag: "🇶🇦", live: false },
+  ];
+
+  const quickActions = [
+    { label: "Add product", tab: "products", icon: Package, color: "#00C896" },
+    { label: "Log order", tab: "orders", icon: Truck, color: "#3B82F6" },
+    { label: "View invoices", tab: "invoices", icon: PackageCheck, color: "#F8B400" },
+    { label: "Browse categories", tab: "categories", icon: ClipboardCheck, color: "#0B1F3A" },
+  ];
 
   return (
     <div>
@@ -1158,94 +1209,140 @@ function OverviewTab({
         <div className="absolute -bottom-20 left-1/3 w-64 h-64 rounded-full opacity-10 blur-2xl" style={{ background: "#F8B400" }} />
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
           <div>
-            <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#7FE8C9" }}>{today}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#7FE8C9" }}>{dateLabel}</span>
+              <span className="text-white/30">·</span>
+              <span className="text-xs font-semibold tracking-widest" style={{ color: "#7FE8C9", fontFamily: "'Space Grotesk', sans-serif" }}>{timeLabel}</span>
+            </div>
             <h1 className="mt-2 text-3xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              Welcome back, {session.name.split(" ")[0]}
+              {greeting}, {session.name.split(" ")[0]}
             </h1>
-            <p className="mt-1.5 text-sm text-white/60 max-w-md">Here's how your {region} store is doing today — {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</p>
+            <p className="mt-1.5 text-sm text-white/60 max-w-md">
+              {region === "UAE"
+                ? <>Here's how your UAE store is doing today — {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>
+                : <>Preview your future {region === "KSA" ? "Saudi" : "Qatar"} storefront below.</>}
+            </p>
           </div>
-          <div className="flex items-center gap-4">
-            {/* UAE / KSA region switch */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* UAE / KSA / Qatar region switch */}
             <div className="flex items-center rounded-full p-1 relative" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
-              {["UAE", "KSA"].map((r) => (
+              {regions.map((r) => (
                 <button
-                  key={r}
-                  onClick={() => setRegion(r)}
-                  className="relative z-10 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 ease-out hover:scale-[1.04] active:scale-95"
+                  key={r.id}
+                  onClick={() => setRegion(r.id)}
+                  className="relative z-10 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 ease-out hover:scale-[1.04] active:scale-95 flex items-center gap-1"
                   style={
-                    region === r
+                    region === r.id
                       ? { background: "#00C896", color: "#04140f", boxShadow: "0 4px 14px rgba(0,200,150,0.35)" }
                       : { color: "rgba(255,255,255,0.55)" }
                   }
                 >
-                  {r === "UAE" ? "🇦🇪 UAE" : "🇸🇦 KSA"}
+                  {r.flag} {r.id}
+                  {!r.live && <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(248,180,0,0.25)", color: "#FFD98A" }}>SOON</span>}
                 </button>
               ))}
             </div>
-            <div className="text-right">
-              <div className="text-xs text-white/50">Confirmed profit</div>
-              <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
-            </div>
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.18)" }}>
-              <Sparkles className="w-5 h-5" style={{ color: "#00e0aa" }} />
-            </div>
+            {region === "UAE" && (
+              <>
+                <div className="text-right">
+                  <div className="text-xs text-white/50">Confirmed profit</div>
+                  <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
+                </div>
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.18)" }}>
+                  <Sparkles className="w-5 h-5" style={{ color: "#00e0aa" }} />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <div key={region} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
-        {cards.map((c, i) => (
-          <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} icon={c.icon} delay={i * 60} />
-        ))}
-      </div>
+      {region !== "UAE" ? (
+        <ComingSoonPanel region={region} />
+      ) : (
+        <>
+          <div key={region} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
+            {cards.map((c, i) => (
+              <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} icon={c.icon} delay={i * 60} />
+            ))}
+          </div>
 
-      <div className="grid lg:grid-cols-3 gap-5 mt-6">
-        <div className="lg:col-span-2 rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-          <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent {region} orders</div>
-          {regionOrders.length === 0 ? (
-            <div className="text-sm text-gray-400">No {region} orders yet — log one from Orders with a buyer city in {region === "UAE" ? "Dubai, Abu Dhabi, Sharjah…" : "Riyadh, Jeddah, Dammam…"}</div>
-          ) : (
-            regionOrders.slice(0, 5).map((o) => (
-              <div key={o.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <div>
-                  <div className="font-semibold text-sm" style={{ color: "#111827" }}>{o.productName}</div>
-                  <div className="text-xs text-gray-400">{o.id} · {o.buyer || "Unnamed buyer"}{o.city ? ", " + o.city : ""}</div>
-                </div>
-                <StatusPill status={o.status} />
-              </div>
-            ))
-          )}
-        </div>
-        <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-          <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Top listing</div>
-          {topListing ? (
-            <>
-              <div className="text-3xl">{topListing.emoji}</div>
-              <div className="mt-2 font-semibold text-sm">{topListing.name}</div>
-              <div className="text-xs mt-1 font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {topListing.sell - topListing.cost}</div>
-            </>
-          ) : (
-            <div className="text-sm text-gray-400">Add a listing to see it here.</div>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-2xl p-6 bg-white mt-5" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{region} order status breakdown</div>
-        <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
-          {breakdown.map((b) => (
-            <div key={b.label} className="h-full transition-all duration-700" style={{ width: `${(b.count / totalForBar) * 100}%`, background: b.color }} />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
-          {breakdown.map((b) => (
-            <div key={b.label} className="flex items-center gap-2 text-xs text-gray-500">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: b.color }} />
-              {b.label} <b style={{ color: "#111827" }}>{b.count}</b>
+          {/* Quick actions */}
+          <div className="rounded-2xl p-5 bg-white mt-6" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Quick actions</div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {quickActions.map((q) => (
+                <button
+                  key={q.label}
+                  onClick={() => setTab(q.tab)}
+                  className="group flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md active:scale-95"
+                  style={{ border: "1px solid #F3F4F6" }}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110" style={{ background: q.color + "1A" }}>
+                    <q.icon className="w-4.5 h-4.5" style={{ color: q.color }} />
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: "#111827" }}>{q.label}</span>
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-5 mt-6">
+            <div className="lg:col-span-2 rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+              <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent UAE orders</div>
+              {regionOrders.length === 0 ? (
+                <div className="text-sm text-gray-400">No UAE orders yet — log one from Orders with a buyer city in Dubai, Abu Dhabi, Sharjah…</div>
+              ) : (
+                regionOrders.slice(0, 5).map((o) => (
+                  <div key={o.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                    <div>
+                      <div className="font-semibold text-sm" style={{ color: "#111827" }}>{o.productName}</div>
+                      <div className="text-xs text-gray-400">{o.id} · {o.buyer || "Unnamed buyer"}{o.city ? ", " + o.city : ""}</div>
+                    </div>
+                    <StatusPill status={o.status} />
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="space-y-5">
+              <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+                <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Top listing</div>
+                {topListing ? (
+                  <>
+                    <div className="text-3xl">{topListing.emoji}</div>
+                    <div className="mt-2 font-semibold text-sm">{topListing.name}</div>
+                    <div className="text-xs mt-1 font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {topListing.sell - topListing.cost}</div>
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-400">Add a listing to see it here.</div>
+                )}
+              </div>
+              <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+                <div className="font-bold text-sm mb-1" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>This week</div>
+                <div className="text-3xl font-bold mt-2" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{ordersThisWeek}</div>
+                <div className="text-xs text-gray-400 mt-1">order{ordersThisWeek === 1 ? "" : "s"} logged in the last 7 days</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl p-6 bg-white mt-5" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>UAE order status breakdown</div>
+            <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
+              {breakdown.map((b) => (
+                <div key={b.label} className="h-full transition-all duration-700" style={{ width: `${(b.count / totalForBar) * 100}%`, background: b.color }} />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
+              {breakdown.map((b) => (
+                <div key={b.label} className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: b.color }} />
+                  {b.label} <b style={{ color: "#111827" }}>{b.count}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1669,25 +1766,35 @@ export default function EmirateFulfilApp() {
   const [view, setView] = useState("home"); // home | signup | login | dashboard
   const [session, setSession] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const notify = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), msg.length > 60 ? 5000 : 2600);
   };
 
-  // Restore session on page load/refresh so users stay logged in
+  // Restore session on page load/refresh so users stay logged in.
+  // Nothing renders until this finishes, so refreshing never flashes the
+  // homepage before landing back on the dashboard.
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
-      const authUser = data.session?.user;
-      if (!authUser) return;
-      const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
-      setSession({ email: authUser.email, name: profile?.name || authUser.email.split("@")[0], company: profile?.company, country: profile?.country });
-      setView("dashboard");
+      try {
+        const authUser = data.session?.user;
+        if (authUser) {
+          const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
+          setSession({ email: authUser.email, name: profile?.name || authUser.email.split("@")[0], company: profile?.company, country: profile?.country });
+          setView("dashboard");
+        }
+      } finally {
+        setCheckingAuth(false);
+      }
     });
   }, []);
 
   const handleAuthed = (s) => { setSession(s); setView("dashboard"); };
   const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); setView("home"); };
+
+  if (checkingAuth) return <SplashLoader />;
 
   return (
     <>
@@ -1698,5 +1805,19 @@ export default function EmirateFulfilApp() {
       )}
       {view === "dashboard" && session && <Dashboard session={session} onLogout={handleLogout} notify={notify} />}
     </>
+  );
+}
+
+function SplashLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0B1F3A" }}>
+      <div className="flex flex-col items-center gap-4">
+        <div
+          className="w-12 h-12 rounded-full animate-spin"
+          style={{ border: "3px solid rgba(255,255,255,0.15)", borderTopColor: "#00C896" }}
+        />
+        <span className="text-white/50 text-sm font-medium" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Loading…</span>
+      </div>
+    </div>
   );
 }
