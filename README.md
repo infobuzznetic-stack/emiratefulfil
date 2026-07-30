@@ -45,6 +45,25 @@ npm run dev
 2. Go to https://vercel.com → your project → it auto-redeploys on every push.
    (Your live URL: https://emiratefulfil.vercel.app/)
 
+## New: full product storefront + checkout
+The **Products** tab is now a mini storefront instead of just a browse grid:
+- Each card shows the product image (emoji), title, and price, with **Add to Cart** and **Buy Now** buttons.
+- Clicking a product opens its own **landing page** (bigger image, description, price, quantity, Add to Cart / Buy Now).
+- **Add to Cart** builds a cart (with a cart icon + badge); **Buy Now** skips straight to checkout for just that item.
+- Checkout collects the customer's **name, email, phone, emirate, and address**, then places the order(s).
+- The **Admin** tab's order table now shows the customer's name, email, phone, and address/emirate for every order, from any seller.
+
+### If you already ran `supabase_schema.sql` before
+You don't need to redo the whole file — it's safe to re-run entirely (it uses
+`create table if not exists` / `on conflict do nothing`), but if you only want
+the new bits, just run this in the SQL Editor:
+```sql
+alter table products add column if not exists description text;
+alter table orders add column if not exists customer_email text;
+alter table orders add column if not exists customer_phone text;
+alter table orders add column if not exists customer_address text;
+```
+
 ## What's new
 - **Real accounts**: signup/login now use Supabase Auth (`auth.users` + a `profiles` table for name/company/etc).
 - **Shared data**: orders and listings are stored per-seller in shared tables — visible from any device/browser.
