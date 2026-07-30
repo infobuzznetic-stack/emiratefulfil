@@ -737,7 +737,7 @@ async function fetchOrders(email) {
     id: o.id, productId: o.product_id, productName: o.product_name, qty: o.qty,
     sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price), buyer: o.buyer, city: o.city, status: o.status,
     customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address,
-    trackingNumber: o.tracking_number,
+    trackingNumber: o.tracking_number, paymentStatus: o.payment_status || "unpaid",
     createdAt: o.created_at,
   }));
 }
@@ -920,12 +920,12 @@ function Dashboard({ session, onLogout, notify }) {
     setListings(listings.filter((x) => x !== id));
   };
   const addOrder = async (order) => {
-    const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10), status: "pending" };
+    const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10), status: "pending", paymentStatus: "unpaid" };
     const { error } = await supabase.from("orders").insert({
       id: newOrder.id, seller_email: session.email, product_id: newOrder.productId, product_name: newOrder.productName,
       qty: newOrder.qty, sell_price: newOrder.sellPrice, cost_price: newOrder.costPrice, buyer: newOrder.buyer, city: newOrder.city,
       customer_email: newOrder.customerEmail || null, customer_phone: newOrder.customerPhone || null, customer_address: newOrder.customerAddress || null,
-      status: "pending",
+      status: "pending", payment_status: "unpaid",
     });
     if (error) { notify("Could not save order."); return null; }
     setOrders([newOrder, ...orders]);
@@ -945,7 +945,11 @@ function Dashboard({ session, onLogout, notify }) {
   const confirmedProfit = delivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
   const pendingCOD = pending.reduce((s, o) => s + o.sellPrice * o.qty, 0);
   const deliveredRevenue = delivered.reduce((s, o) => s + o.sellPrice * o.qty, 0);
-  const totalInvoice = orders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  // Cancelled orders never billed a customer, so they must not count toward invoicing.
+  const billableOrders = orders.filter((o) => o.status !== "cancelled");
+  const totalInvoice = billableOrders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const unpaidInvoice = billableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const paidInvoice = billableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
 
   // Split orders by country so the Dashboard tab can show a UAE-only or KSA-only view
   const regionOrders = orders.filter((o) => (region === "UAE" ? isUAECity(o.city) : isKSACity(o.city)));
@@ -955,7 +959,10 @@ function Dashboard({ session, onLogout, notify }) {
   const regionCancelled = regionOrders.filter((o) => o.status === "cancelled");
   const regionReturned = regionOrders.filter((o) => o.status === "returned");
   const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
-  const regionTotalInvoice = regionOrders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const regionBillableOrders = regionOrders.filter((o) => o.status !== "cancelled");
+  const regionTotalInvoice = regionBillableOrders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const regionUnpaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const regionPaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
   const regionDeliveredRevenue = regionDelivered.reduce((s, o) => s + o.sellPrice * o.qty, 0);
 
   const NAV = [
@@ -1055,6 +1062,7 @@ function Dashboard({ session, onLogout, notify }) {
               region={region} setRegion={setRegion}
               regionOrders={regionOrders} regionConfirmedProfit={regionConfirmedProfit}
               regionTotalInvoice={regionTotalInvoice} regionDeliveredRevenue={regionDeliveredRevenue}
+              regionUnpaidInvoice={regionUnpaidInvoice} regionPaidInvoice={regionPaidInvoice}
               regionPending={regionPending} regionShipped={regionShipped} regionDelivered={regionDelivered}
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
@@ -1065,7 +1073,7 @@ function Dashboard({ session, onLogout, notify }) {
           {tab === "orders" && (
             <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
           )}
-          {tab === "invoices" && <InvoicesTab orders={orders} session={session} />}
+          {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
           {tab === "settings" && <SettingsTab session={session} />}
           {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
         </div>
@@ -1169,6 +1177,7 @@ function OverviewTab({
   session, orders, listings, catalog, setTab,
   region, setRegion,
   regionOrders, regionConfirmedProfit, regionTotalInvoice,
+  regionUnpaidInvoice, regionPaidInvoice,
   regionPending, regionShipped, regionDelivered, regionCancelled, regionReturned,
 }) {
   const topListing = catalog.find((p) => p.id === listings[0]);
@@ -1185,6 +1194,8 @@ function OverviewTab({
     { label: "Returned", value: regionReturned.length, color: "#EF4444", icon: RotateCcw },
     { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
     { label: "Total invoice", value: regionTotalInvoice, prefix: "AED ", color: "#0B1F3A", icon: PackageCheck },
+    { label: "Unpaid invoice", value: regionUnpaidInvoice, prefix: "AED ", color: "#F8B400", icon: Receipt },
+    { label: "Paid invoice", value: regionPaidInvoice, prefix: "AED ", color: "#00C896", icon: CheckCircle2 },
   ];
   const breakdown = [
     { label: "Pending", count: regionPending.length, color: "#F8B400" },
@@ -1361,6 +1372,18 @@ function StatusPill({ status }) {
     pending: { background: "rgba(248,180,0,0.15)", color: "#b07d00" },
   };
   return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={styles[status] || styles.pending}>{status}</span>;
+}
+
+function PaymentPill({ status }) {
+  const paid = status === "paid";
+  return (
+    <span
+      className="text-xs font-semibold px-2.5 py-1 rounded-full"
+      style={paid ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}
+    >
+      {paid ? "Paid" : "Unpaid"}
+    </span>
+  );
 }
 
 /* ---------------- Storefront: product landing page, cart, checkout ---------------- */
@@ -1799,15 +1822,19 @@ function CategoriesTab({ catalog, listings, onAdd }) {
   );
 }
 
-function InvoicesTab({ orders, session }) {
-  const totalBilled = orders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
+  // Cancelled orders were never billed, so they're excluded from every invoice total below.
+  const billable = orders.filter((o) => o.status !== "cancelled");
+  const totalBilled = billable.reduce((s, o) => s + o.sellPrice * o.qty, 0);
   return (
     <div>
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
-      <p className="text-sm text-gray-500 mt-1">An invoice is generated automatically for every order you log.</p>
-      <div className="grid sm:grid-cols-2 gap-4 mt-6">
+      <p className="text-sm text-gray-500 mt-1">An invoice is generated automatically for every order you log. Admin reviews and approves each one before it counts as Paid.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} />
-        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#00C896" icon={ShieldCheck} />
+        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} />
+        <StatCard label="Unpaid invoice" value={unpaidInvoice} prefix="AED " color="#F8B400" icon={Receipt} />
+        <StatCard label="Paid invoice" value={paidInvoice} prefix="AED " color="#00C896" icon={CheckCircle2} />
       </div>
       <div className="mt-6 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
         {orders.length === 0 ? (
@@ -1820,7 +1847,8 @@ function InvoicesTab({ orders, session }) {
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Buyer</th>
                 <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Order status</th>
+                <th className="px-4 py-3">Payment</th>
               </tr>
             </thead>
             <tbody>
@@ -1833,8 +1861,11 @@ function InvoicesTab({ orders, session }) {
                   <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>INV-{o.id}</td>
                   <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
                   <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {o.status === "cancelled" ? "AED 0" : `AED ${o.sellPrice * o.qty}`}
+                  </td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
+                  <td className="px-4 py-3">{o.status === "cancelled" ? <span className="text-xs text-gray-300">—</span> : <PaymentPill status={o.paymentStatus} />}</td>
                 </tr>
               ))}
             </tbody>
@@ -1976,6 +2007,14 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
   };
 
+  // Only Admin can approve an invoice as Paid — this is what moves it out of
+  // the seller's "Unpaid invoice" box and into "Paid invoice".
+  const setAdminPaymentStatus = async (id, payment_status) => {
+    await supabase.from("orders").update({ payment_status }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, payment_status } : o)));
+    notify(payment_status === "paid" ? "Invoice approved as paid." : "Invoice marked unpaid.");
+  };
+
   const [trackingDrafts, setTrackingDrafts] = useState({});
   const saveTracking = async (id) => {
     const value = trackingDrafts[id] ?? "";
@@ -2060,6 +2099,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                 <th className="px-4 py-3">Address / Emirate</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Tracking #</th>
               </tr>
             </thead>
@@ -2078,7 +2118,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     <div>{o.city || "—"}</div>
                     <div className="text-gray-400 truncate" title={o.customer_address}>{o.customer_address || ""}</div>
                   </td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sell_price * o.qty}</td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.status === "cancelled" ? 0 : o.sell_price * o.qty}</td>
                   <td className="px-4 py-3">
                     <select
                       value={o.status}
@@ -2098,6 +2138,20 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                       <option value="cancelled">Cancelled</option>
                       <option value="returned">Returned</option>
                     </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    {o.status === "cancelled" ? (
+                      <span className="text-xs text-gray-300">—</span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <PaymentPill status={o.payment_status} />
+                        {o.payment_status === "paid" ? (
+                          <button onClick={() => setAdminPaymentStatus(o.id, "unpaid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Undo</button>
+                        ) : (
+                          <button onClick={() => setAdminPaymentStatus(o.id, "paid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-white" style={{ background: "#00C896" }}>Approve</button>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
