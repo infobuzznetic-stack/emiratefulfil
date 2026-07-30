@@ -770,14 +770,11 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
     const email = form.email.trim().toLowerCase();
     if (isSignup) {
       if (!form.name || !email || !form.password) { notify("Please fill in all required fields."); setBusy(false); return; }
-      const { data, error } = await supabase.auth.signUp({ email, password: form.password });
+      const { data, error } = await supabase.auth.signUp({
+        email, password: form.password,
+        options: { data: { name: form.name, phone: form.phone, company: form.company, country: form.country } },
+      });
       if (error) { notify(error.message); setBusy(false); return; }
-      const userId = data.user?.id;
-      if (userId) {
-        await supabase.from("profiles").insert({
-          id: userId, email, name: form.name, phone: form.phone, company: form.company, country: form.country,
-        });
-      }
       notify("Thanks for signing up, " + form.name.split(" ")[0] + "! Please check your email to verify your account, then log in.");
       onSwitch("login");
     } else {
@@ -1005,8 +1002,9 @@ function Dashboard({ session, onLogout, notify }) {
   );
 }
 
-function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0 }) {
+function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0, icon: Icon }) {
   const [shown, setShown] = useState(false);
+  const [hover, setHover] = useState(false);
   const [display, setDisplay] = useState(0);
   const numeric = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.]/g, "")) || 0;
 
@@ -1018,7 +1016,7 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
   useEffect(() => {
     if (!shown) return;
     let start = null;
-    const duration = 700;
+    const duration = 800;
     const step = (ts) => {
       if (!start) start = ts;
       const p = Math.min((ts - start) / duration, 1);
@@ -1031,15 +1029,28 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
 
   return (
     <div
-      className="rounded-2xl p-5 bg-white transition-all duration-500"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      className="rounded-2xl p-5 bg-white transition-all duration-500 cursor-default"
       style={{
         border: "1px solid #E5E7EB",
         opacity: shown ? 1 : 0,
-        transform: shown ? "translateY(0px) scale(1)" : "translateY(14px) scale(0.97)",
+        transform: shown ? (hover ? "translateY(-4px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
+        boxShadow: hover ? "0 14px 30px rgba(11,31,58,0.12)" : "0 0px 0px rgba(0,0,0,0)",
       }}
     >
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-2xl font-bold mt-1" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-gray-500">{label}</div>
+        {Icon && (
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-500"
+            style={{ background: color + "1A", transform: hover ? "rotate(-8deg) scale(1.08)" : "rotate(0deg) scale(1)" }}
+          >
+            <Icon className="w-4 h-4" style={{ color }} />
+          </div>
+        )}
+      </div>
+      <div className="text-2xl font-bold mt-2" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
         {prefix}{display.toLocaleString()}
       </div>
       {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
@@ -1050,14 +1061,14 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
 function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deliveredRevenue, totalInvoice, pending, shipped, delivered, cancelled, returned }) {
   const topListing = catalog.find((p) => p.id === listings[0]);
   const cards = [
-    { label: "Total orders", value: orders.length, color: "#0B1F3A" },
-    { label: "Pending", value: pending.length, color: "#F8B400" },
-    { label: "Shipped", value: shipped.length, color: "#3B82F6" },
-    { label: "Delivered", value: delivered.length, color: "#00C896" },
-    { label: "Cancelled", value: cancelled.length, color: "#9CA3AF" },
-    { label: "Returned", value: returned.length, color: "#EF4444" },
-    { label: "Confirmed profit", value: confirmedProfit, prefix: "AED ", color: "#00C896" },
-    { label: "Total invoice", value: totalInvoice, prefix: "AED ", color: "#0B1F3A" },
+    { label: "Total orders", value: orders.length, color: "#0B1F3A", icon: Boxes },
+    { label: "Pending", value: pending.length, color: "#F8B400", icon: ClipboardCheck },
+    { label: "Shipped", value: shipped.length, color: "#3B82F6", icon: Truck },
+    { label: "Delivered", value: delivered.length, color: "#00C896", icon: CheckCircle2 },
+    { label: "Cancelled", value: cancelled.length, color: "#9CA3AF", icon: X },
+    { label: "Returned", value: returned.length, color: "#EF4444", icon: RotateCcw },
+    { label: "Confirmed profit", value: confirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
+    { label: "Total invoice", value: totalInvoice, prefix: "AED ", color: "#0B1F3A", icon: PackageCheck },
   ];
   return (
     <div>
@@ -1065,7 +1076,7 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
       <p className="text-sm text-gray-500 mt-1">Here's how your store is doing.</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         {cards.map((c, i) => (
-          <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} delay={i * 60} />
+          <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} icon={c.icon} delay={i * 60} />
         ))}
       </div>
       <div className="grid lg:grid-cols-3 gap-5 mt-6">
