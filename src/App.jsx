@@ -3,6 +3,7 @@ import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
+  Layers, Receipt,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -873,7 +874,7 @@ function Field({ label, type = "text", value, onChange, placeholder, required })
 ============================================================ */
 function Dashboard({ session, onLogout, notify }) {
   const isAdmin = ADMIN_EMAILS.includes(session.email);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("products");
   const [catalog, setCatalog] = useState([]);
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -928,13 +929,12 @@ function Dashboard({ session, onLogout, notify }) {
   const totalInvoice = orders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
 
   const NAV = [
-    { id: "overview", label: "Overview", icon: Boxes },
-    { id: "catalog", label: "Catalog", icon: Package },
-    { id: "listings", label: "My Listings", icon: ClipboardCheck },
-    { id: "orders", label: "Orders & COD", icon: Truck },
-    { id: "wallet", label: "Wallet & Payouts", icon: ShieldCheck },
+    { id: "products", label: "Products", icon: Package },
+    { id: "catalog", label: "Catalog", icon: Boxes },
+    { id: "categories", label: "Categories", icon: Layers },
+    { id: "orders", label: "Orders", icon: Truck },
+    { id: "invoices", label: "Invoices", icon: Receipt },
     { id: "settings", label: "Settings", icon: Sparkles },
-    { id: "support", label: "Support", icon: MapPin },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
   ];
 
@@ -957,10 +957,18 @@ function Dashboard({ session, onLogout, notify }) {
           {NAV.map((n) => (
             <button
               key={n.id} onClick={() => setTab(n.id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-              style={tab === n.id ? { background: "rgba(0,200,150,0.15)", color: "#00C896" } : { color: "rgba(255,255,255,0.6)" }}
+              className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out hover:scale-[1.03] hover:translate-x-1 active:scale-95"
+              style={
+                tab === n.id
+                  ? { background: "rgba(0,200,150,0.15)", color: "#00C896", boxShadow: "0 4px 14px rgba(0,200,150,0.18)" }
+                  : { color: "rgba(255,255,255,0.6)" }
+              }
             >
-              <n.icon className="w-4.5 h-4.5" /> {n.label}
+              <n.icon
+                className="w-4.5 h-4.5 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110"
+                style={tab === n.id ? { color: "#00C896" } : {}}
+              />
+              <span className="transition-transform duration-300 group-hover:translate-x-0.5">{n.label}</span>
             </button>
           ))}
         </div>
@@ -978,29 +986,46 @@ function Dashboard({ session, onLogout, notify }) {
       </div>
       {mobileNavOpen && (
         <div className="md:hidden fixed top-16 left-0 right-0 z-40 px-5 py-4 space-y-1" style={{ background: "#0B1F3A" }}>
-          {NAV.map((n) => (
-            <button key={n.id} onClick={() => { setTab(n.id); setMobileNavOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/80">
-              <n.icon className="w-4.5 h-4.5" /> {n.label}
+          {NAV.map((n, i) => (
+            <button
+              key={n.id}
+              onClick={() => { setTab(n.id); setMobileNavOpen(false); }}
+              className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/80 transition-all duration-300 ease-out hover:scale-[1.02] hover:translate-x-1 active:scale-95"
+              style={{
+                animation: `dashFadeIn 0.35s ease-out ${i * 60}ms both`,
+                ...(tab === n.id ? { background: "rgba(0,200,150,0.15)", color: "#00C896" } : {}),
+              }}
+            >
+              <n.icon className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110" /> {n.label}
             </button>
           ))}
-          <button onClick={onLogout} className="w-full text-left px-3 py-2.5 text-sm font-semibold text-red-300">Log out</button>
+          <button onClick={onLogout} className="w-full text-left px-3 py-2.5 text-sm font-semibold text-red-300 transition-transform duration-300 hover:translate-x-1 active:scale-95">Log out</button>
         </div>
       )}
+      <style>{`
+        @keyframes dashFadeIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes dashTabIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
       {/* Main */}
       <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
-        {tab === "overview" && (
-          <OverviewTab session={session} orders={orders} listings={listings} catalog={catalog} confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice} pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned} />
-        )}
-        {tab === "catalog" && <CatalogTab catalog={catalog} onAdd={addListing} />}
-        {tab === "listings" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
-        {tab === "orders" && (
-          <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
-        )}
-        {tab === "wallet" && <WalletTab confirmedProfit={confirmedProfit} pending={pending} notify={notify} />}
-        {tab === "settings" && <SettingsTab session={session} />}
-        {tab === "support" && <SupportTab />}
-        {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
+        <div key={tab} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
+          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} />}
+          {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
+          {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
+          {tab === "orders" && (
+            <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
+          )}
+          {tab === "invoices" && <InvoicesTab orders={orders} session={session} />}
+          {tab === "settings" && <SettingsTab session={session} />}
+          {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
+        </div>
       </main>
     </div>
   );
@@ -1180,12 +1205,16 @@ function StatusPill({ status }) {
 function CatalogTab({ catalog, onAdd }) {
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Product catalog</h1>
-      <p className="text-sm text-gray-500 mt-1">Pick products to add to your listings. Cost price is what you pay us; sell price is your suggested COD price.</p>
+      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
+      <p className="text-sm text-gray-500 mt-1">Pick products to add to your catalog. Cost price is what you pay us; sell price is your suggested COD price.</p>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {catalog.map((p) => (
-          <div key={p.id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-            <div className="text-4xl">{p.emoji}</div>
+        {catalog.map((p, i) => (
+          <div
+            key={p.id}
+            className="rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl"
+            style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.35s ease-out ${i * 40}ms both` }}
+          >
+            <div className="text-4xl transition-transform duration-300 hover:scale-110 inline-block">{p.emoji}</div>
             <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
             <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
             <div className="mt-3 flex items-center justify-between text-sm">
@@ -1195,7 +1224,7 @@ function CatalogTab({ catalog, onAdd }) {
               <span className="text-gray-500">Sell <b style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</b></span>
             </div>
             <div className="mt-1 text-xs font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {p.sell - p.cost}</div>
-            <button onClick={() => onAdd(p.id)} className="mt-4 w-full text-xs font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add to my listings</button>
+            <button onClick={() => onAdd(p.id)} className="mt-4 w-full text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "#0B1F3A" }}>+ Add to my catalog</button>
           </div>
         ))}
       </div>
@@ -1206,22 +1235,143 @@ function CatalogTab({ catalog, onAdd }) {
 function ListingsTab({ catalog, listings, onRemove }) {
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>My listings</h1>
+      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Catalog</h1>
       <p className="text-sm text-gray-500 mt-1">Products you're actively selling.</p>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {listings.length === 0 && <div className="col-span-full text-sm text-gray-400 py-10 text-center">No listings yet — add products from the Catalog tab.</div>}
-        {listings.map((id) => {
+        {listings.length === 0 && <div className="col-span-full text-sm text-gray-400 py-10 text-center">Nothing here yet — add products from the Products tab.</div>}
+        {listings.map((id, i) => {
           const p = catalog.find((x) => x.id === id);
           if (!p) return null;
           return (
-            <div key={id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-              <div className="text-4xl">{p.emoji}</div>
+            <div
+              key={id}
+              className="rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl"
+              style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.35s ease-out ${i * 40}ms both` }}
+            >
+              <div className="text-4xl transition-transform duration-300 hover:scale-110 inline-block">{p.emoji}</div>
               <div className="mt-3 font-semibold text-sm">{p.name}</div>
               <div className="mt-1 text-xs font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {p.sell - p.cost}</div>
-              <button onClick={() => onRemove(id)} className="mt-4 w-full text-xs font-semibold py-2 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Remove</button>
+              <button onClick={() => onRemove(id)} className="mt-4 w-full text-xs font-semibold py-2 rounded-full text-red-500 transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #FECACA" }}>Remove</button>
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function CategoriesTab({ catalog, listings, onAdd }) {
+  const [openCat, setOpenCat] = useState(null);
+  const categories = Array.from(new Set(catalog.map((p) => p.category || "General")));
+
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Categories</h1>
+      <p className="text-sm text-gray-500 mt-1">Browse products grouped by category.</p>
+      <div className="mt-6 space-y-3">
+        {categories.length === 0 && <div className="text-sm text-gray-400 py-10 text-center">No categories yet.</div>}
+        {categories.map((cat, i) => {
+          const items = catalog.filter((p) => (p.category || "General") === cat);
+          const isOpen = openCat === cat;
+          return (
+            <div
+              key={cat}
+              className="rounded-2xl bg-white overflow-hidden transition-all duration-300 ease-out"
+              style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.35s ease-out ${i * 50}ms both` }}
+            >
+              <button
+                onClick={() => setOpenCat(isOpen ? null : cat)}
+                className="w-full flex items-center justify-between px-5 py-4 transition-colors duration-200 hover:bg-gray-50 active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.12)" }}>
+                    <Layers className="w-4.5 h-4.5" style={{ color: "#00C896" }} />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-sm" style={{ color: "#111827" }}>{cat}</div>
+                    <div className="text-xs text-gray-400">{items.length} product{items.length === 1 ? "" : "s"}</div>
+                  </div>
+                </div>
+                <ChevronDown className="w-4 h-4 text-gray-400 transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+              </button>
+              <div
+                className="transition-all duration-300 ease-out overflow-hidden"
+                style={{ maxHeight: isOpen ? `${items.length * 90 + 40}px` : "0px" }}
+              >
+                <div className="px-5 pb-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {items.map((p) => {
+                    const already = listings.includes(p.id);
+                    return (
+                      <div key={p.id} className="rounded-xl p-4 flex items-center justify-between gap-3" style={{ border: "1px solid #F3F4F6" }}>
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl">{p.emoji}</div>
+                          <div>
+                            <div className="font-semibold text-sm">{p.name}</div>
+                            <div className="text-xs text-gray-400">AED {p.sell}</div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onAdd(p.id)}
+                          disabled={already}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.05] active:scale-95 disabled:opacity-40"
+                          style={{ background: "#0B1F3A" }}
+                        >
+                          {already ? "Added" : "+ Add"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InvoicesTab({ orders, session }) {
+  const totalBilled = orders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
+      <p className="text-sm text-gray-500 mt-1">An invoice is generated automatically for every order you log.</p>
+      <div className="grid sm:grid-cols-2 gap-4 mt-6">
+        <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} />
+        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#00C896" icon={ShieldCheck} />
+      </div>
+      <div className="mt-6 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+        {orders.length === 0 ? (
+          <div className="text-sm text-gray-400 py-10 text-center">No invoices yet — they appear here once you log an order.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <th className="px-4 py-3">Invoice #</th>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Buyer</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o, i) => (
+                <tr
+                  key={o.id}
+                  className="transition-colors duration-200 hover:bg-gray-50"
+                  style={{ borderBottom: "1px solid #FAFAFA", animation: `dashTabIn 0.3s ease-out ${i * 30}ms both` }}
+                >
+                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>INV-{o.id}</td>
+                  <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
+                  <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
+                  <td className="px-4 py-3"><StatusPill status={o.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
