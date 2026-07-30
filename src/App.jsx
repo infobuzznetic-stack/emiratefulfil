@@ -723,7 +723,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji }));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description }));
 }
 async function fetchListings(email) {
   const { data, error } = await supabase.from("listings").select("product_id").eq("seller_email", email);
@@ -736,6 +736,7 @@ async function fetchOrders(email) {
   return data.map((o) => ({
     id: o.id, productId: o.product_id, productName: o.product_name, qty: o.qty,
     sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price), buyer: o.buyer, city: o.city, status: o.status,
+    customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address,
     createdAt: o.created_at,
   }));
 }
@@ -918,10 +919,12 @@ function Dashboard({ session, onLogout, notify }) {
     setListings(listings.filter((x) => x !== id));
   };
   const addOrder = async (order) => {
-    const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6), status: "pending" };
+    const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10), status: "pending" };
     const { error } = await supabase.from("orders").insert({
       id: newOrder.id, seller_email: session.email, product_id: newOrder.productId, product_name: newOrder.productName,
-      qty: newOrder.qty, sell_price: newOrder.sellPrice, cost_price: newOrder.costPrice, buyer: newOrder.buyer, city: newOrder.city, status: "pending",
+      qty: newOrder.qty, sell_price: newOrder.sellPrice, cost_price: newOrder.costPrice, buyer: newOrder.buyer, city: newOrder.city,
+      customer_email: newOrder.customerEmail || null, customer_phone: newOrder.customerPhone || null, customer_address: newOrder.customerAddress || null,
+      status: "pending",
     });
     if (error) { notify("Could not save order."); return; }
     setOrders([newOrder, ...orders]);
@@ -1054,7 +1057,7 @@ function Dashboard({ session, onLogout, notify }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} />}
+          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} />}
           {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
           {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
           {tab === "orders" && (
@@ -1358,70 +1361,268 @@ function StatusPill({ status }) {
   return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={styles[status] || styles.pending}>{status}</span>;
 }
 
-function ProductOrderForm({ product, onPlaceOrder }) {
-  const [form, setForm] = useState({ qty: 1, buyer: "", city: "" });
-  const [busy, setBusy] = useState(false);
+/* ---------------- Storefront: product landing page, cart, checkout ---------------- */
+const EMIRATES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al Khaimah", "Umm Al Quwain", "Al Ain"];
 
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    await onPlaceOrder({
-      productId: product.id, productName: product.name,
-      qty: parseInt(form.qty) || 1, sellPrice: product.sell, costPrice: product.cost,
-      buyer: form.buyer, city: form.city,
-    });
-    setBusy(false);
-    setForm({ qty: 1, buyer: "", city: "" });
-  };
-
+function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
+  const [qty, setQty] = useState(1);
+  const description = product.description || `${product.name} — a popular ${(product.category || "product").toLowerCase()} item, sourced and fulfilled across the UAE with cash-on-delivery available in every emirate.`;
   return (
-    <form onSubmit={submit} className="mt-3 space-y-2" style={{ animation: "dashTabIn 0.25s ease-out both" }}>
-      <input placeholder="Buyer name" value={form.buyer} onChange={(e) => setForm({ ...form, buyer: e.target.value })} className="w-full rounded-lg px-3 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-      <div className="flex gap-2">
-        <input placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="flex-1 rounded-lg px-3 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-        <input type="number" min="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} className="w-16 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-      </div>
-      <button disabled={busy} className="w-full text-xs font-semibold py-2 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-60" style={{ background: "#00C896" }}>
-        {busy ? "Placing…" : "Confirm order"}
+    <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
+      <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
+        <ChevronDown className="w-4 h-4 rotate-90" /> Back to products
       </button>
-    </form>
+      <div className="mt-5 grid md:grid-cols-2 gap-8">
+        <div className="rounded-2xl bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB", minHeight: 340 }}>
+          <span style={{ fontSize: 140 }}>{product.emoji}</span>
+        </div>
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#00a67e" }}>{product.category || "Product"}</div>
+          <h1 className="mt-1 text-2xl md:text-3xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
+          <div className="mt-3 text-3xl font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</div>
+          <p className="mt-4 text-sm text-gray-600 leading-relaxed">{description}</p>
+
+          <div className="mt-6 flex items-center gap-3">
+            <label className="text-xs font-semibold text-gray-500">Quantity</label>
+            <div className="flex items-center rounded-full" style={{ border: "1px solid #E5E7EB" }}>
+              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
+              <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
+              <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => onAddToCart(qty)}
+              className="flex-1 text-sm font-semibold py-3 rounded-full transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+              style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
+            >
+              🛒 Add to Cart
+            </button>
+            <button
+              onClick={() => onBuyNow(qty)}
+              className="flex-1 text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}
+            >
+              Buy Now
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function CatalogTab({ catalog, onAdd, onPlaceOrder }) {
-  const [orderingId, setOrderingId] = useState(null);
+function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
+  return (
+    <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
+      <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
+        <ChevronDown className="w-4 h-4 rotate-90" /> Continue shopping
+      </button>
+      <h1 className="mt-4 text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Your cart</h1>
+      {items.length === 0 ? (
+        <div className="mt-8 text-sm text-gray-400 text-center py-16 rounded-2xl bg-white" style={{ border: "1px solid #E5E7EB" }}>Your cart is empty.</div>
+      ) : (
+        <>
+          <div className="mt-6 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+            {items.map((it, i) => (
+              <div key={it.id} className="flex items-center gap-4 px-5 py-4" style={{ borderBottom: i < items.length - 1 ? "1px solid #F3F4F6" : "none" }}>
+                <span className="text-3xl">{it.emoji}</span>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold" style={{ color: "#111827" }}>{it.name}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">AED {it.sell} each</div>
+                </div>
+                <div className="flex items-center rounded-full" style={{ border: "1px solid #E5E7EB" }}>
+                  <button onClick={() => onUpdateQty(it.id, it.qty - 1)} className="w-8 h-8 text-sm font-bold text-gray-600">−</button>
+                  <span className="w-7 text-center text-sm font-semibold">{it.qty}</span>
+                  <button onClick={() => onUpdateQty(it.id, it.qty + 1)} className="w-8 h-8 text-sm font-bold text-gray-600">+</button>
+                </div>
+                <div className="w-20 text-right text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {it.sell * it.qty}</div>
+                <button onClick={() => onRemove(it.id)} className="text-gray-300 hover:text-red-500"><X className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex items-center justify-between rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="text-sm text-gray-500">Total</div>
+            <div className="text-xl font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {total}</div>
+          </div>
+          <button onClick={onCheckout} className="mt-5 w-full sm:w-auto text-sm font-semibold px-8 py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+            Proceed to checkout
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CheckoutForm({ items, onBack, onSubmit }) {
+  const [form, setForm] = useState({ name: "", email: "", phone: "", emirate: EMIRATES[0], address: "" });
+  const [busy, setBusy] = useState(false);
+  const total = items.reduce((s, it) => s + it.sell * it.qty, 0);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name || !form.phone || !form.address) return;
+    setBusy(true);
+    await onSubmit(form);
+    setBusy(false);
+  };
+
+  const inputStyle = { border: "1px solid #E5E7EB" };
+  return (
+    <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
+      <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
+        <ChevronDown className="w-4 h-4 rotate-90" /> Back
+      </button>
+      <h1 className="mt-4 text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Checkout</h1>
+      <p className="text-sm text-gray-500 mt-1">Enter the customer's delivery details to place this order.</p>
+
+      <div className="mt-6 grid md:grid-cols-5 gap-6">
+        <form onSubmit={submit} className="md:col-span-3 rounded-2xl p-6 bg-white space-y-3" style={{ border: "1px solid #E5E7EB" }}>
+          <div>
+            <label className="text-xs text-gray-500">Customer name</label>
+            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500">Email</label>
+              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="customer@email.com" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Phone</label>
+              <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05XXXXXXXX" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Emirate</label>
+            <select value={form.emirate} onChange={(e) => setForm({ ...form, emirate: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
+              {EMIRATES.map((em) => <option key={em} value={em}>{em}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Delivery address</label>
+            <textarea required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Building, street, area / landmark" rows={3} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
+          </div>
+          <button disabled={busy} className="w-full mt-2 text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+            {busy ? "Placing order…" : `Place order — AED ${total}`}
+          </button>
+        </form>
+
+        <div className="md:col-span-2 rounded-2xl p-6 bg-white h-fit" style={{ border: "1px solid #E5E7EB" }}>
+          <div className="font-bold text-sm" style={{ color: "#111827" }}>Order summary</div>
+          <div className="mt-4 space-y-3">
+            {items.map((it) => (
+              <div key={it.id} className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">{it.name} <span className="text-gray-400">×{it.qty}</span></span>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {it.sell * it.qty}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 pt-4 flex items-center justify-between text-sm font-bold" style={{ borderTop: "1px solid #F3F4F6", color: "#0B1F3A" }}>
+            <span>Total</span>
+            <span style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {total}</span>
+          </div>
+          <div className="mt-3 text-xs text-gray-400">Cash on delivery — payment collected on arrival.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CatalogTab({ catalog, onAdd, onPlaceOrder, notify }) {
+  const [view, setView] = useState("list"); // list | detail | cart | checkout
+  const [activeProduct, setActiveProduct] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [checkoutItems, setCheckoutItems] = useState([]);
+  const [checkoutFrom, setCheckoutFrom] = useState("detail"); // where "Back" should return to
+
+  const addToCart = (product, qty) => {
+    setCart((prev) => {
+      const existing = prev.find((c) => c.id === product.id);
+      if (existing) return prev.map((c) => (c.id === product.id ? { ...c, qty: c.qty + qty } : c));
+      return [...prev, { id: product.id, name: product.name, sell: product.sell, cost: product.cost, emoji: product.emoji, qty }];
+    });
+    notify && notify("Added to cart.");
+  };
+  const updateCartQty = (id, qty) => setCart((prev) => prev.map((c) => (c.id === id ? { ...c, qty } : c)).filter((c) => c.qty > 0));
+  const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id));
+  const cartCount = cart.reduce((s, c) => s + c.qty, 0);
+  const cartTotal = cart.reduce((s, c) => s + c.sell * c.qty, 0);
+
+  const openProduct = (p) => { setActiveProduct(p); setView("detail"); };
+  const buyNow = (product, qty) => {
+    setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, cost: product.cost, emoji: product.emoji, qty }]);
+    setCheckoutFrom("detail");
+    setView("checkout");
+  };
+  const goToCartCheckout = () => {
+    if (cart.length === 0) { notify && notify("Your cart is empty."); return; }
+    setCheckoutItems(cart);
+    setCheckoutFrom("cart");
+    setView("checkout");
+  };
+
+  const placeOrder = async (customer) => {
+    for (const item of checkoutItems) {
+      await onPlaceOrder({
+        productId: item.id, productName: item.name, qty: item.qty,
+        sellPrice: item.sell, costPrice: item.cost,
+        buyer: customer.name, city: customer.emirate,
+        customerEmail: customer.email, customerPhone: customer.phone, customerAddress: customer.address,
+      });
+    }
+    if (checkoutFrom === "cart") setCart([]);
+    setCheckoutItems([]);
+    setActiveProduct(null);
+    setView("list");
+    notify && notify("Order placed! Track it under Orders.");
+  };
+
+  if (view === "detail" && activeProduct) {
+    return <ProductLandingPage product={activeProduct} onBack={() => setView("list")} onAddToCart={(qty) => addToCart(activeProduct, qty)} onBuyNow={(qty) => buyNow(activeProduct, qty)} />;
+  }
+  if (view === "cart") {
+    return <CartView items={cart} onUpdateQty={updateCartQty} onRemove={removeFromCart} onBack={() => setView("list")} onCheckout={goToCartCheckout} total={cartTotal} />;
+  }
+  if (view === "checkout") {
+    return <CheckoutForm items={checkoutItems} onBack={() => setView(checkoutFrom)} onSubmit={placeOrder} />;
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
-      <p className="text-sm text-gray-500 mt-1">Browse the catalog, add products to your own catalog, or place a customer order directly.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
+          <p className="text-sm text-gray-500 mt-1">Click a product to view it, or add it to cart / buy it now for a customer.</p>
+        </div>
+        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>
+          🛒 Cart
+          {cartCount > 0 && (
+            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896" }}>{cartCount}</span>
+          )}
+        </button>
+      </div>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.map((p, i) => (
           <div
             key={p.id}
-            className="rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl"
+            onClick={() => openProduct(p)}
+            className="rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl cursor-pointer"
             style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.35s ease-out ${i * 40}ms both` }}
           >
             <div className="text-4xl transition-transform duration-300 hover:scale-110 inline-block">{p.emoji}</div>
             <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
             <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
-            <div className="mt-3 flex items-center justify-between text-sm">
-              <span className="text-gray-500">Cost <b style={{ color: "#111827", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.cost}</b></span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Sell <b style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</b></span>
-            </div>
-            <div className="mt-1 text-xs font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {p.sell - p.cost}</div>
-            <div className="mt-4 flex gap-2">
-              <button onClick={() => onAdd(p.id)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "#0B1F3A" }}>+ Add to catalog</button>
-              <button
-                onClick={() => setOrderingId(orderingId === p.id ? null : p.id)}
-                className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95"
-                style={{ border: "1px solid #00C896", color: "#00a67e" }}
-              >
-                {orderingId === p.id ? "Cancel" : "Place order"}
+            <div className="mt-2 text-lg font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
+            <div className="mt-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => addToCart(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
+                🛒 Add to Cart
+              </button>
+              <button onClick={() => buyNow(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                Buy Now
               </button>
             </div>
-            {orderingId === p.id && <ProductOrderForm product={p} onPlaceOrder={onPlaceOrder} />}
+            <button onClick={(e) => { e.stopPropagation(); onAdd(p.id); }} className="mt-2 w-full text-xs font-medium py-1.5 text-gray-400 hover:text-gray-700">+ Add to my seller catalog</button>
           </div>
         ))}
       </div>
@@ -1701,7 +1902,7 @@ function SettingsTab({ session }) {
 }
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦" });
+  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "" });
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
@@ -1725,9 +1926,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     const { error } = await supabase.from("products").insert({
       id, name: form.name, category: form.category || "General",
       cost: parseFloat(form.cost), sell: parseFloat(form.sell), emoji: form.emoji || "📦",
+      description: form.description || null,
     });
     if (error) { notify("Could not add product."); return; }
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦" });
+    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "" });
     notify("Product added to catalog.");
     onCatalogChanged();
   };
@@ -1755,6 +1957,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Emoji</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
       </form>
 
@@ -1787,7 +1990,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                 <th className="px-4 py-3">Order</th>
                 <th className="px-4 py-3">Seller</th>
                 <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Buyer/City</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Email / Phone</th>
+                <th className="px-4 py-3">Address / Emirate</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
               </tr>
@@ -1798,7 +2003,15 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
                   <td className="px-4 py-3 text-gray-500">{o.seller_email}</td>
                   <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
-                  <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
+                  <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    <div>{o.customer_email || "—"}</div>
+                    <div className="text-gray-400">{o.customer_phone || ""}</div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs max-w-[180px]">
+                    <div>{o.city || "—"}</div>
+                    <div className="text-gray-400 truncate" title={o.customer_address}>{o.customer_address || ""}</div>
+                  </td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sell_price * o.qty}</td>
                   <td className="px-4 py-3">
                     <select
