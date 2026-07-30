@@ -921,10 +921,13 @@ function Dashboard({ session, onLogout, notify }) {
 
   const delivered = orders.filter((o) => o.status === "delivered");
   const pending = orders.filter((o) => o.status === "pending");
+  const shipped = orders.filter((o) => o.status === "shipped");
+  const cancelled = orders.filter((o) => o.status === "cancelled");
   const returned = orders.filter((o) => o.status === "returned");
   const confirmedProfit = delivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
   const pendingCOD = pending.reduce((s, o) => s + o.sellPrice * o.qty, 0);
   const deliveredRevenue = delivered.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const totalInvoice = orders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
 
   const NAV = [
     { id: "overview", label: "Overview", icon: Boxes },
@@ -962,7 +965,7 @@ function Dashboard({ session, onLogout, notify }) {
         </div>
         <div className="mt-auto pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
           <div className="text-white text-sm font-semibold">{session.name}</div>
-          <div className="text-white/40 text-xs">{session.company || session.email}</div>
+          <div className="text-white/40 text-xs">{session.company || "Seller account"}</div>
           <button onClick={onLogout} className="mt-3 text-white/60 text-xs font-semibold hover:text-white">Log out</button>
         </div>
       </aside>
@@ -986,7 +989,7 @@ function Dashboard({ session, onLogout, notify }) {
       {/* Main */}
       <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl">
         {tab === "overview" && (
-          <OverviewTab session={session} orders={orders} listings={listings} catalog={catalog} confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} pending={pending} />
+          <OverviewTab session={session} orders={orders} listings={listings} catalog={catalog} confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice} pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned} />
         )}
         {tab === "catalog" && <CatalogTab catalog={catalog} onAdd={addListing} />}
         {tab === "listings" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
@@ -1002,27 +1005,68 @@ function Dashboard({ session, onLogout, notify }) {
   );
 }
 
-function StatCard({ label, value, color = "#0B1F3A", sub }) {
+function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0 }) {
+  const [shown, setShown] = useState(false);
+  const [display, setDisplay] = useState(0);
+  const numeric = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.]/g, "")) || 0;
+
+  useEffect(() => {
+    const t = setTimeout(() => setShown(true), delay);
+    return () => clearTimeout(t);
+  }, [delay]);
+
+  useEffect(() => {
+    if (!shown) return;
+    let start = null;
+    const duration = 700;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(Math.round(eased * numeric));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [shown, numeric]);
+
   return (
-    <div className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+    <div
+      className="rounded-2xl p-5 bg-white transition-all duration-500"
+      style={{
+        border: "1px solid #E5E7EB",
+        opacity: shown ? 1 : 0,
+        transform: shown ? "translateY(0px) scale(1)" : "translateY(14px) scale(0.97)",
+      }}
+    >
       <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-2xl font-bold mt-1" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>{value}</div>
+      <div className="text-2xl font-bold mt-1" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
+        {prefix}{display.toLocaleString()}
+      </div>
       {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
     </div>
   );
 }
 
-function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deliveredRevenue, pending }) {
+function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deliveredRevenue, totalInvoice, pending, shipped, delivered, cancelled, returned }) {
   const topListing = catalog.find((p) => p.id === listings[0]);
+  const cards = [
+    { label: "Total orders", value: orders.length, color: "#0B1F3A" },
+    { label: "Pending", value: pending.length, color: "#F8B400" },
+    { label: "Shipped", value: shipped.length, color: "#3B82F6" },
+    { label: "Delivered", value: delivered.length, color: "#00C896" },
+    { label: "Cancelled", value: cancelled.length, color: "#9CA3AF" },
+    { label: "Returned", value: returned.length, color: "#EF4444" },
+    { label: "Confirmed profit", value: confirmedProfit, prefix: "AED ", color: "#00C896" },
+    { label: "Total invoice", value: totalInvoice, prefix: "AED ", color: "#0B1F3A" },
+  ];
   return (
     <div>
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Welcome back, {session.name.split(" ")[0]}</h1>
       <p className="text-sm text-gray-500 mt-1">Here's how your store is doing.</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        <StatCard label="Total orders" value={orders.length} />
-        <StatCard label="Pending" value={pending.length} color="#F8B400" />
-        <StatCard label="Delivered revenue" value={"AED " + deliveredRevenue.toLocaleString()} />
-        <StatCard label="Confirmed profit" value={"AED " + confirmedProfit.toLocaleString()} color="#00C896" />
+        {cards.map((c, i) => (
+          <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} delay={i * 60} />
+        ))}
       </div>
       <div className="grid lg:grid-cols-3 gap-5 mt-6">
         <div className="lg:col-span-2 rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
@@ -1061,10 +1105,12 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
 function StatusPill({ status }) {
   const styles = {
     delivered: { background: "rgba(0,200,150,0.15)", color: "#00a67e" },
+    shipped: { background: "rgba(59,130,246,0.12)", color: "#3B82F6" },
+    cancelled: { background: "rgba(156,163,175,0.18)", color: "#6B7280" },
     returned: { background: "rgba(239,68,68,0.12)", color: "#EF4444" },
     pending: { background: "rgba(248,180,0,0.15)", color: "#b07d00" },
   };
-  return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={styles[status]}>{status}</span>;
+  return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={styles[status] || styles.pending}>{status}</span>;
 }
 
 function CatalogTab({ catalog, onAdd }) {
@@ -1135,8 +1181,8 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Orders &amp; COD tracking</h1>
       <p className="text-sm text-gray-500 mt-1">Log new COD orders and update their status as they move.</p>
       <div className="grid sm:grid-cols-3 gap-4 mt-6">
-        <StatCard label="Confirmed profit" value={"AED " + confirmedProfit.toLocaleString()} color="#00C896" />
-        <StatCard label="Pending COD value" value={"AED " + pendingCOD.toLocaleString()} color="#F8B400" />
+        <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" />
+        <StatCard label="Pending COD value" value={pendingCOD} prefix="AED " color="#F8B400" />
         <StatCard label="Returned" value={returnedCount} color="#EF4444" />
       </div>
       <form onSubmit={submit} className="mt-8 rounded-2xl p-6 bg-white grid sm:grid-cols-5 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
@@ -1172,11 +1218,15 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
                   <td className="px-4 py-3">
                     <select value={o.status} onChange={(e) => onSetStatus(o.id, e.target.value)} className="text-xs rounded-full px-2 py-1 font-semibold border-0" style={
                       o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
+                      o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
+                      o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
                       o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
                       { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
                     }>
                       <option value="pending">Pending</option>
+                      <option value="shipped">Shipped</option>
                       <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
                       <option value="returned">Returned</option>
                     </select>
                   </td>
@@ -1205,9 +1255,9 @@ function WalletTab({ confirmedProfit, pending, notify }) {
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Wallet &amp; payouts</h1>
       <p className="text-sm text-gray-500 mt-1">Your available balance is calculated from delivered COD orders, minus product cost.</p>
       <div className="grid sm:grid-cols-3 gap-4 mt-6">
-        <StatCard label="Available balance" value={"AED " + confirmedProfit.toLocaleString()} color="#00C896" />
-        <StatCard label="In transit (pending)" value={"AED " + inTransit.toLocaleString()} color="#F8B400" />
-        <StatCard label="Lifetime payouts" value="AED 0" />
+        <StatCard label="Available balance" value={confirmedProfit} prefix="AED " color="#00C896" />
+        <StatCard label="In transit (pending)" value={inTransit} prefix="AED " color="#F8B400" />
+        <StatCard label="Lifetime payouts" value={0} prefix="AED " />
       </div>
       <div className="mt-8 rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
         <div className="font-bold text-sm mb-1" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Request payout</div>
