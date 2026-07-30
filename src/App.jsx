@@ -1054,7 +1054,7 @@ function Dashboard({ session, onLogout, notify }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} />}
+          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} />}
           {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
           {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
           {tab === "orders" && (
@@ -1358,11 +1358,42 @@ function StatusPill({ status }) {
   return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={styles[status] || styles.pending}>{status}</span>;
 }
 
-function CatalogTab({ catalog, onAdd }) {
+function ProductOrderForm({ product, onPlaceOrder }) {
+  const [form, setForm] = useState({ qty: 1, buyer: "", city: "" });
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    await onPlaceOrder({
+      productId: product.id, productName: product.name,
+      qty: parseInt(form.qty) || 1, sellPrice: product.sell, costPrice: product.cost,
+      buyer: form.buyer, city: form.city,
+    });
+    setBusy(false);
+    setForm({ qty: 1, buyer: "", city: "" });
+  };
+
+  return (
+    <form onSubmit={submit} className="mt-3 space-y-2" style={{ animation: "dashTabIn 0.25s ease-out both" }}>
+      <input placeholder="Buyer name" value={form.buyer} onChange={(e) => setForm({ ...form, buyer: e.target.value })} className="w-full rounded-lg px-3 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+      <div className="flex gap-2">
+        <input placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="flex-1 rounded-lg px-3 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+        <input type="number" min="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} className="w-16 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+      </div>
+      <button disabled={busy} className="w-full text-xs font-semibold py-2 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-60" style={{ background: "#00C896" }}>
+        {busy ? "Placing…" : "Confirm order"}
+      </button>
+    </form>
+  );
+}
+
+function CatalogTab({ catalog, onAdd, onPlaceOrder }) {
+  const [orderingId, setOrderingId] = useState(null);
   return (
     <div>
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
-      <p className="text-sm text-gray-500 mt-1">Pick products to add to your catalog. Cost price is what you pay us; sell price is your suggested COD price.</p>
+      <p className="text-sm text-gray-500 mt-1">Browse the catalog, add products to your own catalog, or place a customer order directly.</p>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.map((p, i) => (
           <div
@@ -1380,7 +1411,17 @@ function CatalogTab({ catalog, onAdd }) {
               <span className="text-gray-500">Sell <b style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</b></span>
             </div>
             <div className="mt-1 text-xs font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {p.sell - p.cost}</div>
-            <button onClick={() => onAdd(p.id)} className="mt-4 w-full text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "#0B1F3A" }}>+ Add to my catalog</button>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => onAdd(p.id)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "#0B1F3A" }}>+ Add to catalog</button>
+              <button
+                onClick={() => setOrderingId(orderingId === p.id ? null : p.id)}
+                className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95"
+                style={{ border: "1px solid #00C896", color: "#00a67e" }}
+              >
+                {orderingId === p.id ? "Cancel" : "Place order"}
+              </button>
+            </div>
+            {orderingId === p.id && <ProductOrderForm product={p} onPlaceOrder={onPlaceOrder} />}
           </div>
         ))}
       </div>
@@ -1661,6 +1702,21 @@ function SettingsTab({ session }) {
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦" });
+  const [allOrders, setAllOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+
+  const loadAllOrders = async () => {
+    setOrdersLoading(true);
+    const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    if (!error) setAllOrders(data || []);
+    setOrdersLoading(false);
+  };
+  useEffect(() => { loadAllOrders(); }, []); // eslint-disable-line
+
+  const setAdminOrderStatus = async (id, status) => {
+    await supabase.from("orders").update({ status }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
+  };
 
   const addProduct = async (e) => {
     e.preventDefault();
@@ -1687,9 +1743,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Admin</h1>
       <p className="text-sm text-gray-500 mt-1">Manage the shared product catalog every seller sees, and track signups.</p>
 
-      <div className="grid sm:grid-cols-2 gap-4 mt-6">
+      <div className="grid sm:grid-cols-3 gap-4 mt-6">
         <StatCard label="Total sellers signed up" value={sellerCount} color="#00C896" />
         <StatCard label="Products in catalog" value={catalog.length} />
+        <StatCard label="Customer orders (all sellers)" value={allOrders.length} color="#F8B400" />
       </div>
 
       <form onSubmit={addProduct} className="mt-8 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
@@ -1711,6 +1768,63 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
             <button onClick={() => deleteProduct(p.id)} className="mt-4 w-full text-xs font-semibold py-2 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Remove from catalog</button>
           </div>
         ))}
+      </div>
+
+      {/* Every order every seller has logged — this is where fulfillment happens */}
+      <div className="mt-10 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="px-5 pt-5 pb-1">
+          <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer orders — all sellers</div>
+          <p className="text-xs text-gray-400 mt-1">Every order any seller logs lands here for you to fulfill and update.</p>
+        </div>
+        {ordersLoading ? (
+          <div className="text-sm text-gray-400 py-10 text-center">Loading orders…</div>
+        ) : allOrders.length === 0 ? (
+          <div className="text-sm text-gray-400 py-10 text-center">No customer orders yet.</div>
+        ) : (
+          <table className="w-full text-sm mt-3">
+            <thead>
+              <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <th className="px-4 py-3">Order</th>
+                <th className="px-4 py-3">Seller</th>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Buyer/City</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allOrders.map((o) => (
+                <tr key={o.id} className="transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA" }}>
+                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
+                  <td className="px-4 py-3 text-gray-500">{o.seller_email}</td>
+                  <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
+                  <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sell_price * o.qty}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={o.status}
+                      onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
+                      className="text-xs rounded-full px-2 py-1 font-semibold border-0"
+                      style={
+                        o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
+                        o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
+                        o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
+                        o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
+                        { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
+                      }
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="returned">Returned</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
