@@ -1366,48 +1366,88 @@ const EMIRATES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al 
 
 function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
   const [qty, setQty] = useState(1);
-  const description = product.description || `${product.name} — a popular ${(product.category || "product").toLowerCase()} item, sourced and fulfilled across the UAE with cash-on-delivery available in every emirate.`;
+  const category = product.category || "Product";
+  const description = product.description || `${product.name} is one of our best-selling ${category.toLowerCase()} items — carefully sourced, quality-checked, and shipped from our regional warehouse. It's fulfilled across every emirate with cash-on-delivery, so customers can pay when the order arrives at their door.`;
+  const highlights = [
+    "Ships fast — dispatched within 24 hours from our UAE warehouse",
+    "Cash on Delivery available in every emirate",
+    "Quality-checked before packing, easy 7-day returns",
+  ];
   return (
     <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
       <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
         <ChevronDown className="w-4 h-4 rotate-90" /> Back to products
       </button>
-      <div className="mt-5 grid md:grid-cols-2 gap-8">
-        <div className="rounded-2xl bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB", minHeight: 340 }}>
-          <span style={{ fontSize: 140 }}>{product.emoji}</span>
-        </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#00a67e" }}>{product.category || "Product"}</div>
-          <h1 className="mt-1 text-2xl md:text-3xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
-          <div className="mt-3 text-3xl font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</div>
-          <p className="mt-4 text-sm text-gray-600 leading-relaxed">{description}</p>
 
-          <div className="mt-6 flex items-center gap-3">
-            <label className="text-xs font-semibold text-gray-500">Quantity</label>
-            <div className="flex items-center rounded-full" style={{ border: "1px solid #E5E7EB" }}>
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
-              <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
+      <div className="mt-5 grid md:grid-cols-2 gap-10">
+        <div className="rounded-3xl bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB", minHeight: 400 }}>
+          <span style={{ fontSize: 170 }}>{product.emoji}</span>
+        </div>
+
+        <div>
+          <div className="text-xs font-bold uppercase tracking-widest" style={{ color: "#00a67e" }}>{category}</div>
+          <h1 className="mt-2 text-3xl md:text-4xl font-extrabold leading-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
+          <div className="mt-4 text-4xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</div>
+
+          <p className="mt-5 text-base text-gray-600 leading-relaxed">{description}</p>
+
+          <ul className="mt-5 space-y-2">
+            {highlights.map((h, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                <CheckCircle2 className="w-4.5 h-4.5 flex-shrink-0 mt-0.5" style={{ color: "#00C896" }} />
+                {h}
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-7 rounded-2xl p-5" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-semibold text-gray-500">Quantity</label>
+              <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
+                <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
+                <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
+              </div>
+              <span className="ml-auto text-sm text-gray-500">Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty}</b></span>
+            </div>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => onAddToCart(qty)}
+                className="flex-1 text-sm font-semibold py-3.5 rounded-full bg-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+                style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
+              >
+                🛒 Add to Cart
+              </button>
+              <button
+                onClick={() => onBuyNow(qty)}
+                className="flex-1 text-sm font-semibold py-3.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+                style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 24px rgba(0,200,150,0.35)" }}
+              >
+                Buy Now
+              </button>
             </div>
           </div>
-
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => onAddToCart(qty)}
-              className="flex-1 text-sm font-semibold py-3 rounded-full transition-transform duration-200 hover:scale-[1.02] active:scale-95"
-              style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
-            >
-              🛒 Add to Cart
-            </button>
-            <button
-              onClick={() => onBuyNow(qty)}
-              className="flex-1 text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
-              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}
-            >
-              Buy Now
-            </button>
-          </div>
         </div>
+      </div>
+
+      {/* Trust strip */}
+      <div className="mt-10 grid sm:grid-cols-3 gap-4">
+        {[
+          { icon: Truck, title: "Fast delivery", desc: "Across all seven emirates" },
+          { icon: ClipboardCheck, title: "Cash on delivery", desc: "Pay when it arrives" },
+          { icon: RotateCcw, title: "Easy returns", desc: "7-day return window" },
+        ].map((f, i) => (
+          <div key={i} className="rounded-2xl p-5 bg-white flex items-center gap-3" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
+              <f.icon className="w-5 h-5" style={{ color: "#00a67e" }} />
+            </div>
+            <div>
+              <div className="text-sm font-semibold" style={{ color: "#111827" }}>{f.title}</div>
+              <div className="text-xs text-gray-400">{f.desc}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
