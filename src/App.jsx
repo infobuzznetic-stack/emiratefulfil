@@ -939,9 +939,12 @@ function Dashboard({ session, onLogout, notify }) {
   ];
 
   return (
-    <div style={{ fontFamily: "Inter, sans-serif", background: "#F8FAFC" }} className="min-h-screen flex">
+    <div style={{ fontFamily: "Inter, sans-serif", background: "linear-gradient(180deg,#EEF2F8 0%,#F8FAFC 320px,#F8FAFC 100%)", position: "relative", overflow: "hidden" }} className="min-h-screen flex">
+      <div className="pointer-events-none absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full opacity-[0.10] blur-3xl" style={{ background: "#00C896" }} />
+      <div className="pointer-events-none absolute top-40 -right-32 w-[380px] h-[380px] rounded-full opacity-[0.08] blur-3xl" style={{ background: "#F8B400" }} />
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-72" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0.04), transparent)" }} />
       {/* Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen" style={{ background: "#0B1F3A" }}>
+      <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen relative z-10" style={{ background: "#0B1F3A" }}>
         <div className="flex items-center gap-2.5 px-2">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
             <PackageCheck className="w-5 h-5 text-white" />
@@ -985,7 +988,7 @@ function Dashboard({ session, onLogout, notify }) {
       )}
 
       {/* Main */}
-      <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl">
+      <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
         {tab === "overview" && (
           <OverviewTab session={session} orders={orders} listings={listings} catalog={catalog} confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice} pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned} />
         )}
@@ -1071,15 +1074,47 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
     { label: "Confirmed profit", value: confirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
     { label: "Total invoice", value: totalInvoice, prefix: "AED ", color: "#0B1F3A", icon: PackageCheck },
   ];
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const breakdown = [
+    { label: "Pending", count: pending.length, color: "#F8B400" },
+    { label: "Shipped", count: shipped.length, color: "#3B82F6" },
+    { label: "Delivered", count: delivered.length, color: "#00C896" },
+    { label: "Cancelled", count: cancelled.length, color: "#9CA3AF" },
+    { label: "Returned", count: returned.length, color: "#EF4444" },
+  ];
+  const totalForBar = orders.length || 1;
+
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Welcome back, {session.name.split(" ")[0]}</h1>
-      <p className="text-sm text-gray-500 mt-1">Here's how your store is doing.</p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-2xl" style={{ background: "#00C896" }} />
+        <div className="absolute -bottom-20 left-1/3 w-64 h-64 rounded-full opacity-10 blur-2xl" style={{ background: "#F8B400" }} />
+        <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
+          <div>
+            <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#7FE8C9" }}>{today}</span>
+            <h1 className="mt-2 text-3xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              Welcome back, {session.name.split(" ")[0]}
+            </h1>
+            <p className="mt-1.5 text-sm text-white/60 max-w-md">Here's how your store is doing today — {orders.length} order{orders.length === 1 ? "" : "s"} logged so far.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-xs text-white/50">Confirmed profit</div>
+              <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {confirmedProfit.toLocaleString()}</div>
+            </div>
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.18)" }}>
+              <Sparkles className="w-5 h-5" style={{ color: "#00e0aa" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((c, i) => (
           <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} icon={c.icon} delay={i * 60} />
         ))}
       </div>
+
       <div className="grid lg:grid-cols-3 gap-5 mt-6">
         <div className="lg:col-span-2 rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
           <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent orders</div>
@@ -1108,6 +1143,23 @@ function OverviewTab({ session, orders, listings, catalog, confirmedProfit, deli
           ) : (
             <div className="text-sm text-gray-400">Add a listing to see it here.</div>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl p-6 bg-white mt-5" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Order status breakdown</div>
+        <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
+          {breakdown.map((b) => (
+            <div key={b.label} className="h-full transition-all duration-700" style={{ width: `${(b.count / totalForBar) * 100}%`, background: b.color }} />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
+          {breakdown.map((b) => (
+            <div key={b.label} className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: b.color }} />
+              {b.label} <b style={{ color: "#111827" }}>{b.count}</b>
+            </div>
+          ))}
         </div>
       </div>
     </div>
