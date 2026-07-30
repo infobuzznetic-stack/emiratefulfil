@@ -778,11 +778,18 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
           id: userId, email, name: form.name, phone: form.phone, company: form.company, country: form.country,
         });
       }
-      onAuthed({ email, name: form.name, company: form.company, country: form.country });
-      notify("Account created — welcome to EmirateFulfil, " + form.name.split(" ")[0] + ".");
+      notify("Thanks for signing up, " + form.name.split(" ")[0] + "! Please check your email to verify your account, then log in.");
+      onSwitch("login");
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: form.password });
-      if (error) { notify("Incorrect email or password."); setBusy(false); return; }
+      if (error) {
+        if (error.message.toLowerCase().includes("confirm")) {
+          notify("Please verify your email first — check your inbox for the confirmation link.");
+        } else {
+          notify("Incorrect email or password.");
+        }
+        setBusy(false); return;
+      }
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
       onAuthed({ email, name: profile?.name || email, company: profile?.company, country: profile?.country });
       notify("Welcome back, " + (profile?.name || email).split(" ")[0] + ".");
@@ -1342,7 +1349,7 @@ export default function EmirateFulfilApp() {
 
   const notify = (msg) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 2600);
+    setTimeout(() => setToastMsg(""), msg.length > 60 ? 5000 : 2600);
   };
 
   // Restore session on page load/refresh so users stay logged in
