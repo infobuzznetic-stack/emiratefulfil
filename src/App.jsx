@@ -4,6 +4,7 @@ import {
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
+  User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1175,7 +1176,7 @@ function Dashboard({ session, onLogout, notify }) {
     { id: "products", label: "Products", icon: Package },
     { id: "orders", label: "Orders", icon: Truck },
     { id: "invoices", label: "Invoices", icon: Receipt },
-    { id: "settings", label: "Settings", icon: Sparkles },
+    { id: "settings", label: "Seller Details", icon: Sparkles },
     { id: "support", label: "Customer Support", icon: LifeBuoy },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
   ];
@@ -2696,25 +2697,115 @@ function WalletTab({ confirmedProfit, pending, notify }) {
   );
 }
 
+function DetailRow({ icon: Icon, label, value, color, delay = 0 }) {
+  return (
+    <div
+      className="flex items-start gap-3 py-3 transition-all duration-300"
+      style={{ borderBottom: "1px solid #F3F4F6", animation: `dashTabIn 0.4s ease-out both`, animationDelay: `${delay}ms` }}
+    >
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+        style={{ background: color + "1A" }}
+      >
+        <Icon className="w-4 h-4" style={{ color }} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs text-gray-500">{label}</div>
+        <div className="mt-0.5 text-sm font-semibold truncate" style={{ color: value === "—" ? "#C0C5CE" : "#111827" }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function DetailSection({ title, icon: Icon, color, rows, delay = 0 }) {
+  return (
+    <div
+      className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-0.5"
+      style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)", animation: "dashTabIn 0.45s ease-out both", animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-center gap-2.5 mb-1">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 6px 14px ${color}40` }}>
+          <Icon className="w-4 h-4 text-white" />
+        </div>
+        <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</div>
+      </div>
+      <div>
+        {rows.map((r, i) => (
+          <DetailRow key={r.label} icon={r.icon} label={r.label} value={r.value} color={color} delay={i * 60} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SettingsTab({ session }) {
+  const initials = (session.name || session.email || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
+
+  const personal = [
+    { icon: User, label: "Full name", value: session.name || "—" },
+    { icon: Mail, label: "Email", value: session.email || "—" },
+    { icon: Phone, label: "Mobile", value: session.phone || "—" },
+    { icon: MessageCircle, label: "WhatsApp", value: session.whatsapp || "—" },
+  ];
+  const store = [
+    { icon: Store, label: "Store name", value: session.storeName || session.company || "—" },
+    { icon: Globe2, label: "Country", value: session.country || "—" },
+    { icon: TrendingUp, label: "Monthly avg. orders", value: session.monthlyOrders || "—" },
+  ];
+  const banking = [
+    { icon: Landmark, label: "Bank name", value: session.bankName || "—" },
+    { icon: User, label: "Account title", value: session.accountTitle || "—" },
+    { icon: Hash, label: "Account number", value: session.accountNumber || "—" },
+    { icon: Hash, label: "IBAN", value: session.iban || "—" },
+  ];
+
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Settings</h1>
-      <p className="text-sm text-gray-500 mt-1">Your account details.</p>
-      <div className="mt-6 rounded-2xl p-6 bg-white max-w-lg space-y-4" style={{ border: "1px solid #E5E7EB" }}>
-        {[
-          ["Full name", session.name], ["Email", session.email], ["Store name", session.storeName || session.company || "—"],
-          ["Country", session.country || "—"], ["Mobile", session.phone || "—"], ["WhatsApp", session.whatsapp || "—"],
-          ["Monthly avg. orders", session.monthlyOrders || "—"], ["Bank name", session.bankName || "—"],
-          ["Account title", session.accountTitle || "—"], ["Account number", session.accountNumber || "—"], ["IBAN", session.iban || "—"],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <label className="text-xs text-gray-500">{label}</label>
-            <div className="mt-1 text-sm font-semibold" style={{ color: "#111827" }}>{value}</div>
+      {/* Profile header banner, matching the dashboard's visual language */}
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
+
+        <div className="relative flex items-center gap-5">
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-extrabold text-white"
+            style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 10px 24px rgba(0,200,150,0.4)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {initials}
           </div>
-        ))}
-        <p className="text-xs text-gray-400 pt-2" style={{ borderTop: "1px solid #F3F4F6" }}>Editing profile fields isn't wired up yet in this prototype — say the word and I'll add it next.</p>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {session.name || "Seller"}
+              </h1>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(0,200,150,0.18)", color: "#7FE8C9" }}>
+                <BadgeCheck className="w-3 h-3" /> Verified Seller
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-white/60">{session.storeName || session.company || "Your store"} · {session.country || "UAE"}</p>
+          </div>
+        </div>
       </div>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+        <DetailSection title="Personal information" icon={User} color="#3B82F6" rows={personal} delay={0} />
+        <DetailSection title="Store information" icon={Store} color="#F8B400" rows={store} delay={80} />
+        <div className="lg:col-span-2">
+          <DetailSection title="Banking information" icon={Landmark} color="#8B5CF6" rows={banking} delay={160} />
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-400 mt-5 px-1">Editing these fields isn't wired up yet in this prototype — say the word and I'll add it next.</p>
     </div>
   );
 }
