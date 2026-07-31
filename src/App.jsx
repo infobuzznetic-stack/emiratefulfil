@@ -916,7 +916,11 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
     if (isForgot) {
       if (!email) { notify("Please enter your email."); setBusy(false); return; }
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
-      if (error) { notify(error.message); setBusy(false); return; }
+      if (error) {
+        notify(error.message || "Could not send the reset email right now — please check the SMTP settings or try again shortly.");
+        setBusy(false);
+        return;
+      }
       notify("If an account exists for that email, a reset link has been sent. Please check your inbox.");
       setBusy(false);
       return;
