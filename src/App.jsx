@@ -870,7 +870,7 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
         },
       });
       if (error) { notify(error.message); setBusy(false); return; }
-      notify("Thanks for signing up, " + form.name.split(" ")[0] + "! Please check your email to verify your account, then log in.");
+      notify("Thanks for signing up, " + form.name.split(" ")[0] + "! Please check your email to verify your account. After that, an Admin still needs to approve your account before you can log in.");
       onSwitch("login");
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: form.password });
@@ -884,6 +884,18 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
       }
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
       const displayName = profile?.name || email.split("@")[0];
+      const approval = profile?.approval_status || "pending";
+      const isAdmin = ADMIN_EMAILS.includes(email);
+      if (!isAdmin && approval !== "approved") {
+        await supabase.auth.signOut();
+        notify(
+          approval === "deactivated"
+            ? "Your account has been deactivated by Admin. Please contact support."
+            : "Your account is still waiting for Admin approval. Please check back soon."
+        );
+        setBusy(false);
+        return;
+      }
       onAuthed({
         email, name: displayName, company: profile?.company, country: profile?.country,
         storeName: profile?.store_name, monthlyOrders: profile?.monthly_orders, whatsapp: profile?.whatsapp,
@@ -2755,6 +2767,19 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   };
   useEffect(() => { loadAllOrders(); loadSellers(); }, []); // eslint-disable-line
 
+  // Approve a newly-signed-up seller (lets them log in), or deactivate/reactivate
+  // an existing one (blocks/unblocks their next login) — Admin only.
+  const setSellerApproval = async (id, approval_status) => {
+    const { error } = await supabase.from("profiles").update({ approval_status }).eq("id", id);
+    if (error) { notify("Could not update this seller's status."); return; }
+    setSellers(sellers.map((s) => (s.id === id ? { ...s, approval_status } : s)));
+    notify(
+      approval_status === "approved" ? "Seller approved — they can now log in." :
+      approval_status === "deactivated" ? "Seller deactivated — they can no longer log in." :
+      "Seller status updated."
+    );
+  };
+
   const setAdminOrderStatus = async (id, status) => {
     await supabase.from("orders").update({ status }).eq("id", id);
     setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
@@ -2910,8 +2935,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Admin</h1>
       <p className="text-sm text-gray-500 mt-1">Manage the shared product catalog every seller sees, and track signups.</p>
 
-      <div className="grid sm:grid-cols-3 gap-4 mt-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Total sellers signed up" value={sellers.length || sellerCount} color="#00C896" />
+        <StatCard label="Pending seller approvals" value={sellers.filter((s) => s.approval_status !== "approved" && s.approval_status !== "deactivated").length} color="#F8B400" />
         <StatCard label="Products in catalog" value={catalog.length} />
         <StatCard label="Customer orders (all sellers)" value={allOrders.length} color="#F8B400" />
       </div>
@@ -3083,6 +3109,8 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <th className="px-4 py-3">Bank</th>
                   <th className="px-4 py-3">Orders</th>
                   <th className="px-4 py-3">Signed up</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Approval</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "#F3F4F6" }}>
@@ -3116,6 +3144,29 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     <td className="px-4 py-3 text-gray-500">{sellerOrderCount(s.email)}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                       {s.created_at ? new Date(s.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                        style={
+                          s.approval_status === "approved" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
+                          s.approval_status === "deactivated" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
+                          { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
+                        }
+                      >
+                        {s.approval_status === "approved" ? "Approved" : s.approval_status === "deactivated" ? "Deactivated" : "Pending"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.approval_status === "approved" ? (
+                        <button onClick={() => setSellerApproval(s.id, "deactivated")} className="text-xs font-semibold px-3 py-1.5 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button onClick={() => setSellerApproval(s.id, "approved")} className="text-xs font-semibold px-3 py-1.5 rounded-full text-white" style={{ background: "#00C896" }}>
+                          {s.approval_status === "deactivated" ? "Reactivate" : "Approve"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -3356,13 +3407,24 @@ export default function EmirateFulfilApp() {
         const authUser = data.session?.user;
         if (authUser) {
           const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
-          setSession({
-            email: authUser.email, name: profile?.name || authUser.email.split("@")[0], company: profile?.company, country: profile?.country,
-            storeName: profile?.store_name, monthlyOrders: profile?.monthly_orders, whatsapp: profile?.whatsapp,
-            phone: profile?.phone, bankName: profile?.bank_name, accountTitle: profile?.account_title,
-            accountNumber: profile?.account_number, iban: profile?.iban,
-          });
-          setView("dashboard");
+          const approval = profile?.approval_status || "pending";
+          const isAdmin = ADMIN_EMAILS.includes(authUser.email);
+          if (!isAdmin && approval !== "approved") {
+            await supabase.auth.signOut();
+            notify(
+              approval === "deactivated"
+                ? "Your account has been deactivated by Admin. Please contact support."
+                : "Your account is still waiting for Admin approval. Please check back soon."
+            );
+          } else {
+            setSession({
+              email: authUser.email, name: profile?.name || authUser.email.split("@")[0], company: profile?.company, country: profile?.country,
+              storeName: profile?.store_name, monthlyOrders: profile?.monthly_orders, whatsapp: profile?.whatsapp,
+              phone: profile?.phone, bankName: profile?.bank_name, accountTitle: profile?.account_title,
+              accountNumber: profile?.account_number, iban: profile?.iban,
+            });
+            setView("dashboard");
+          }
         }
       } finally {
         setCheckingAuth(false);
