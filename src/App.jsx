@@ -3,7 +3,7 @@ import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
-  Layers, Receipt, Clock, CreditCard,
+  Layers, Receipt, Clock, CreditCard, LifeBuoy, Send,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1173,10 +1173,10 @@ function Dashboard({ session, onLogout, notify }) {
   const NAV = [
     { id: "overview", label: "Dashboard", icon: Boxes },
     { id: "products", label: "Products", icon: Package },
-    { id: "categories", label: "Categories", icon: Layers },
     { id: "orders", label: "Orders", icon: Truck },
     { id: "invoices", label: "Invoices", icon: Receipt },
     { id: "settings", label: "Settings", icon: Sparkles },
+    { id: "support", label: "Customer Support", icon: LifeBuoy },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
   ];
 
@@ -1274,20 +1274,20 @@ function Dashboard({ session, onLogout, notify }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {/* Settings and Admin aren't country-specific, so they stay open regardless of the region switch.
+          {/* Settings, Support, and Admin aren't country-specific, so they stay open regardless of the region switch.
               Every other tab is UAE-only for now — switching to KSA/Qatar shows Coming Soon everywhere. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "admin" && region !== "UAE" && (
+          {tab !== "overview" && tab !== "settings" && tab !== "support" && tab !== "admin" && region !== "UAE" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || region === "UAE") && (
+          {(tab === "settings" || tab === "support" || region === "UAE") && (
             <>
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} onCatalogChanged={reload} />}
-              {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
               {tab === "orders" && (
                 <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
               )}
               {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
               {tab === "settings" && <SettingsTab session={session} />}
+              {tab === "support" && <SupportTab session={session} />}
             </>
           )}
           {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
@@ -1470,7 +1470,7 @@ function OverviewTab({
     { label: "Order Product", tab: "products", icon: Package, color: "#00C896" },
     { label: "See Orders", tab: "orders", icon: Truck, color: "#3B82F6" },
     { label: "View invoices", tab: "invoices", icon: PackageCheck, color: "#F8B400" },
-    { label: "Contact Customer Support", tab: "categories", icon: ClipboardCheck, color: "#0B1F3A" },
+    { label: "Contact Customer Support", tab: "support", icon: LifeBuoy, color: "#0B1F3A" },
   ];
 
   return (
@@ -2766,6 +2766,40 @@ function SettingsTab({ session }) {
           </div>
         ))}
         <p className="text-xs text-gray-400 pt-2" style={{ borderTop: "1px solid #F3F4F6" }}>Editing profile fields isn't wired up yet in this prototype — say the word and I'll add it next.</p>
+      </div>
+    </div>
+  );
+}
+
+function SupportTab({ session }) {
+  return (
+    <div>
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896" }} />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+            <LifeBuoy className="w-7 h-7" style={{ color: "#00e0aa" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer Support</h1>
+            <p className="text-sm text-white/60 mt-1">We're here to help, {session.name.split(" ")[0]}.</p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="rounded-2xl p-10 bg-white flex flex-col items-center justify-center text-center"
+        style={{ border: "1px dashed #D1D5DB" }}
+      >
+        <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(0,200,150,0.12)" }}>
+          <Send className="w-5 h-5" style={{ color: "#00a67e" }} />
+        </div>
+        <h2 className="text-base font-bold" style={{ color: "#0B1F3A" }}>This page is ready for content</h2>
+        <p className="text-sm text-gray-500 mt-1.5 max-w-sm">Tell us what should live here — a contact form, WhatsApp link, FAQs, or a live chat — and we'll build it in.</p>
       </div>
     </div>
   );
