@@ -5057,7 +5057,19 @@ export default function EmirateFulfilApp() {
   // Restore session on page load/refresh so users stay logged in.
   // Nothing renders until this finishes, so refreshing never flashes the
   // homepage before landing back on the dashboard.
+  //
+  // Exception: a password-reset email link also arrives with a session
+  // (Supabase logs the user in temporarily so they can set a new password).
+  // Without this check, this effect would race the recovery listener below
+  // and send the seller straight to the dashboard, skipping the "set a new
+  // password" screen entirely — so we detect that case up front and bail.
   useEffect(() => {
+    const isRecoveryLink = window.location.hash.includes("type=recovery");
+    if (isRecoveryLink) {
+      setView("reset-password");
+      setCheckingAuth(false);
+      return;
+    }
     supabase.auth.getSession().then(async ({ data }) => {
       try {
         const authUser = data.session?.user;
@@ -5088,10 +5100,9 @@ export default function EmirateFulfilApp() {
     });
   }, []);
 
-  // When a seller clicks the "reset password" link in their email, Supabase
-  // redirects back here and fires this event with a temporary session —
-  // that's our cue to show the "set a new password" screen instead of
-  // whatever page they'd otherwise land on.
+  // Backup for the same recovery case — if the link is opened while the
+  // page is already loaded (rare, but possible), this listener catches the
+  // PASSWORD_RECOVERY event Supabase fires once it finishes parsing the link.
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setView("reset-password");
