@@ -2692,6 +2692,20 @@ function AdminOrdersPanel({ notify }) {
     notify && notify("Tracking number saved.");
   };
 
+  // Group every order by seller, in the order each seller's most recent order appeared —
+  // so the busiest / most-recent seller naturally floats to the top.
+  const sellerGroups = [];
+  const seenSellers = new Map();
+  for (const o of allOrders) {
+    const key = o.seller_email || "Unknown seller";
+    if (!seenSellers.has(key)) {
+      seenSellers.set(key, sellerGroups.length);
+      sellerGroups.push({ seller: key, orders: [] });
+    }
+    sellerGroups[seenSellers.get(key)].orders.push(o);
+  }
+  const SELLER_COLORS = ["#00C896", "#3B82F6", "#F8B400", "#8B5CF6", "#EC4899", "#0B7A5E"];
+
   return (
     <div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
@@ -2715,109 +2729,140 @@ function AdminOrdersPanel({ notify }) {
       <style>{`
         @keyframes adminOrdersFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes adminOrderRowFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes sellerGroupFadeIn { from { opacity: 0; transform: translateY(18px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .admin-orders-panel { animation: adminOrdersFadeIn 0.5s cubic-bezier(.2,.7,.2,1) both; }
         .admin-order-row { opacity: 0; animation: adminOrderRowFadeIn 0.4s cubic-bezier(.2,.7,.2,1) forwards; }
+        .seller-group { opacity: 0; animation: sellerGroupFadeIn 0.5s cubic-bezier(.2,.7,.2,1) forwards; }
       `}</style>
-      <div className="admin-orders-panel rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="px-5 pt-5 pb-1 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer orders — all sellers</div>
-            <p className="text-xs text-gray-400 mt-1">Update status, approve payments, and save tracking numbers below.</p>
-          </div>
-          {!ordersLoading && allOrders.length > 0 && (
-            <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(0,200,150,0.12)", color: "#00a67e" }}>
-              {allOrders.length} order{allOrders.length === 1 ? "" : "s"} · {new Set(allOrders.map((o) => o.seller_email)).size} seller{new Set(allOrders.map((o) => o.seller_email)).size === 1 ? "" : "s"}
-            </span>
-          )}
+
+      {!ordersLoading && allOrders.length > 0 && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-gray-500">Update status, approve payments, and save tracking numbers below.</div>
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(0,200,150,0.12)", color: "#00a67e" }}>
+            {allOrders.length} order{allOrders.length === 1 ? "" : "s"} · {sellerGroups.length} seller{sellerGroups.length === 1 ? "" : "s"}
+          </span>
         </div>
-        {ordersLoading ? (
-          <div className="text-sm text-gray-400 py-10 text-center">Loading orders…</div>
-        ) : allOrders.length === 0 ? (
-          <div className="text-sm text-gray-400 py-10 text-center">No customer orders yet.</div>
-        ) : (
-          <table className="w-full text-sm mt-3">
-            <thead>
-              <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <th className="px-4 py-3">Order</th>
-                <th className="px-4 py-3">Seller</th>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Email / Phone</th>
-                <th className="px-4 py-3">Address / Emirate</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Payment</th>
-                <th className="px-4 py-3">Tracking #</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allOrders.map((o, i) => (
-                <tr key={o.id} className="admin-order-row transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA", animationDelay: `${Math.min(i, 20) * 35}ms` }}>
-                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
-                  <td className="px-4 py-3 text-gray-500">{o.seller_email}</td>
-                  <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
-                  <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    <div>{o.customer_email || "—"}</div>
-                    <div className="text-gray-400">{o.customer_phone || ""}</div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
-                    <div className="text-gray-700 font-medium">{o.city || "—"}</div>
-                    <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
-                  </td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={o.status}
-                      onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
-                      className="text-xs rounded-full px-2 py-1 font-semibold border-0"
-                      style={
-                        o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
-                        o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
-                        o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
-                        o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
-                        { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
-                      }
+      )}
+
+      {ordersLoading ? (
+        <div className="rounded-2xl bg-white text-sm text-gray-400 py-10 text-center" style={{ border: "1px solid #E5E7EB" }}>Loading orders…</div>
+      ) : allOrders.length === 0 ? (
+        <div className="rounded-2xl bg-white text-sm text-gray-400 py-10 text-center" style={{ border: "1px solid #E5E7EB" }}>No customer orders yet.</div>
+      ) : (
+        <div className="space-y-6">
+          {sellerGroups.map((group, gi) => {
+            const color = SELLER_COLORS[gi % SELLER_COLORS.length];
+            return (
+              <div
+                key={group.seller}
+                className="seller-group admin-orders-panel rounded-2xl bg-white overflow-hidden"
+                style={{ border: "1px solid #E5E7EB", animationDelay: `${gi * 90}ms`, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
+              >
+                {/* Seller header — colored, one per seller, sits above their own orders */}
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 transition-all duration-300"
+                  style={{ background: `linear-gradient(90deg, ${color}1A, ${color}05)`, borderBottom: `1px solid ${color}30` }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-extrabold"
+                      style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 6px 14px ${color}40`, fontFamily: "'Space Grotesk', sans-serif" }}
                     >
-                      <option value="pending">Pending</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="returned">Returned</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    {o.status === "cancelled" ? (
-                      <span className="text-xs text-gray-300">—</span>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <PaymentPill status={o.payment_status} />
-                        {o.payment_status === "paid" ? (
-                          <button onClick={() => setAdminPaymentStatus(o.id, "unpaid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Undo</button>
-                        ) : (
-                          <button onClick={() => setAdminPaymentStatus(o.id, "paid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-white" style={{ background: "#00C896" }}>Approve</button>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        defaultValue={o.tracking_number || ""}
-                        onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
-                        placeholder="e.g. AWB123456"
-                        className="w-28 rounded-lg px-2 py-1.5 text-xs"
-                        style={{ border: "1px solid #E5E7EB" }}
-                      />
-                      <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                      {(group.seller[0] || "?").toUpperCase()}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+                    <div className="font-bold text-sm truncate" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{group.seller}</div>
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: color + "22", color }}>
+                    {group.orders.length} order{group.orders.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                        <th className="px-4 py-3">Order</th>
+                        <th className="px-4 py-3">Product</th>
+                        <th className="px-4 py-3">Customer</th>
+                        <th className="px-4 py-3">Email / Phone</th>
+                        <th className="px-4 py-3">Address / Emirate</th>
+                        <th className="px-4 py-3">Amount</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Payment</th>
+                        <th className="px-4 py-3">Tracking #</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.orders.map((o, i) => (
+                        <tr key={o.id} className="admin-order-row transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA", animationDelay: `${gi * 90 + Math.min(i, 20) * 35}ms` }}>
+                          <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
+                          <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
+                          <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">
+                            <div>{o.customer_email || "—"}</div>
+                            <div className="text-gray-400">{o.customer_phone || ""}</div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
+                            <div className="text-gray-700 font-medium">{o.city || "—"}</div>
+                            <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
+                          </td>
+                          <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={o.status}
+                              onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
+                              className="text-xs rounded-full px-2 py-1 font-semibold border-0"
+                              style={
+                                o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
+                                o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
+                                o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
+                                o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
+                                { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
+                              }
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="shipped">Shipped</option>
+                              <option value="delivered">Delivered</option>
+                              <option value="cancelled">Cancelled</option>
+                              <option value="returned">Returned</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            {o.status === "cancelled" ? (
+                              <span className="text-xs text-gray-300">—</span>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <PaymentPill status={o.payment_status} />
+                                {o.payment_status === "paid" ? (
+                                  <button onClick={() => setAdminPaymentStatus(o.id, "unpaid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Undo</button>
+                                ) : (
+                                  <button onClick={() => setAdminPaymentStatus(o.id, "paid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-white" style={{ background: "#00C896" }}>Approve</button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                defaultValue={o.tracking_number || ""}
+                                onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
+                                placeholder="e.g. AWB123456"
+                                className="w-28 rounded-lg px-2 py-1.5 text-xs"
+                                style={{ border: "1px solid #E5E7EB" }}
+                              />
+                              <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
