@@ -1529,8 +1529,8 @@ function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
   );
 }
 
-function CheckoutForm({ items, onBack, onSubmit }) {
-  const [form, setForm] = useState({ name: "", email: "", phone: "", emirate: EMIRATES[0], address: "" });
+function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
+  const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "" });
   const [busy, setBusy] = useState(false);
   const total = items.reduce((s, it) => s + it.sell * it.qty, 0);
 
@@ -1554,27 +1554,21 @@ function CheckoutForm({ items, onBack, onSubmit }) {
       <div className="mt-6 grid md:grid-cols-5 gap-6">
         <form onSubmit={submit} className="md:col-span-3 rounded-2xl p-6 bg-white space-y-3" style={{ border: "1px solid #E5E7EB" }}>
           <div>
-            <label className="text-xs text-gray-500">Customer name</label>
+            <label className="text-xs text-gray-500">Customer name <span className="text-red-500">*</span></label>
             <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500">Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="customer@email.com" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Phone</label>
-              <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05XXXXXXXX" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
-            </div>
+          <div>
+            <label className="text-xs text-gray-500">Phone <span className="text-red-500">*</span></label>
+            <input required type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05XXXXXXXX" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
           </div>
           <div>
-            <label className="text-xs text-gray-500">Emirate</label>
+            <label className="text-xs text-gray-500">Emirate <span className="text-red-500">*</span></label>
             <select value={form.emirate} onChange={(e) => setForm({ ...form, emirate: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
               {EMIRATES.map((em) => <option key={em} value={em}>{em}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-500">Delivery address</label>
+            <label className="text-xs text-gray-500">Delivery address <span className="text-red-500">*</span></label>
             <textarea required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Building, street, area / landmark" rows={3} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
           </div>
           <button disabled={busy} className="w-full mt-2 text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
@@ -1584,13 +1578,32 @@ function CheckoutForm({ items, onBack, onSubmit }) {
 
         <div className="md:col-span-2 rounded-2xl p-6 bg-white h-fit" style={{ border: "1px solid #E5E7EB" }}>
           <div className="font-bold text-sm" style={{ color: "#111827" }}>Order summary</div>
-          <div className="mt-4 space-y-3">
-            {items.map((it) => (
-              <div key={it.id} className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{it.name} <span className="text-gray-400">×{it.qty}</span></span>
-                <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {it.sell * it.qty}</span>
-              </div>
-            ))}
+          <div className="mt-4 space-y-4">
+            {items.map((it) => {
+              const extra = (it.sell - it.listSell) * it.qty;
+              return (
+                <div key={it.id} className="text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">{it.name} <span className="text-gray-400">×{it.qty}</span></span>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {it.sell * it.qty}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <label className="text-xs text-gray-400 whitespace-nowrap">Selling price (AED, per unit)</label>
+                    <input
+                      type="number" min="0" value={it.sell}
+                      onChange={(e) => onUpdateItemPrice(it.id, parseFloat(e.target.value) || 0)}
+                      className="w-24 rounded-lg px-2 py-1 text-sm text-right"
+                      style={{ border: "1px solid #E5E7EB" }}
+                    />
+                  </div>
+                  <div className="mt-1 text-xs text-gray-400">
+                    Catalog price AED {it.listSell}
+                    {extra > 0 && <span className="ml-1.5 font-semibold" style={{ color: "#00a67e" }}>· +AED {extra} extra profit</span>}
+                    {extra < 0 && <span className="ml-1.5 font-semibold text-red-500">· AED {Math.abs(extra)} below catalog price</span>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <div className="mt-4 pt-4 flex items-center justify-between text-sm font-bold" style={{ borderTop: "1px solid #F3F4F6", color: "#0B1F3A" }}>
             <span>Total</span>
@@ -1615,7 +1628,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
     setCart((prev) => {
       const existing = prev.find((c) => c.id === product.id);
       if (existing) return prev.map((c) => (c.id === product.id ? { ...c, qty: c.qty + qty } : c));
-      return [...prev, { id: product.id, name: product.name, sell: product.sell, cost: product.cost, emoji: product.emoji, qty }];
+      return [...prev, { id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, qty }];
     });
     notify && notify("Added to cart.");
   };
@@ -1626,7 +1639,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
 
   const openProduct = (p) => { setActiveProduct(p); setView("detail"); };
   const buyNow = (product, qty) => {
-    setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, cost: product.cost, emoji: product.emoji, qty }]);
+    setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, qty }]);
     setCheckoutFrom("detail");
     setView("checkout");
   };
@@ -1636,6 +1649,11 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
     setCheckoutFrom("cart");
     setView("checkout");
   };
+  // Lets the seller charge this particular customer more than the catalog price —
+  // the gap between what they charge and the catalog price becomes extra profit.
+  const updateCheckoutItemPrice = (id, sell) => {
+    setCheckoutItems((prev) => prev.map((it) => (it.id === id ? { ...it, sell: Math.max(0, sell) } : it)));
+  };
 
   const placeOrder = async (customer) => {
     const created = [];
@@ -1644,7 +1662,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
         productId: item.id, productName: item.name, qty: item.qty,
         sellPrice: item.sell, costPrice: item.cost,
         buyer: customer.name, city: customer.emirate,
-        customerEmail: customer.email, customerPhone: customer.phone, customerAddress: customer.address,
+        customerPhone: customer.phone, customerAddress: customer.address,
       });
       if (result) created.push(result);
     }
@@ -1687,7 +1705,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
     return <CartView items={cart} onUpdateQty={updateCartQty} onRemove={removeFromCart} onBack={() => setView("list")} onCheckout={goToCartCheckout} total={cartTotal} />;
   }
   if (view === "checkout") {
-    return <CheckoutForm items={checkoutItems} onBack={() => setView(checkoutFrom)} onSubmit={placeOrder} />;
+    return <CheckoutForm items={checkoutItems} onBack={() => setView(checkoutFrom)} onSubmit={placeOrder} onUpdateItemPrice={updateCheckoutItemPrice} />;
   }
 
   return (
