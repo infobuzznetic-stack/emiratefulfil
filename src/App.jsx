@@ -967,8 +967,8 @@ function Dashboard({ session, onLogout, notify }) {
   const confirmedProfit = delivered.reduce((s, o) => s + (o.sellPrice - o.listPrice) * o.qty, 0);
   const pendingCOD = pending.reduce((s, o) => s + billTotal(o), 0);
   const deliveredRevenue = delivered.reduce((s, o) => s + billTotal(o), 0);
-  // Cancelled orders never billed a customer, so they must not count toward invoicing.
-  const billableOrders = orders.filter((o) => o.status !== "cancelled");
+  // Cancelled and returned orders never actually get paid for by the customer, so they must not count toward invoicing.
+  const billableOrders = orders.filter((o) => o.status !== "cancelled" && o.status !== "returned");
   const totalInvoice = billableOrders.reduce((s, o) => s + billTotal(o), 0);
   const unpaidInvoice = billableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + billTotal(o), 0);
   const paidInvoice = billableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + billTotal(o), 0);
@@ -981,7 +981,7 @@ function Dashboard({ session, onLogout, notify }) {
   const regionCancelled = regionOrders.filter((o) => o.status === "cancelled");
   const regionReturned = regionOrders.filter((o) => o.status === "returned");
   const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + (o.sellPrice - o.listPrice) * o.qty, 0);
-  const regionBillableOrders = regionOrders.filter((o) => o.status !== "cancelled");
+  const regionBillableOrders = regionOrders.filter((o) => o.status !== "cancelled" && o.status !== "returned");
   const regionTotalInvoice = regionBillableOrders.reduce((s, o) => s + billTotal(o), 0);
   const regionUnpaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + billTotal(o), 0);
   const regionPaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + billTotal(o), 0);
@@ -1933,7 +1933,7 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
                   <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
                   <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                    {o.status === "cancelled" ? "AED 0" : `AED ${o.sellPrice * o.qty + (o.deliveryCharge || 0)}`}
+                    {(o.status === "cancelled" || o.status === "returned") ? "AED 0" : `AED ${o.sellPrice * o.qty + (o.deliveryCharge || 0)}`}
                   </td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
                   <td className="px-4 py-3">{o.status === "cancelled" ? <span className="text-xs text-gray-300">—</span> : <PaymentPill status={o.paymentStatus} />}</td>
@@ -2190,7 +2190,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     <div>{o.city || "—"}</div>
                     <div className="text-gray-400 truncate" title={o.customer_address}>{o.customer_address || ""}</div>
                   </td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.status === "cancelled" ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
                   <td className="px-4 py-3">
                     <select
                       value={o.status}
