@@ -1251,6 +1251,11 @@ function Dashboard({ session, onLogout, notify }) {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes livePulse {
+          0% { box-shadow: 0 0 0 0 rgba(0,200,150,0.55); }
+          70% { box-shadow: 0 0 0 8px rgba(0,200,150,0); }
+          100% { box-shadow: 0 0 0 0 rgba(0,200,150,0); }
+        }
       `}</style>
 
       {/* Main */}
@@ -1321,29 +1326,34 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="rounded-2xl p-5 bg-white transition-all duration-500 cursor-default"
+      className="relative rounded-2xl p-5 bg-white transition-all duration-500 cursor-default overflow-hidden"
       style={{
         border: "1px solid #E5E7EB",
         opacity: shown ? 1 : 0,
-        transform: shown ? (hover ? "translateY(-4px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
-        boxShadow: hover ? "0 14px 30px rgba(11,31,58,0.12)" : "0 0px 0px rgba(0,0,0,0)",
+        transform: shown ? (hover ? "translateY(-5px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
+        boxShadow: hover ? `0 20px 36px -10px ${color}40` : "0 1px 2px rgba(16,24,40,0.04)",
       }}
     >
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-gray-500">{label}</div>
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${color}, ${color}00)` }} />
+      <div
+        className="absolute -top-6 -right-6 w-24 h-24 rounded-full transition-opacity duration-500"
+        style={{ background: `radial-gradient(circle, ${color}25, transparent 70%)`, opacity: hover ? 1 : 0.5 }}
+      />
+      <div className="relative flex items-center justify-between">
+        <div className="text-xs font-medium text-gray-500">{label}</div>
         {Icon && (
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-500"
-            style={{ background: color + "1A", transform: hover ? "rotate(-8deg) scale(1.08)" : "rotate(0deg) scale(1)" }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-500"
+            style={{ background: color + "1A", transform: hover ? "rotate(-8deg) scale(1.1)" : "rotate(0deg) scale(1)" }}
           >
-            <Icon className="w-4 h-4" style={{ color }} />
+            <Icon className="w-4.5 h-4.5" style={{ color }} />
           </div>
         )}
       </div>
-      <div className="text-2xl font-bold mt-2" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
+      <div className="relative text-[26px] leading-tight font-extrabold mt-2.5 tracking-tight" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
         {prefix}{display.toLocaleString()}
       </div>
-      {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
+      {sub && <div className="relative text-xs text-gray-400 mt-1">{sub}</div>}
     </div>
   );
 }
@@ -1430,17 +1440,25 @@ function OverviewTab({
   return (
     <div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-2xl" style={{ background: "#00C896" }} />
-        <div className="absolute -bottom-20 left-1/3 w-64 h-64 rounded-full opacity-10 blur-2xl" style={{ background: "#F8B400" }} />
+        {/* subtle dot-grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
+        <div className="absolute top-1/2 left-10 w-40 h-40 rounded-full opacity-10 blur-3xl -translate-y-1/2" style={{ background: "#3B82F6", animation: "floatY 7s ease-in-out infinite" }} />
+
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
+              <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
               <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#7FE8C9" }}>{dateLabel}</span>
               <span className="text-white/30">·</span>
               <span className="text-xs font-semibold tracking-widest" style={{ color: "#7FE8C9", fontFamily: "'Space Grotesk', sans-serif" }}>{timeLabel}</span>
             </div>
-            <h1 className="mt-2 text-3xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {greeting}, {session.name.split(" ")[0]}
+            <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              {greeting}, <span style={{ background: "linear-gradient(90deg,#7FE8C9,#00C896)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{session.name.split(" ")[0]}</span>
             </h1>
             <p className="mt-1.5 text-sm text-white/60 max-w-md">
               {region === "UAE"
@@ -1468,15 +1486,18 @@ function OverviewTab({
               ))}
             </div>
             {region === "UAE" && (
-              <>
+              <div
+                className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl"
+                style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", backdropFilter: "blur(6px)" }}
+              >
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 6px 16px rgba(0,200,150,0.4)" }}>
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
                 <div className="text-right">
-                  <div className="text-xs text-white/50">Confirmed profit</div>
-                  <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
+                  <div className="text-[11px] font-medium text-white/50 uppercase tracking-wide">Confirmed profit</div>
+                  <div className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
                 </div>
-                <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.18)" }}>
-                  <Sparkles className="w-5 h-5" style={{ color: "#00e0aa" }} />
-                </div>
-              </>
+              </div>
             )}
           </div>
         </div>
