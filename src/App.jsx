@@ -780,6 +780,11 @@ async function fetchListings(email) {
   if (error) { console.error(error); return []; }
   return data.map((r) => r.product_id);
 }
+async function fetchReviews(productId) {
+  const { data, error } = await supabase.from("reviews").select("*").eq("product_id", productId).order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data.map((r) => ({ id: r.id, name: r.name, rating: Number(r.rating), body: r.body, createdAt: r.created_at }));
+}
 async function fetchOrders(email) {
   const { data, error } = await supabase.from("orders").select("*").eq("seller_email", email).order("created_at", { ascending: false });
   if (error) { console.error(error); return []; }
@@ -1550,9 +1555,24 @@ function reviewsForProduct(product) {
   return { avg: Math.min(5, Math.round(avg * 10) / 10), count, list };
 }
 
+function daysAgoFromDate(iso) {
+  if (!iso) return 0;
+  const diff = Date.now() - new Date(iso).getTime();
+  return Math.max(0, Math.floor(diff / 86400000));
+}
+
 function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = [], onOpenProduct }) {
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState("description");
+  // Real reviews come from Supabase (added by Admin). Until a product has at
+  // least one, we fall back to sample reviews so the page isn't empty.
+  const [dbReviews, setDbReviews] = useState(null); // null = still loading
+  useEffect(() => {
+    let active = true;
+    setDbReviews(null);
+    fetchReviews(product.id).then((r) => { if (active) setDbReviews(r); });
+    return () => { active = false; };
+  }, [product.id]);
   const galleryImages = Array.isArray(product.images) && product.images.length ? product.images : (product.image_url ? [product.image_url] : []);
   const [activeImg, setActiveImg] = useState(0);
   useEffect(() => { setActiveImg(0); }, [product.id]);
@@ -1576,7 +1596,15 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
     { icon: CreditCard, label: "Cash on Delivery" },
   ];
   const specs = specsForProduct(product);
-  const { avg, count, list: reviewList } = reviewsForProduct(product);
+  const sampleReviews = reviewsForProduct(product);
+  const hasRealReviews = Array.isArray(dbReviews) && dbReviews.length > 0;
+  const reviewList = hasRealReviews
+    ? dbReviews.map((r) => ({ name: r.name, body: r.body, rating: r.rating, daysAgo: daysAgoFromDate(r.createdAt) }))
+    : sampleReviews.list;
+  const count = hasRealReviews ? dbReviews.length : sampleReviews.count;
+  const avg = hasRealReviews
+    ? Math.round((dbReviews.reduce((s, r) => s + r.rating, 0) / dbReviews.length) * 10) / 10
+    : sampleReviews.avg;
   const related = (catalog || []).filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
   const relatedFallback = related.length > 0 ? related : (catalog || []).filter((p) => p.id !== product.id).slice(0, 4);
 
@@ -2647,6 +2675,61 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     onCatalogChanged();
   };
 
+  // Reviews management — Admin can open a product's reviews, add new ones,
+  // edit or delete existing ones. Loaded on demand per product.
+  const [reviewsOpenId, setReviewsOpenId] = useState(null);
+  const [reviewsByProduct, setReviewsByProduct] = useState({});
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [newReview, setNewReview] = useState({ name: "", rating: 5, body: "" });
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [editReviewForm, setEditReviewForm] = useState(null);
+
+  const toggleReviews = async (productId) => {
+    if (reviewsOpenId === productId) { setReviewsOpenId(null); return; }
+    setReviewsOpenId(productId);
+    setNewReview({ name: "", rating: 5, body: "" });
+    setEditingReviewId(null);
+    if (!reviewsByProduct[productId]) {
+      setReviewsLoading(true);
+      const list = await fetchReviews(productId);
+      setReviewsByProduct((prev) => ({ ...prev, [productId]: list }));
+      setReviewsLoading(false);
+    }
+  };
+
+  const addReview = async (productId) => {
+    if (!newReview.name || !newReview.body) { notify("Fill in the reviewer name and review text."); return; }
+    const { data, error } = await supabase.from("reviews").insert({
+      product_id: productId, name: newReview.name, rating: Number(newReview.rating) || 5, body: newReview.body,
+    }).select().single();
+    if (error) { notify("Could not add review."); return; }
+    const mapped = { id: data.id, name: data.name, rating: Number(data.rating), body: data.body, createdAt: data.created_at };
+    setReviewsByProduct((prev) => ({ ...prev, [productId]: [mapped, ...(prev[productId] || [])] }));
+    setNewReview({ name: "", rating: 5, body: "" });
+    notify("Review added.");
+  };
+
+  const startEditReview = (r) => { setEditingReviewId(r.id); setEditReviewForm({ name: r.name, rating: r.rating, body: r.body }); };
+  const cancelEditReview = () => { setEditingReviewId(null); setEditReviewForm(null); };
+  const saveEditReview = async (productId, reviewId) => {
+    if (!editReviewForm.name || !editReviewForm.body) { notify("Fill in the reviewer name and review text."); return; }
+    const { error } = await supabase.from("reviews").update({
+      name: editReviewForm.name, rating: Number(editReviewForm.rating) || 5, body: editReviewForm.body,
+    }).eq("id", reviewId);
+    if (error) { notify("Could not save changes."); return; }
+    setReviewsByProduct((prev) => ({
+      ...prev,
+      [productId]: (prev[productId] || []).map((r) => (r.id === reviewId ? { ...r, name: editReviewForm.name, rating: Number(editReviewForm.rating) || 5, body: editReviewForm.body } : r)),
+    }));
+    cancelEditReview();
+    notify("Review updated.");
+  };
+  const deleteReview = async (productId, reviewId) => {
+    await supabase.from("reviews").delete().eq("id", reviewId);
+    setReviewsByProduct((prev) => ({ ...prev, [productId]: (prev[productId] || []).filter((r) => r.id !== reviewId) }));
+    notify("Review removed.");
+  };
+
   const sellerOrderCount = (email) => allOrders.filter((o) => o.seller_email === email).length;
   const filteredSellers = sellers.filter((s) => {
     const q = sellerSearch.trim().toLowerCase();
@@ -2825,6 +2908,65 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <button onClick={() => startEdit(p)} className="flex-1 text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
                   <button onClick={() => deleteProduct(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Remove</button>
                 </div>
+                <button onClick={() => toggleReviews(p.id)} className="mt-2 w-full text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                  {reviewsOpenId === p.id ? "Hide reviews" : `Manage reviews${reviewsByProduct[p.id] ? ` (${reviewsByProduct[p.id].length})` : ""}`}
+                </button>
+
+                {reviewsOpenId === p.id && (
+                  <div className="mt-3 pt-3 space-y-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+                    {reviewsLoading && !reviewsByProduct[p.id] ? (
+                      <div className="text-xs text-gray-400 text-center py-3">Loading reviews…</div>
+                    ) : (
+                      <>
+                        {(reviewsByProduct[p.id] || []).length === 0 && (
+                          <p className="text-[11px] text-gray-400">No real reviews yet — the storefront shows sample reviews until you add one.</p>
+                        )}
+                        {(reviewsByProduct[p.id] || []).map((r) => (
+                          <div key={r.id} className="rounded-lg p-2.5" style={{ background: "#F8FAFC", border: "1px solid #F3F4F6" }}>
+                            {editingReviewId === r.id ? (
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <input value={editReviewForm.name} onChange={(e) => setEditReviewForm({ ...editReviewForm, name: e.target.value })} placeholder="Reviewer name" className="flex-1 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                                  <select value={editReviewForm.rating} onChange={(e) => setEditReviewForm({ ...editReviewForm, rating: e.target.value })} className="rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }}>
+                                    {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} ★</option>)}
+                                  </select>
+                                </div>
+                                <textarea rows={2} value={editReviewForm.body} onChange={(e) => setEditReviewForm({ ...editReviewForm, body: e.target.value })} placeholder="Review text" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                                <div className="flex gap-2">
+                                  <button onClick={() => saveEditReview(p.id, r.id)} className="flex-1 text-xs font-semibold py-1.5 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
+                                  <button onClick={cancelEditReview} className="flex-1 text-xs font-semibold py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Cancel</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold">{r.name}</span>
+                                  <span className="text-xs" style={{ color: "#F8B400" }}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">{r.body}</p>
+                                <div className="flex gap-2 mt-2">
+                                  <button onClick={() => startEditReview(r)} className="flex-1 text-[11px] font-semibold py-1 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
+                                  <button onClick={() => deleteReview(p.id, r.id)} className="flex-1 text-[11px] font-semibold py-1 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Delete</button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+
+                        <div className="rounded-lg p-2.5 space-y-1.5" style={{ border: "1px dashed #D1D5DB" }}>
+                          <div className="flex items-center gap-2">
+                            <input value={newReview.name} onChange={(e) => setNewReview({ ...newReview, name: e.target.value })} placeholder="Reviewer name" className="flex-1 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                            <select value={newReview.rating} onChange={(e) => setNewReview({ ...newReview, rating: e.target.value })} className="rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }}>
+                              {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} ★</option>)}
+                            </select>
+                          </div>
+                          <textarea rows={2} value={newReview.body} onChange={(e) => setNewReview({ ...newReview, body: e.target.value })} placeholder="Review text" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                          <button onClick={() => addReview(p.id)} className="w-full text-xs font-semibold py-1.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add review</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
