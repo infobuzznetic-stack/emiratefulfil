@@ -37,6 +37,36 @@ function Logo({ box = "w-9 h-9", icon = "w-5 h-5" }) {
   );
 }
 
+// Product picture: shows the uploaded image if a product has one, otherwise
+// falls back to the emoji (so old products without a picture still look fine).
+// `size` sets the emoji font-size fallback; pass a wrapper with your own
+// width/height/rounded classes around this.
+function ProductThumb({ product, size = 40, className = "" }) {
+  if (product?.image_url) {
+    return (
+      <img
+        src={product.image_url}
+        alt={product.name || "Product"}
+        className={`w-full h-full object-cover ${className}`}
+      />
+    );
+  }
+  return <span style={{ fontSize: size }} className={className}>{product?.emoji || "📦"}</span>;
+}
+
+// Reusable "upload a picture to Supabase Storage" helper — same public-assets
+// bucket the site logo uses, just under a products/ prefix so files don't clash.
+async function uploadProductImage(file) {
+  if (!file) return { url: null, error: "No file" };
+  if (!file.type.startsWith("image/")) return { url: null, error: "Please choose an image file." };
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error: upErr } = await supabase.storage.from("public-assets").upload(path, file, { upsert: true, cacheControl: "3600" });
+  if (upErr) return { url: null, error: "Could not upload the picture." };
+  const { data } = supabase.storage.from("public-assets").getPublicUrl(path);
+  return { url: data?.publicUrl || null, error: null };
+}
+
 const FONT_LINK_ID = "emiratefulfil-fonts";
 
 function useGoogleFonts() {
@@ -743,7 +773,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description }));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url }));
 }
 async function fetchListings(email) {
   const { data, error } = await supabase.from("listings").select("product_id").eq("seller_email", email);
@@ -1367,7 +1397,9 @@ function OverviewTab({
                 <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Top listing</div>
                 {topListing ? (
                   <>
-                    <div className="text-3xl">{topListing.emoji}</div>
+                    <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center" style={{ background: "#F8FAFC" }}>
+                      <ProductThumb product={topListing} size={30} />
+                    </div>
                     <div className="mt-2 font-semibold text-sm">{topListing.name}</div>
                     <div className="text-xs mt-1 font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {topListing.sell - topListing.cost}</div>
                   </>
@@ -1569,12 +1601,20 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
         <div className="lg:col-span-4">
           <div className="relative rounded-3xl bg-white flex items-center justify-center overflow-hidden" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
             <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Best Seller</span>
-            <span style={{ fontSize: 150 }}>{product.emoji}</span>
+            {product.image_url ? (
+              <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
+            ) : (
+              <span style={{ fontSize: 150 }}>{product.emoji}</span>
+            )}
           </div>
           <div className="mt-3 grid grid-cols-4 gap-3">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl bg-white flex items-center justify-center py-4" style={{ border: i === 0 ? "2px solid #00C896" : "1px solid #E5E7EB" }}>
-                <span style={{ fontSize: 26, opacity: i === 0 ? 1 : 0.55 }}>{product.emoji}</span>
+              <div key={i} className="rounded-xl bg-white flex items-center justify-center py-4 overflow-hidden" style={{ border: i === 0 ? "2px solid #00C896" : "1px solid #E5E7EB", opacity: i === 0 ? 1 : 0.55 }}>
+                {product.image_url ? (
+                  <img src={product.image_url} alt={product.name} className="w-full h-10 object-cover" />
+                ) : (
+                  <span style={{ fontSize: 26 }}>{product.emoji}</span>
+                )}
               </div>
             ))}
           </div>
@@ -1769,8 +1809,8 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
                 className="text-left rounded-2xl bg-white p-4 transition-transform duration-200 hover:scale-[1.02]"
                 style={{ border: "1px solid #E5E7EB" }}
               >
-                <div className="rounded-xl flex items-center justify-center py-5" style={{ background: "#F8FAFC" }}>
-                  <span style={{ fontSize: 40 }}>{p.emoji}</span>
+                <div className="rounded-xl flex items-center justify-center py-5 overflow-hidden" style={{ background: "#F8FAFC", height: p.image_url ? 80 : "auto" }}>
+                  <ProductThumb product={p} size={40} />
                 </div>
                 <div className="mt-3 text-sm font-semibold truncate" style={{ color: "#111827" }}>{p.name}</div>
                 <div className="mt-1 text-sm font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
@@ -1797,7 +1837,9 @@ function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
           <div className="mt-6 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
             {items.map((it, i) => (
               <div key={it.id} className="flex items-center gap-4 px-5 py-4" style={{ borderBottom: i < items.length - 1 ? "1px solid #F3F4F6" : "none" }}>
-                <span className="text-3xl">{it.emoji}</span>
+                <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
+                  <ProductThumb product={it} size={26} />
+                </div>
                 <div className="flex-1">
                   <div className="text-sm font-semibold" style={{ color: "#111827" }}>{it.name}</div>
                   <div className="text-xs text-gray-400 mt-0.5">AED {it.sell} each</div>
@@ -1949,17 +1991,29 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   // Admin-only inline product editing, right from this grid.
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [editImageUploading, setEditImageUploading] = useState(false);
   const startEdit = (p) => {
     setEditingId(p.id);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "" });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", image_url: p.image_url || "" });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
+  const uploadEditImage = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setEditImageUploading(true);
+    const { url, error } = await uploadProductImage(file);
+    setEditImageUploading(false);
+    if (error) { notify && notify(error); return; }
+    setEditForm((f) => ({ ...f, image_url: url }));
+  };
   const saveEdit = async (id) => {
     if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify && notify("Fill in name, cost and sell price."); return; }
     const { error } = await supabase.from("products").update({
       name: editForm.name, category: editForm.category || "General",
       cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell),
       emoji: editForm.emoji || "📦", description: editForm.description || null,
+      image_url: editForm.image_url || null,
     }).eq("id", id);
     if (error) { notify && notify("Could not save changes."); return; }
     notify && notify("Product updated.");
@@ -1974,7 +2028,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     setCart((prev) => {
       const existing = prev.find((c) => c.id === product.id);
       if (existing) return prev.map((c) => (c.id === product.id ? { ...c, qty: c.qty + qty } : c));
-      return [...prev, { id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, qty }];
+      return [...prev, { id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, qty }];
     });
     notify && notify("Added to cart.");
   };
@@ -1985,7 +2039,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 
   const openProduct = (p) => { setActiveProduct(p); setView("detail"); };
   const buyNow = (product, qty) => {
-    setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, qty }]);
+    setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, qty }]);
     setCheckoutFrom("detail");
     setView("checkout");
   };
@@ -2104,8 +2158,20 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
               >
                 <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
                 <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+                      <ProductThumb product={editForm} size={26} />
+                    </div>
+                    <label className="text-xs font-semibold px-3 py-2 rounded-full cursor-pointer text-center" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: editImageUploading ? 0.6 : 1 }}>
+                      {editImageUploading ? "Uploading…" : "Upload picture"}
+                      <input type="file" accept="image/*" onChange={uploadEditImage} disabled={editImageUploading} className="hidden" />
+                    </label>
+                    {editForm.image_url && (
+                      <button onClick={() => setEditForm({ ...editForm, image_url: "" })} className="text-xs font-semibold text-red-500">Remove</button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
-                    <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
+                    <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} title="Fallback emoji (shown until a picture is uploaded)" className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
                     <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="flex-1 rounded-lg px-2 py-1.5 text-sm font-semibold" style={{ border: "1px solid #E5E7EB" }} />
                   </div>
                   <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} placeholder="Category" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
@@ -2147,10 +2213,10 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                 </button>
               )}
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
                 style={{ background: `${color}18` }}
               >
-                {p.emoji}
+                <ProductThumb product={p} size={30} />
               </div>
               <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
               <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{p.category}</span>
@@ -2216,7 +2282,9 @@ function CategoriesTab({ catalog, listings, onAdd }) {
                     return (
                       <div key={p.id} className="rounded-xl p-4 flex items-center justify-between gap-3" style={{ border: "1px solid #F3F4F6" }}>
                         <div className="flex items-center gap-3">
-                          <div className="text-2xl">{p.emoji}</div>
+                          <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
+                            <ProductThumb product={p} size={22} />
+                          </div>
                           <div>
                             <div className="font-semibold text-sm">{p.name}</div>
                             <div className="text-xs text-gray-400">AED {p.sell}</div>
@@ -2405,7 +2473,18 @@ function SettingsTab({ session }) {
 }
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "" });
+  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", image_url: "" });
+  const [formImageUploading, setFormImageUploading] = useState(false);
+  const uploadFormImage = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setFormImageUploading(true);
+    const { url, error } = await uploadProductImage(file);
+    setFormImageUploading(false);
+    if (error) { notify(error); return; }
+    setForm((f) => ({ ...f, image_url: url }));
+  };
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [sellers, setSellers] = useState([]);
@@ -2485,10 +2564,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     const { error } = await supabase.from("products").insert({
       id, name: form.name, category: form.category || "General",
       cost: parseFloat(form.cost), sell: parseFloat(form.sell), emoji: form.emoji || "📦",
-      description: form.description || null,
+      description: form.description || null, image_url: form.image_url || null,
     });
     if (error) { notify("Could not add product."); return; }
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "" });
+    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", image_url: "" });
     notify("Product added to catalog.");
     onCatalogChanged();
   };
@@ -2503,17 +2582,29 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   // form, Save writes the changes straight to Supabase.
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [editImageUploading, setEditImageUploading] = useState(false);
   const startEdit = (p) => {
     setEditingId(p.id);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "" });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", image_url: p.image_url || "" });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
+  const uploadEditImage = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setEditImageUploading(true);
+    const { url, error } = await uploadProductImage(file);
+    setEditImageUploading(false);
+    if (error) { notify(error); return; }
+    setEditForm((f) => ({ ...f, image_url: url }));
+  };
   const saveEdit = async (id) => {
     if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify("Fill in name, cost and sell price."); return; }
     const { error } = await supabase.from("products").update({
       name: editForm.name, category: editForm.category || "General",
       cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell),
       emoji: editForm.emoji || "📦", description: editForm.description || null,
+      image_url: editForm.image_url || null,
     }).eq("id", id);
     if (error) { notify("Could not save changes."); return; }
     notify("Product updated.");
@@ -2627,7 +2718,19 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <div><label className="text-xs text-gray-500">Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Emoji</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div><label className="text-xs text-gray-500">Emoji (fallback)</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div className="sm:col-span-6 flex items-center gap-3">
+          <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+            <ProductThumb product={form} size={26} />
+          </div>
+          <label className="text-sm font-semibold px-4 py-2 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: formImageUploading ? 0.6 : 1 }}>
+            {formImageUploading ? "Uploading…" : "Upload product picture"}
+            <input type="file" accept="image/*" onChange={uploadFormImage} disabled={formImageUploading} className="hidden" />
+          </label>
+          {form.image_url && (
+            <button type="button" onClick={() => setForm({ ...form, image_url: "" })} className="text-sm font-semibold text-red-500">Remove</button>
+          )}
+        </div>
         <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
       </form>
@@ -2637,8 +2740,17 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           <div key={p.id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
             {editingId === p.id ? (
               <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+                    <ProductThumb product={editForm} size={22} />
+                  </div>
+                  <label className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: editImageUploading ? 0.6 : 1 }}>
+                    {editImageUploading ? "Uploading…" : "Upload picture"}
+                    <input type="file" accept="image/*" onChange={uploadEditImage} disabled={editImageUploading} className="hidden" />
+                  </label>
+                </div>
                 <div className="flex items-center gap-2">
-                  <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
+                  <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} title="Fallback emoji" className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
                   <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="flex-1 rounded-lg px-2 py-1.5 text-sm font-semibold" style={{ border: "1px solid #E5E7EB" }} />
                 </div>
                 <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} placeholder="Category" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
@@ -2654,7 +2766,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
               </div>
             ) : (
               <>
-                <div className="text-4xl">{p.emoji}</div>
+                <div className="w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center" style={{ background: "#F8FAFC" }}>
+                  <ProductThumb product={p} size={36} />
+                </div>
                 <div className="mt-3 font-semibold text-sm">{p.name}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
                 <div className="mt-1 text-xs text-gray-500">Cost AED {p.cost} · Sell AED {p.sell}</div>
