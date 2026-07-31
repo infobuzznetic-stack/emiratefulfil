@@ -2408,20 +2408,28 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     <div>
       <div
         className="rounded-2xl p-6 text-white relative overflow-hidden flex items-start justify-between gap-4 flex-wrap"
-        style={{ background: "linear-gradient(135deg,#0B1F3A,#0F2E52 55%,#00997a)" }}
+        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}
       >
         <div
-          className="absolute -left-8 -bottom-12 w-44 h-44 rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(0,200,150,0.3), transparent 70%)" }}
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div
+          className="absolute -left-8 -bottom-12 w-52 h-52 rounded-full opacity-70 blur-3xl"
+          style={{ background: "rgba(0,200,150,0.3)", animation: "blobMove 9s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute -top-14 right-16 w-40 h-40 rounded-full opacity-40 blur-3xl"
+          style={{ background: "rgba(248,180,0,0.35)", animation: "blobMove 11s ease-in-out infinite reverse" }}
         />
         <div className="relative">
           <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
           <p className="text-sm text-white/70 mt-1">Click a product to view it, or add it to cart / buy it now for a customer.</p>
         </div>
-        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full transition-transform duration-200 hover:scale-105" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff" }}>
+        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full transition-all duration-300 hover:scale-105 active:scale-95" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", backdropFilter: "blur(6px)" }}>
           🛒 Cart
           {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896" }}>{cartCount}</span>
+            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896", animation: "livePulse 2s infinite" }}>{cartCount}</span>
           )}
         </button>
       </div>
@@ -2478,25 +2486,37 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             <div
               key={p.id}
               onClick={() => openProduct(p)}
-              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1 cursor-pointer overflow-hidden flex flex-col"
+              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1.5 cursor-pointer overflow-hidden flex flex-col"
               style={{
                 border: "1px solid #E5E7EB",
                 animation: `dashTabIn 0.35s ease-out ${i * 40}ms both`,
                 boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 20px 32px -12px ${color}33`)}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 24px 40px -14px ${color}45`)}
               onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 2px rgba(16,24,40,0.04)")}
             >
+              {/* Gradient accent bar, same touch used across the dashboard's cards */}
+              <div className="absolute top-0 left-0 right-0 h-[3px] z-10" style={{ background: `linear-gradient(90deg, ${color}, ${color}00)` }} />
+
               {/* ── Image ── */}
               <div className="relative w-full aspect-square flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(160deg, ${color}14, ${color}05)` }}>
-                <div className="transition-transform duration-500 ease-out group-hover:scale-105 flex items-center justify-center w-full h-full">
+                <div className="transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full">
                   <ProductThumb product={p} size={56} className="w-full h-full" />
                 </div>
+                {/* Diagonal shine sweep on hover */}
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)",
+                    backgroundSize: "220% 220%",
+                    animation: "shimmer 1.6s ease-in-out",
+                  }}
+                />
                 <span
-                  className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm"
+                  className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm shadow-sm"
                   style={inStock ? { background: "rgba(255,255,255,0.92)", color: "#00a67e" } : { background: "rgba(255,255,255,0.92)", color: "#EF4444" }}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444" }} />
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444", animation: inStock ? "livePulse 2s infinite" : "none" }} />
                   {inStock ? "In Stock" : "Out of Stock"}
                 </span>
                 {isAdmin && (
@@ -2513,9 +2533,12 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 
               {/* ── Content ── */}
               <div className="p-4 flex flex-col flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{p.category}</span>
-                <div className="mt-1 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
-                <div className="mt-2 text-xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>
+                <span className="inline-block w-fit text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color, background: color + "16" }}>{p.category}</span>
+                <div className="mt-2 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
+                <div
+                  className="mt-2 text-xl font-extrabold"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif", background: `linear-gradient(90deg, #0B1F3A, ${color})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+                >
                   AED {Number(p.sell).toLocaleString()}
                 </div>
 
