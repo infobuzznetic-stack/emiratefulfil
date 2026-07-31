@@ -1773,7 +1773,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
                 Buy Now
               </button>
             </div>
-            <button onClick={(e) => { e.stopPropagation(); onAdd(p.id); }} className="mt-2 w-full text-xs font-medium py-1.5 text-gray-400 hover:text-gray-700">+ Add to my seller catalog</button>
+            <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1.5 text-gray-500 hover:text-gray-800">View product →</button>
           </div>
         ))}
       </div>
