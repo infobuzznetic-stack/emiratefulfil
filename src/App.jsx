@@ -2771,40 +2771,6 @@ function SettingsTab({ session }) {
   );
 }
 
-function SupportTab({ session }) {
-  return (
-    <div>
-      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
-        />
-        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896" }} />
-        <div className="relative flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
-            <LifeBuoy className="w-7 h-7" style={{ color: "#00e0aa" }} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer Support</h1>
-            <p className="text-sm text-white/60 mt-1">We're here to help, {session.name.split(" ")[0]}.</p>
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="rounded-2xl p-10 bg-white flex flex-col items-center justify-center text-center"
-        style={{ border: "1px dashed #D1D5DB" }}
-      >
-        <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(0,200,150,0.12)" }}>
-          <Send className="w-5 h-5" style={{ color: "#00a67e" }} />
-        </div>
-        <h2 className="text-base font-bold" style={{ color: "#0B1F3A" }}>This page is ready for content</h2>
-        <p className="text-sm text-gray-500 mt-1.5 max-w-sm">Tell us what should live here — a contact form, WhatsApp link, FAQs, or a live chat — and we'll build it in.</p>
-      </div>
-    </div>
-  );
-}
-
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "" });
   const [formImageUploading, setFormImageUploading] = useState(false);
@@ -3436,22 +3402,35 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   );
 }
 
-function SupportTab() {
+function SupportTab({ session }) {
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Support</h1>
-      <p className="text-sm text-gray-500 mt-1">Reach the EmirateFulfil seller support team.</p>
-      <div className="mt-6 grid sm:grid-cols-2 gap-5 max-w-2xl">
-        <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-          <div className="text-2xl">💬</div>
-          <div className="font-bold text-sm mt-3" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>WhatsApp support</div>
-          <div className="text-xs text-gray-400 mt-1">Fastest response — usually under 10 minutes.</div>
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896" }} />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+            <LifeBuoy className="w-7 h-7" style={{ color: "#00e0aa" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer Support</h1>
+            <p className="text-sm text-white/60 mt-1">We're here to help, {session?.name ? session.name.split(" ")[0] : "there"}.</p>
+          </div>
         </div>
-        <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-          <div className="text-2xl">✉️</div>
-          <div className="font-bold text-sm mt-3" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Email support</div>
-          <div className="text-xs text-gray-400 mt-1">sellers@emiratefulfil.com — replies within 24h.</div>
+      </div>
+
+      <div
+        className="rounded-2xl p-10 bg-white flex flex-col items-center justify-center text-center"
+        style={{ border: "1px dashed #D1D5DB" }}
+      >
+        <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(0,200,150,0.12)" }}>
+          <Send className="w-5 h-5" style={{ color: "#00a67e" }} />
         </div>
+        <h2 className="text-base font-bold" style={{ color: "#0B1F3A" }}>This page is ready for content</h2>
+        <p className="text-sm text-gray-500 mt-1.5 max-w-sm">Tell us what should live here — a contact form, WhatsApp link, FAQs, or a live chat — and we'll build it in.</p>
       </div>
     </div>
   );
