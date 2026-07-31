@@ -897,7 +897,7 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-16" style={{ background: "#081221", fontFamily: "Inter, sans-serif" }}>
-      <div className="w-full max-w-md">
+      <div className={`w-full ${isSignup ? "max-w-2xl" : "max-w-md"}`}>
         <button onClick={() => onSwitch("home")} className="flex items-center gap-2.5 justify-center mb-8 w-full">
           <Logo />
           <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -924,59 +924,63 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
               <>
                 {/* --- Your details --- */}
                 <AuthSection title="Your details" delay="0.1s">
-                  <Field label="Full name" value={form.name} onChange={update("name")} placeholder="Ahmed Khan" required />
-                  <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@example.com" required />
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <Field label="Full name" value={form.name} onChange={update("name")} placeholder="Ahmed Khan" required />
+                    <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@example.com" required />
+                  </div>
                   <Field label="Password" type="password" value={form.password} onChange={update("password")} placeholder="••••••••" required />
                 </AuthSection>
 
                 {/* --- Store details --- */}
                 <AuthSection title="Store details" delay="0.18s">
-                  <Field label="Store name" value={form.storeName} onChange={update("storeName")} placeholder="Your store name" required />
-                  <div>
-                    <label className="text-xs text-white/50">Monthly avg. orders</label>
-                    <select
-                      value={form.monthlyOrders}
-                      onChange={update("monthlyOrders")}
-                      required
-                      className="mt-1 w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none"
-                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
-                    >
-                      <option value="" disabled style={{ color: "#666" }}>Select…</option>
-                      {MONTHLY_ORDER_OPTIONS.map((o) => (
-                        <option key={o} value={o} style={{ color: "#000" }}>{o}</option>
-                      ))}
-                    </select>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <Field label="Store name" value={form.storeName} onChange={update("storeName")} placeholder="Your store name" required />
+                    <div>
+                      <label className="text-xs text-white/50">Monthly avg. orders</label>
+                      <select
+                        value={form.monthlyOrders}
+                        onChange={update("monthlyOrders")}
+                        required
+                        className="mt-1 w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                      >
+                        <option value="" disabled style={{ color: "#666" }}>Select…</option>
+                        {MONTHLY_ORDER_OPTIONS.map((o) => (
+                          <option key={o} value={o} style={{ color: "#000" }}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </AuthSection>
 
                 {/* --- Contact numbers --- */}
                 <AuthSection title="Contact numbers" delay="0.26s">
-                  <div>
-                    <label className="text-xs text-white/50">Country</label>
-                    <select
-                      value={form.country}
-                      onChange={update("country")}
-                      className="mt-1 w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none"
-                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
-                    >
-                      {SIGNUP_COUNTRIES.map((c) => (
-                        <option key={c.code} value={c.code} style={{ color: "#000" }}>{c.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-white/50">Country</label>
+                      <select
+                        value={form.country}
+                        onChange={update("country")}
+                        className="mt-1 w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                      >
+                        {SIGNUP_COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code} style={{ color: "#000" }}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
                     <Field label="Mobile" value={form.phone} onChange={update("phone")} placeholder={`${selectedCountry.dial} ${selectedCountry.sample}`} required />
-                    <Field label="WhatsApp" value={form.whatsapp} onChange={update("whatsapp")} placeholder={`${selectedCountry.dial} ${selectedCountry.sample}`} required />
                   </div>
+                  <Field label="WhatsApp" value={form.whatsapp} onChange={update("whatsapp")} placeholder={`${selectedCountry.dial} ${selectedCountry.sample}`} required />
                 </AuthSection>
 
                 {/* --- Bank details (for payouts) --- */}
                 <AuthSection title="Bank details" subtitle="Used to send your weekly payouts." delay="0.34s">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
                     <Field label="Bank name" value={form.bankName} onChange={update("bankName")} placeholder={selectedCountry.bankSample} required />
                     <Field label="Account title" value={form.accountTitle} onChange={update("accountTitle")} placeholder="Name on account" required />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
                     <Field label="Account number" value={form.accountNumber} onChange={update("accountNumber")} placeholder="0123456789" required />
                     <Field label="IBAN" value={form.iban} onChange={update("iban")} placeholder={selectedCountry.ibanSample} required />
                   </div>
