@@ -773,7 +773,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [] }));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0) }));
 }
 async function fetchListings(email) {
   const { data, error } = await supabase.from("listings").select("product_id").eq("seller_email", email);
@@ -1605,6 +1605,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
   const avg = hasRealReviews
     ? Math.round((dbReviews.reduce((s, r) => s + r.rating, 0) / dbReviews.length) * 10) / 10
     : sampleReviews.avg;
+  const inStock = (product.stock ?? 0) > 0;
   const related = (catalog || []).filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
   const relatedFallback = related.length > 0 ? related : (catalog || []).filter((p) => p.id !== product.id).slice(0, 4);
 
@@ -1669,6 +1670,12 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</span>
             <span className="text-sm text-gray-300 line-through" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {Math.round(product.sell * 1.35)}</span>
+            <span
+              className="text-xs font-semibold px-2.5 py-1 rounded-full"
+              style={inStock ? { background: "rgba(0,200,150,0.12)", color: "#00a67e" } : { background: "rgba(239,68,68,0.1)", color: "#EF4444" }}
+            >
+              {inStock ? "In Stock" : "Out of Stock"}
+            </span>
           </div>
 
           <p className="mt-4 text-sm text-gray-600 leading-relaxed">{description}</p>
@@ -1708,18 +1715,20 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
 
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
               <button
+                disabled={!inStock}
                 onClick={() => onAddToCart(qty)}
-                className="flex-1 text-sm font-semibold py-3.5 rounded-full bg-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+                className="flex-1 text-sm font-semibold py-3.5 rounded-full bg-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
               >
                 🛒 Add to Cart
               </button>
               <button
+                disabled={!inStock}
                 onClick={() => onBuyNow(qty)}
-                className="flex-1 text-sm font-semibold py-3.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+                className="flex-1 text-sm font-semibold py-3.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 24px rgba(0,200,150,0.35)" }}
               >
-                Buy Now
+                {inStock ? "Buy Now" : "Out of Stock"}
               </button>
             </div>
           </div>
@@ -2035,7 +2044,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   const startEdit = (p) => {
     setEditingId(p.id);
     const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0 });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
   const uploadEditImages = async (e) => {
@@ -2063,6 +2072,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
       cost: parseFloat(editForm.cost) || 0, sell: parseFloat(editForm.sell),
       emoji: editForm.emoji || "📦", description: editForm.description || null,
       images, image_url: images[0] || null,
+      stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
     }).eq("id", id);
     if (error) { notify && notify("Could not save changes."); return; }
     notify && notify("Product updated.");
@@ -2227,6 +2237,10 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                   <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} placeholder="Category" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                   {/* SELL PRICE ONLY — cost is admin-internal, not shown here */}
                   <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell price (AED)" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                  <div>
+                    <label className="text-[11px] text-gray-400">Stock quantity (only you see this number — sellers just see In Stock / Out of Stock)</label>
+                    <input type="number" min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} placeholder="Stock quantity" className="mt-1 w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                  </div>
                   <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => saveEdit(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
@@ -2236,6 +2250,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
               </div>
             );
           }
+          const inStock = (p.stock ?? 0) > 0;
           return (
             <div
               key={p.id}
@@ -2267,7 +2282,15 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                 <ProductThumb product={p} size={30} />
               </div>
               <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
-              <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{p.category}</span>
+              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{p.category}</span>
+                <span
+                  className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                  style={inStock ? { background: "rgba(0,200,150,0.12)", color: "#00a67e" } : { background: "rgba(239,68,68,0.1)", color: "#EF4444" }}
+                >
+                  {inStock ? "In Stock" : "Out of Stock"}
+                </span>
+              </div>
               <div className="mt-2 text-lg font-bold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
 
               {/* ── Quantity counter ── */}
@@ -2287,11 +2310,11 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
               </div>
 
               <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => addToCart(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
+                <button disabled={!inStock} onClick={() => addToCart(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
                   🛒 Add to Cart
                 </button>
-                <button onClick={() => buyNow(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
-                  Buy Now
+                <button disabled={!inStock} onClick={() => buyNow(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                  {inStock ? "Buy Now" : "Out of Stock"}
                 </button>
               </div>
               <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1.5 text-gray-500 hover:text-gray-800">View product →</button>
@@ -2537,7 +2560,7 @@ function SettingsTab({ session }) {
 }
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [] });
+  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "" });
   const [formImageUploading, setFormImageUploading] = useState(false);
   const uploadFormImages = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -2637,9 +2660,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       id, name: form.name, category: form.category || "General",
       cost: parseFloat(form.cost), sell: parseFloat(form.sell), emoji: form.emoji || "📦",
       description: form.description || null, images, image_url: images[0] || null,
+      stock: Math.max(0, parseInt(form.stock, 10) || 0),
     });
     if (error) { notify("Could not add product."); return; }
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [] });
+    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "" });
     notify("Product added to catalog.");
     onCatalogChanged();
   };
@@ -2658,7 +2682,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const startEdit = (p) => {
     setEditingId(p.id);
     const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0 });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
   const uploadEditImages = async (e) => {
@@ -2686,6 +2710,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell),
       emoji: editForm.emoji || "📦", description: editForm.description || null,
       images, image_url: images[0] || null,
+      stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
     }).eq("id", id);
     if (error) { notify("Could not save changes."); return; }
     notify("Product updated.");
@@ -2854,6 +2879,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <div><label className="text-xs text-gray-500">Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div><label className="text-xs text-gray-500">Stock quantity</label><input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Emoji (fallback)</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div className="sm:col-span-6 flex items-center gap-3 flex-wrap">
           {(form.images || []).map((url, idx) => (
@@ -2908,6 +2934,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <input type="number" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} placeholder="Cost" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                   <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                 </div>
+                <input type="number" min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} placeholder="Stock quantity" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                 <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => saveEdit(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
@@ -2922,6 +2949,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                 <div className="mt-3 font-semibold text-sm">{p.name}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
                 <div className="mt-1 text-xs text-gray-500">Cost AED {p.cost} · Sell AED {p.sell}</div>
+                <div className="mt-1 text-xs font-semibold" style={{ color: (p.stock ?? 0) > 0 ? "#00a67e" : "#EF4444" }}>
+                  Stock: {p.stock ?? 0} {(p.stock ?? 0) > 0 ? "" : "(Out of Stock)"}
+                </div>
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => startEdit(p)} className="flex-1 text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
                   <button onClick={() => deleteProduct(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Remove</button>
