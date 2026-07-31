@@ -4,6 +4,7 @@ import {
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
+  User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1175,7 +1176,7 @@ function Dashboard({ session, onLogout, notify }) {
     { id: "products", label: "Products", icon: Package },
     { id: "orders", label: "Orders", icon: Truck },
     { id: "invoices", label: "Invoices", icon: Receipt },
-    { id: "settings", label: "Settings", icon: Sparkles },
+    { id: "settings", label: "Seller Details", icon: Sparkles },
     { id: "support", label: "Customer Support", icon: LifeBuoy },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
   ];
@@ -1189,8 +1190,8 @@ function Dashboard({ session, onLogout, notify }) {
       <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen relative z-10" style={{ background: "#0B1F3A" }}>
         <div className="flex items-center gap-2.5 px-2">
           <Logo />
-          <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
+          <span className="font-extrabold text-white text-xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            Emirate<span style={{ background: "linear-gradient(90deg,#00C896,#7FE8C9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Fulfil</span>
           </span>
         </div>
         <div className="mt-8 space-y-1">
@@ -1283,10 +1284,12 @@ function Dashboard({ session, onLogout, notify }) {
             <>
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} onCatalogChanged={reload} />}
               {tab === "orders" && (
-                <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
+                isAdmin
+                  ? <AdminOrdersPanel notify={notify} />
+                  : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
               )}
               {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
-              {tab === "settings" && <SettingsTab session={session} />}
+              {tab === "settings" && <SettingsTab session={session} notify={notify} />}
               {tab === "support" && <SupportTab session={session} />}
             </>
           )}
@@ -2407,20 +2410,28 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     <div>
       <div
         className="rounded-2xl p-6 text-white relative overflow-hidden flex items-start justify-between gap-4 flex-wrap"
-        style={{ background: "linear-gradient(135deg,#0B1F3A,#0F2E52 55%,#00997a)" }}
+        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}
       >
         <div
-          className="absolute -left-8 -bottom-12 w-44 h-44 rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(0,200,150,0.3), transparent 70%)" }}
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div
+          className="absolute -left-8 -bottom-12 w-52 h-52 rounded-full opacity-70 blur-3xl"
+          style={{ background: "rgba(0,200,150,0.3)", animation: "blobMove 9s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute -top-14 right-16 w-40 h-40 rounded-full opacity-40 blur-3xl"
+          style={{ background: "rgba(248,180,0,0.35)", animation: "blobMove 11s ease-in-out infinite reverse" }}
         />
         <div className="relative">
           <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
           <p className="text-sm text-white/70 mt-1">Click a product to view it, or add it to cart / buy it now for a customer.</p>
         </div>
-        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full transition-transform duration-200 hover:scale-105" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff" }}>
+        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full transition-all duration-300 hover:scale-105 active:scale-95" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", backdropFilter: "blur(6px)" }}>
           🛒 Cart
           {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896" }}>{cartCount}</span>
+            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896", animation: "livePulse 2s infinite" }}>{cartCount}</span>
           )}
         </button>
       </div>
@@ -2477,25 +2488,37 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             <div
               key={p.id}
               onClick={() => openProduct(p)}
-              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1 cursor-pointer overflow-hidden flex flex-col"
+              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1.5 cursor-pointer overflow-hidden flex flex-col"
               style={{
                 border: "1px solid #E5E7EB",
                 animation: `dashTabIn 0.35s ease-out ${i * 40}ms both`,
                 boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 20px 32px -12px ${color}33`)}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 24px 40px -14px ${color}45`)}
               onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 2px rgba(16,24,40,0.04)")}
             >
+              {/* Gradient accent bar, same touch used across the dashboard's cards */}
+              <div className="absolute top-0 left-0 right-0 h-[3px] z-10" style={{ background: `linear-gradient(90deg, ${color}, ${color}00)` }} />
+
               {/* ── Image ── */}
               <div className="relative w-full aspect-square flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(160deg, ${color}14, ${color}05)` }}>
-                <div className="transition-transform duration-500 ease-out group-hover:scale-105 flex items-center justify-center w-full h-full">
+                <div className="transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full">
                   <ProductThumb product={p} size={56} className="w-full h-full" />
                 </div>
+                {/* Diagonal shine sweep on hover */}
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)",
+                    backgroundSize: "220% 220%",
+                    animation: "shimmer 1.6s ease-in-out",
+                  }}
+                />
                 <span
-                  className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm"
+                  className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm shadow-sm"
                   style={inStock ? { background: "rgba(255,255,255,0.92)", color: "#00a67e" } : { background: "rgba(255,255,255,0.92)", color: "#EF4444" }}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444" }} />
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444", animation: inStock ? "livePulse 2s infinite" : "none" }} />
                   {inStock ? "In Stock" : "Out of Stock"}
                 </span>
                 {isAdmin && (
@@ -2512,9 +2535,12 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 
               {/* ── Content ── */}
               <div className="p-4 flex flex-col flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{p.category}</span>
-                <div className="mt-1 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
-                <div className="mt-2 text-xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>
+                <span className="inline-block w-fit text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color, background: color + "16" }}>{p.category}</span>
+                <div className="mt-2 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
+                <div
+                  className="mt-2 text-xl font-extrabold"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif", background: `linear-gradient(90deg, #0B1F3A, ${color})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+                >
                   AED {Number(p.sell).toLocaleString()}
                 </div>
 
@@ -2560,17 +2586,46 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
   const totalBilled = billable.reduce((s, o) => s + o.sellPrice * o.qty + (o.deliveryCharge || 0), 0);
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
-      <p className="text-sm text-gray-500 mt-1">An invoice is generated automatically for every order you log. Admin reviews and approves each one before it counts as Paid.</p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} />
-        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} />
-        <StatCard label="Unpaid invoice" value={unpaidInvoice} prefix="AED " color="#F8B400" icon={Receipt} />
-        <StatCard label="Paid invoice" value={paidInvoice} prefix="AED " color="#00C896" icon={CheckCircle2} />
+      <div
+        className="rounded-2xl p-6 text-white relative overflow-hidden mb-6"
+        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}
+      >
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div
+          className="absolute -top-14 -right-10 w-56 h-56 rounded-full opacity-30 blur-3xl"
+          style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl"
+          style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }}
+        />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+            <Receipt className="w-7 h-7" style={{ color: "#00e0aa" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
+            <p className="text-sm text-white/70 mt-1">An invoice is generated automatically for every order you log. Admin reviews and approves each one before it counts as Paid.</p>
+          </div>
+        </div>
       </div>
-      <div className="mt-6 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} delay={0} />
+        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} delay={60} />
+        <StatCard label="Unpaid invoice" value={unpaidInvoice} prefix="AED " color="#F8B400" icon={Receipt} delay={120} />
+        <StatCard label="Paid invoice" value={paidInvoice} prefix="AED " color="#00C896" icon={CheckCircle2} delay={180} />
+      </div>
+      <div className="mt-6 rounded-2xl bg-white overflow-x-auto transition-all duration-500" style={{ border: "1px solid #E5E7EB", animation: "dashTabIn 0.4s ease-out 0.2s both" }}>
         {orders.length === 0 ? (
-          <div className="text-sm text-gray-400 py-10 text-center">No invoices yet — they appear here once you log an order.</div>
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.06)" }}>
+              <Receipt className="w-7 h-7" style={{ color: "#9CA3AF" }} />
+            </div>
+            <div className="text-sm text-gray-400">No invoices yet — they appear here once you log an order.</div>
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -2604,6 +2659,239 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+function AdminOrdersPanel({ notify }) {
+  const [allOrders, setAllOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [trackingDrafts, setTrackingDrafts] = useState({});
+  // Seller bank details, keyed by email — pulled from profiles so the payout
+  // account each seller filled in (and can update from Seller Details) shows
+  // right here next to their orders, no need to jump to the Sellers table.
+  const [sellerBankInfo, setSellerBankInfo] = useState({});
+
+  const loadAllOrders = async () => {
+    setOrdersLoading(true);
+    const [{ data, error }, { data: profiles }] = await Promise.all([
+      supabase.from("orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("email, bank_name, account_title, account_number, iban"),
+    ]);
+    if (!error) setAllOrders(data || []);
+    const bankMap = {};
+    (profiles || []).forEach((p) => { if (p.email) bankMap[p.email] = p; });
+    setSellerBankInfo(bankMap);
+    setOrdersLoading(false);
+  };
+  useEffect(() => { loadAllOrders(); }, []); // eslint-disable-line
+
+  const setAdminOrderStatus = async (id, status) => {
+    await supabase.from("orders").update({ status }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
+  };
+  const setAdminPaymentStatus = async (id, payment_status) => {
+    await supabase.from("orders").update({ payment_status }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, payment_status } : o)));
+    notify && notify(payment_status === "paid" ? "Invoice approved as paid." : "Invoice marked unpaid.");
+  };
+  const saveTracking = async (id) => {
+    const value = trackingDrafts[id] ?? "";
+    await supabase.from("orders").update({ tracking_number: value }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, tracking_number: value } : o)));
+    notify && notify("Tracking number saved.");
+  };
+
+  // Group every order by seller, in the order each seller's most recent order appeared —
+  // so the busiest / most-recent seller naturally floats to the top.
+  const sellerGroups = [];
+  const seenSellers = new Map();
+  for (const o of allOrders) {
+    const key = o.seller_email || "Unknown seller";
+    if (!seenSellers.has(key)) {
+      seenSellers.set(key, sellerGroups.length);
+      sellerGroups.push({ seller: key, orders: [] });
+    }
+    sellerGroups[seenSellers.get(key)].orders.push(o);
+  }
+  const SELLER_COLORS = ["#00C896", "#3B82F6", "#F8B400", "#8B5CF6", "#EC4899", "#0B7A5E"];
+
+  return (
+    <div>
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div className="absolute -top-14 -right-10 w-56 h-56 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+            <Truck className="w-7 h-7" style={{ color: "#00e0aa" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Orders — all sellers</h1>
+            <p className="text-sm text-white/70 mt-1">Every order any seller logs lands here immediately for you to fulfill and update.</p>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes adminOrdersFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes adminOrderRowFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes sellerGroupFadeIn { from { opacity: 0; transform: translateY(18px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .admin-orders-panel { animation: adminOrdersFadeIn 0.5s cubic-bezier(.2,.7,.2,1) both; }
+        .admin-order-row { opacity: 0; animation: adminOrderRowFadeIn 0.4s cubic-bezier(.2,.7,.2,1) forwards; }
+        .seller-group { opacity: 0; animation: sellerGroupFadeIn 0.5s cubic-bezier(.2,.7,.2,1) forwards; }
+      `}</style>
+
+      {!ordersLoading && allOrders.length > 0 && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-gray-500">Update status, approve payments, and save tracking numbers below.</div>
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(0,200,150,0.12)", color: "#00a67e" }}>
+            {allOrders.length} order{allOrders.length === 1 ? "" : "s"} · {sellerGroups.length} seller{sellerGroups.length === 1 ? "" : "s"}
+          </span>
+        </div>
+      )}
+
+      {ordersLoading ? (
+        <div className="rounded-2xl bg-white text-sm text-gray-400 py-10 text-center" style={{ border: "1px solid #E5E7EB" }}>Loading orders…</div>
+      ) : allOrders.length === 0 ? (
+        <div className="rounded-2xl bg-white text-sm text-gray-400 py-10 text-center" style={{ border: "1px solid #E5E7EB" }}>No customer orders yet.</div>
+      ) : (
+        <div className="space-y-6">
+          {sellerGroups.map((group, gi) => {
+            const color = SELLER_COLORS[gi % SELLER_COLORS.length];
+            return (
+              <div
+                key={group.seller}
+                className="seller-group admin-orders-panel rounded-2xl bg-white overflow-hidden"
+                style={{ border: "1px solid #E5E7EB", animationDelay: `${gi * 90}ms`, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
+              >
+                {/* Seller header — colored, one per seller, sits above their own orders */}
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 transition-all duration-300"
+                  style={{ background: `linear-gradient(90deg, ${color}1A, ${color}05)`, borderBottom: `1px solid ${color}30` }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-extrabold"
+                      style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 6px 14px ${color}40`, fontFamily: "'Space Grotesk', sans-serif" }}
+                    >
+                      {(group.seller[0] || "?").toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm truncate" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{group.seller}</div>
+                      {(() => {
+                        const bank = sellerBankInfo[group.seller];
+                        if (!bank || (!bank.bank_name && !bank.account_number && !bank.iban)) return null;
+                        return (
+                          <div
+                            className="flex items-center gap-1 text-[11px] text-gray-500 truncate mt-0.5"
+                            title={`Account title: ${bank.account_title || "—"}  ·  IBAN: ${bank.iban || "—"}`}
+                          >
+                            <Landmark className="w-3 h-3 flex-shrink-0" style={{ color }} />
+                            <span className="truncate">{bank.bank_name || "—"} · {bank.account_number || "—"}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: color + "22", color }}>
+                    {group.orders.length} order{group.orders.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                        <th className="px-4 py-3">Order</th>
+                        <th className="px-4 py-3">Product</th>
+                        <th className="px-4 py-3">Customer</th>
+                        <th className="px-4 py-3">Email / Phone</th>
+                        <th className="px-4 py-3">Address / Emirate</th>
+                        <th className="px-4 py-3">Amount</th>
+                        <th className="px-4 py-3">Profit</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Payment</th>
+                        <th className="px-4 py-3">Tracking #</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.orders.map((o, i) => (
+                        <tr key={o.id} className="admin-order-row transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA", animationDelay: `${gi * 90 + Math.min(i, 20) * 35}ms` }}>
+                          <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
+                          <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
+                          <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">
+                            <div>{o.customer_email || "—"}</div>
+                            <div className="text-gray-400">{o.customer_phone || ""}</div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
+                            <div className="text-gray-700 font-medium">{o.city || "—"}</div>
+                            <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
+                          </td>
+                          <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
+                          <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>
+                            AED {(o.status === "cancelled" || o.status === "returned") ? 0 : (Number(o.sell_price) - Number(o.list_price != null ? o.list_price : o.sell_price)) * o.qty}
+                          </td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={o.status}
+                              onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
+                              className="text-xs rounded-full px-2 py-1 font-semibold border-0"
+                              style={
+                                o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
+                                o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
+                                o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
+                                o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
+                                { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
+                              }
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="shipped">Shipped</option>
+                              <option value="delivered">Delivered</option>
+                              <option value="cancelled">Cancelled</option>
+                              <option value="returned">Returned</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            {o.status === "cancelled" ? (
+                              <span className="text-xs text-gray-300">—</span>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <PaymentPill status={o.payment_status} />
+                                {o.payment_status === "paid" ? (
+                                  <button onClick={() => setAdminPaymentStatus(o.id, "unpaid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Undo</button>
+                                ) : (
+                                  <button onClick={() => setAdminPaymentStatus(o.id, "paid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-white" style={{ background: "#00C896" }}>Approve</button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                defaultValue={o.tracking_number || ""}
+                                onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
+                                placeholder="e.g. AWB123456"
+                                className="w-28 rounded-lg px-2 py-1.5 text-xs"
+                                style={{ border: "1px solid #E5E7EB" }}
+                              />
+                              <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -2696,25 +2984,229 @@ function WalletTab({ confirmedProfit, pending, notify }) {
   );
 }
 
-function SettingsTab({ session }) {
+function DetailRow({ icon: Icon, label, value, color, delay = 0 }) {
+  return (
+    <div
+      className="flex items-start gap-3 py-3 transition-all duration-300"
+      style={{ borderBottom: "1px solid #F3F4F6", animation: `dashTabIn 0.4s ease-out both`, animationDelay: `${delay}ms` }}
+    >
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+        style={{ background: color + "1A" }}
+      >
+        <Icon className="w-4 h-4" style={{ color }} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs text-gray-500">{label}</div>
+        <div className="mt-0.5 text-sm font-semibold truncate" style={{ color: value === "—" ? "#C0C5CE" : "#111827" }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function DetailSection({ title, icon: Icon, color, rows, delay = 0 }) {
+  return (
+    <div
+      className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-0.5"
+      style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)", animation: "dashTabIn 0.45s ease-out both", animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-center gap-2.5 mb-1">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 6px 14px ${color}40` }}>
+          <Icon className="w-4 h-4 text-white" />
+        </div>
+        <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</div>
+      </div>
+      <div>
+        {rows.map((r, i) => (
+          <DetailRow key={r.label} icon={r.icon} label={r.label} value={r.value} color={color} delay={i * 60} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SettingsTab({ session, notify }) {
+  const initials = (session.name || session.email || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
+
+  const personal = [
+    { icon: User, label: "Full name", value: session.name || "—" },
+    { icon: Mail, label: "Email", value: session.email || "—" },
+    { icon: Phone, label: "Mobile", value: session.phone || "—" },
+    { icon: MessageCircle, label: "WhatsApp", value: session.whatsapp || "—" },
+  ];
+  const store = [
+    { icon: Store, label: "Store name", value: session.storeName || session.company || "—" },
+    { icon: Globe2, label: "Country", value: session.country || "—" },
+    { icon: TrendingUp, label: "Monthly avg. orders", value: session.monthlyOrders || "—" },
+  ];
+
+  // Bank details are editable — everything else on this page still isn't.
+  // savedBank reflects what's actually in Supabase; bankForm is the draft
+  // being edited. Saving writes to profiles by email, so Admin's Orders and
+  // Sellers views (which read from the same table) pick up the change too.
+  const [editingBank, setEditingBank] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
+  const [savedBank, setSavedBank] = useState({
+    bankName: session.bankName || "", accountTitle: session.accountTitle || "",
+    accountNumber: session.accountNumber || "", iban: session.iban || "",
+  });
+  const [bankForm, setBankForm] = useState(savedBank);
+
+  const startEditBank = () => { setBankForm(savedBank); setEditingBank(true); };
+  const cancelEditBank = () => { setEditingBank(false); setBankForm(savedBank); };
+  const updateBankField = (k) => (e) => setBankForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const saveBank = async () => {
+    if (!bankForm.bankName || !bankForm.accountTitle || !bankForm.accountNumber || !bankForm.iban) {
+      notify && notify("Please fill in all bank details.");
+      return;
+    }
+    setSavingBank(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        bank_name: bankForm.bankName, account_title: bankForm.accountTitle,
+        account_number: bankForm.accountNumber, iban: bankForm.iban,
+      })
+      .eq("email", session.email);
+    setSavingBank(false);
+    if (error) { notify && notify("Could not save bank details."); return; }
+    setSavedBank(bankForm);
+    setEditingBank(false);
+    notify && notify("Bank details updated.");
+  };
+
+  const banking = [
+    { icon: Landmark, label: "Bank name", value: savedBank.bankName || "—" },
+    { icon: User, label: "Account title", value: savedBank.accountTitle || "—" },
+    { icon: Hash, label: "Account number", value: savedBank.accountNumber || "—" },
+    { icon: Hash, label: "IBAN", value: savedBank.iban || "—" },
+  ];
+
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Settings</h1>
-      <p className="text-sm text-gray-500 mt-1">Your account details.</p>
-      <div className="mt-6 rounded-2xl p-6 bg-white max-w-lg space-y-4" style={{ border: "1px solid #E5E7EB" }}>
-        {[
-          ["Full name", session.name], ["Email", session.email], ["Store name", session.storeName || session.company || "—"],
-          ["Country", session.country || "—"], ["Mobile", session.phone || "—"], ["WhatsApp", session.whatsapp || "—"],
-          ["Monthly avg. orders", session.monthlyOrders || "—"], ["Bank name", session.bankName || "—"],
-          ["Account title", session.accountTitle || "—"], ["Account number", session.accountNumber || "—"], ["IBAN", session.iban || "—"],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <label className="text-xs text-gray-500">{label}</label>
-            <div className="mt-1 text-sm font-semibold" style={{ color: "#111827" }}>{value}</div>
+      {/* Profile header banner, matching the dashboard's visual language */}
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
+
+        <div className="relative flex items-center gap-5">
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-extrabold text-white"
+            style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 10px 24px rgba(0,200,150,0.4)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {initials}
           </div>
-        ))}
-        <p className="text-xs text-gray-400 pt-2" style={{ borderTop: "1px solid #F3F4F6" }}>Editing profile fields isn't wired up yet in this prototype — say the word and I'll add it next.</p>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {session.name || "Seller"}
+              </h1>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(0,200,150,0.18)", color: "#7FE8C9" }}>
+                <BadgeCheck className="w-3 h-3" /> Verified Seller
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-white/60">{session.storeName || session.company || "Your store"} · {session.country || "UAE"}</p>
+          </div>
+        </div>
       </div>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+        <DetailSection title="Personal information" icon={User} color="#3B82F6" rows={personal} delay={0} />
+        <DetailSection title="Store information" icon={Store} color="#F8B400" rows={store} delay={80} />
+        <div className="lg:col-span-2">
+          {!editingBank ? (
+            <div
+              className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-0.5"
+              style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)", animation: "dashTabIn 0.45s ease-out both", animationDelay: "160ms" }}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#8B5CF6,#8B5CF6CC)", boxShadow: "0 6px 14px #8B5CF640" }}>
+                    <Landmark className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Banking information</div>
+                </div>
+                <button
+                  onClick={startEditBank}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full transition-transform hover:scale-105"
+                  style={{ background: "rgba(139,92,246,0.12)", color: "#8B5CF6" }}
+                >
+                  Edit
+                </button>
+              </div>
+              <div>
+                {banking.map((r, i) => (
+                  <DetailRow key={r.label} icon={r.icon} label={r.label} value={r.value} color="#8B5CF6" delay={i * 60} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div
+              className="rounded-2xl p-6 bg-white"
+              style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
+            >
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#8B5CF6,#8B5CF6CC)", boxShadow: "0 6px 14px #8B5CF640" }}>
+                  <Landmark className="w-4 h-4 text-white" />
+                </div>
+                <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Edit banking information</div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <LightField label="Bank name" value={bankForm.bankName} onChange={updateBankField("bankName")} />
+                <LightField label="Account title" value={bankForm.accountTitle} onChange={updateBankField("accountTitle")} />
+                <LightField label="Account number" value={bankForm.accountNumber} onChange={updateBankField("accountNumber")} />
+                <LightField label="IBAN" value={bankForm.iban} onChange={updateBankField("iban")} />
+              </div>
+              <div className="flex items-center gap-2 mt-5">
+                <button
+                  onClick={saveBank}
+                  disabled={savingBank}
+                  className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
+                  style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: savingBank ? 0.6 : 1 }}
+                >
+                  {savingBank ? "Saving…" : "Save changes"}
+                </button>
+                <button
+                  onClick={cancelEditBank}
+                  disabled={savingBank}
+                  className="text-sm font-semibold px-5 py-2.5 rounded-full"
+                  style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-400 mt-5 px-1">Personal and store details aren't editable yet — only banking information can be updated for now.</p>
+    </div>
+  );
+}
+
+// Light-background input used on the Seller Details page (unlike Field,
+// which is styled for the dark Auth page).
+function LightField({ label, type = "text", value, onChange, placeholder }) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500">{label}</label>
+      <input
+        type={type} value={value} onChange={onChange} placeholder={placeholder}
+        className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+        style={{ background: "#F8FAFC", border: "1px solid #E5E7EB", color: "#111827" }}
+      />
     </div>
   );
 }
@@ -2801,27 +3293,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       approval_status === "deactivated" ? "Seller deactivated — they can no longer log in." :
       "Seller status updated."
     );
-  };
-
-  const setAdminOrderStatus = async (id, status) => {
-    await supabase.from("orders").update({ status }).eq("id", id);
-    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
-  };
-
-  // Only Admin can approve an invoice as Paid — this is what moves it out of
-  // the seller's "Unpaid invoice" box and into "Paid invoice".
-  const setAdminPaymentStatus = async (id, payment_status) => {
-    await supabase.from("orders").update({ payment_status }).eq("id", id);
-    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, payment_status } : o)));
-    notify(payment_status === "paid" ? "Invoice approved as paid." : "Invoice marked unpaid.");
-  };
-
-  const [trackingDrafts, setTrackingDrafts] = useState({});
-  const saveTracking = async (id) => {
-    const value = trackingDrafts[id] ?? "";
-    await supabase.from("orders").update({ tracking_number: value }).eq("id", id);
-    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, tracking_number: value } : o)));
-    notify("Tracking number saved.");
   };
 
   const addProduct = async (e) => {
@@ -2965,115 +3436,8 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <StatCard label="Customer orders (all sellers)" value={allOrders.length} color="#F8B400" />
       </div>
 
-      {/* Every order every seller has logged — moved to the top of Admin so
-          it's the first thing you see, with a fade/slide-in entrance and a
-          staggered row animation each time the list loads or refreshes. */}
-      <style>{`
-        @keyframes adminOrdersFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes adminOrderRowFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .admin-orders-panel { animation: adminOrdersFadeIn 0.5s cubic-bezier(.2,.7,.2,1) both; }
-        .admin-order-row { opacity: 0; animation: adminOrderRowFadeIn 0.4s cubic-bezier(.2,.7,.2,1) forwards; }
-      `}</style>
-      <div className="admin-orders-panel mt-6 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="px-5 pt-5 pb-1 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer orders — all sellers</div>
-            <p className="text-xs text-gray-400 mt-1">Every order any seller logs lands here immediately for you to fulfill and update.</p>
-          </div>
-          {!ordersLoading && allOrders.length > 0 && (
-            <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(0,200,150,0.12)", color: "#00a67e" }}>
-              {allOrders.length} order{allOrders.length === 1 ? "" : "s"} · {new Set(allOrders.map((o) => o.seller_email)).size} seller{new Set(allOrders.map((o) => o.seller_email)).size === 1 ? "" : "s"}
-            </span>
-          )}
-        </div>
-        {ordersLoading ? (
-          <div className="text-sm text-gray-400 py-10 text-center">Loading orders…</div>
-        ) : allOrders.length === 0 ? (
-          <div className="text-sm text-gray-400 py-10 text-center">No customer orders yet.</div>
-        ) : (
-          <table className="w-full text-sm mt-3">
-            <thead>
-              <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <th className="px-4 py-3">Order</th>
-                <th className="px-4 py-3">Seller</th>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Email / Phone</th>
-                <th className="px-4 py-3">Address / Emirate</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Payment</th>
-                <th className="px-4 py-3">Tracking #</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allOrders.map((o, i) => (
-                <tr key={o.id} className="admin-order-row transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA", animationDelay: `${Math.min(i, 20) * 35}ms` }}>
-                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
-                  <td className="px-4 py-3 text-gray-500">{o.seller_email}</td>
-                  <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
-                  <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    <div>{o.customer_email || "—"}</div>
-                    <div className="text-gray-400">{o.customer_phone || ""}</div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
-                    <div className="text-gray-700 font-medium">{o.city || "—"}</div>
-                    <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
-                  </td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={o.status}
-                      onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
-                      className="text-xs rounded-full px-2 py-1 font-semibold border-0"
-                      style={
-                        o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
-                        o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
-                        o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
-                        o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
-                        { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
-                      }
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="returned">Returned</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    {o.status === "cancelled" ? (
-                      <span className="text-xs text-gray-300">—</span>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <PaymentPill status={o.payment_status} />
-                        {o.payment_status === "paid" ? (
-                          <button onClick={() => setAdminPaymentStatus(o.id, "unpaid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Undo</button>
-                        ) : (
-                          <button onClick={() => setAdminPaymentStatus(o.id, "paid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-white" style={{ background: "#00C896" }}>Approve</button>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        defaultValue={o.tracking_number || ""}
-                        onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
-                        placeholder="e.g. AWB123456"
-                        className="w-28 rounded-lg px-2 py-1.5 text-xs"
-                        style={{ border: "1px solid #E5E7EB" }}
-                      />
-                      <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Full order management for every seller now lives under the "Orders"
+          tab in the sidebar (shown there for Admin logins) — see AdminOrdersPanel. */}
 
       {/* Site logo: upload a picture from your computer to replace the default icon everywhere */}
       <div className="mt-6 rounded-2xl bg-white p-5" style={{ border: "1px solid #E5E7EB" }}>
@@ -3350,7 +3714,29 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   );
 }
 
+function SupportChannelCard({ icon, iconBg, title, subtitle, action, delay = 0 }) {
+  return (
+    <div
+      className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-1 hover:shadow-lg"
+      style={{ border: "1px solid #E5E7EB", animation: "dashTabIn 0.45s ease-out both", animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</div>
+          <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
 function SupportTab({ session }) {
+  const email = "info.buzznetic@gmail.com";
+  const address = "99 Al Waha St - Al Qouz Third - Al Quoz - Dubai - United Arab Emirates";
   return (
     <div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
@@ -3358,7 +3744,8 @@ function SupportTab({ session }) {
           className="absolute inset-0 opacity-[0.07]"
           style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         />
-        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896" }} />
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="relative flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
             <LifeBuoy className="w-7 h-7" style={{ color: "#00e0aa" }} />
@@ -3370,25 +3757,61 @@ function SupportTab({ session }) {
         </div>
       </div>
 
-      <div className="rounded-2xl p-6 bg-white max-w-md" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,211,102,0.12)" }}>
-            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>
-          </div>
-          <div>
-            <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>WhatsApp support</div>
-            <div className="text-xs text-gray-400 mt-0.5">Usually replies within a few minutes.</div>
-          </div>
-        </div>
-        <a
-          href="https://wa.me/971568328274"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
-          style={{ background: "#25D366" }}
-        >
-          Chat on WhatsApp · +971 56 832 8274
-        </a>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <SupportChannelCard
+          delay={0}
+          iconBg="rgba(37,211,102,0.12)"
+          icon={<svg viewBox="0 0 24 24" className="w-6 h-6" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>}
+          title="WhatsApp support"
+          subtitle="+971 56 832 8274 · replies within minutes"
+          action={
+            <a
+              href="https://wa.me/971568328274"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+              style={{ background: "#25D366" }}
+            >
+              Chat on WhatsApp
+            </a>
+          }
+        />
+
+        <SupportChannelCard
+          delay={90}
+          iconBg="rgba(59,130,246,0.12)"
+          icon={<Mail className="w-6 h-6" style={{ color: "#3B82F6" }} />}
+          title="Email support"
+          subtitle="We reply within one business day."
+          action={
+            <a
+              href={`mailto:${email}`}
+              className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+              style={{ background: "#3B82F6" }}
+            >
+              {email}
+            </a>
+          }
+        />
+
+        <SupportChannelCard
+          delay={180}
+          iconBg="rgba(248,180,0,0.15)"
+          icon={<MapPin className="w-6 h-6" style={{ color: "#F8B400" }} />}
+          title="Our office"
+          subtitle="Dubai, United Arab Emirates"
+          action={
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex items-center justify-center gap-2 w-full text-xs sm:text-sm font-semibold py-3 rounded-full text-white text-center transition-transform duration-200 hover:scale-[1.02] active:scale-95 leading-snug px-2"
+              style={{ background: "#F8B400" }}
+            >
+              {address}
+            </a>
+          }
+        />
       </div>
     </div>
   );
