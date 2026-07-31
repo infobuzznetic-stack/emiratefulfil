@@ -1358,6 +1358,42 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
   );
 }
 
+// Real vector flags (simplified) — Windows renders emoji flags as plain "AE"/"SA"/"QA"
+// letter badges, so we draw the actual flags ourselves for a proper look everywhere.
+function MiniFlag({ id, className = "w-5 h-3.5" }) {
+  const common = "rounded-[2px] overflow-hidden flex-shrink-0 ring-1 ring-black/10";
+  if (id === "UAE") {
+    return (
+      <svg viewBox="0 0 24 16" className={`${className} ${common}`}>
+        <rect width="24" height="16" fill="#00732F" />
+        <rect y="0" width="24" height="5.33" fill="#00732F" />
+        <rect y="5.33" width="24" height="5.34" fill="#FFFFFF" />
+        <rect y="10.67" width="24" height="5.33" fill="#000000" />
+        <rect width="7" height="16" fill="#FF0000" />
+      </svg>
+    );
+  }
+  if (id === "KSA") {
+    return (
+      <svg viewBox="0 0 24 16" className={`${className} ${common}`}>
+        <rect width="24" height="16" fill="#006C35" />
+        <rect y="6.2" width="24" height="1.4" fill="#FFFFFF" />
+        <rect y="10" width="14" height="1.1" fill="#FFFFFF" />
+      </svg>
+    );
+  }
+  if (id === "QATAR") {
+    return (
+      <svg viewBox="0 0 24 16" className={`${className} ${common}`}>
+        <rect width="24" height="16" fill="#8D1B3D" />
+        <rect width="8" height="16" fill="#FFFFFF" />
+        <polygon points="8,0 10,0 8,2 10,3.2 8,4.4 10,5.6 8,6.8 10,8 8,9.2 10,10.4 8,11.6 10,12.8 8,14 10,16 8,16" fill="#FFFFFF" />
+      </svg>
+    );
+  }
+  return null;
+}
+
 function LiveClock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -1466,34 +1502,35 @@ function OverviewTab({
                 : <>Preview your future {region === "KSA" ? "Saudi" : "Qatar"} storefront below.</>}
             </p>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             {/* UAE / KSA / Qatar region switch */}
-            <div className="flex items-center rounded-full p-1 relative" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
+            <div className="flex items-center rounded-full p-1 relative w-full sm:w-auto" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
               {regions.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => setRegion(r.id)}
-                  className="relative z-10 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 ease-out hover:scale-[1.04] active:scale-95 flex items-center gap-1"
+                  className="relative z-10 flex-1 sm:flex-initial px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 ease-out hover:scale-[1.04] active:scale-95 flex items-center justify-center gap-1.5"
                   style={
                     region === r.id
                       ? { background: "#00C896", color: "#04140f", boxShadow: "0 4px 14px rgba(0,200,150,0.35)" }
                       : { color: "rgba(255,255,255,0.55)" }
                   }
                 >
-                  {r.flag} {r.id}
-                  {!r.live && <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(248,180,0,0.25)", color: "#FFD98A" }}>SOON</span>}
+                  <MiniFlag id={r.id} />
+                  {r.id}
+                  {!r.live && <span className="ml-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(248,180,0,0.25)", color: "#FFD98A" }}>SOON</span>}
                 </button>
               ))}
             </div>
             {region === "UAE" && (
               <div
-                className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl"
+                className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto"
                 style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", backdropFilter: "blur(6px)" }}
               >
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 6px 16px rgba(0,200,150,0.4)" }}>
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-1 sm:flex-initial">
                   <div className="text-[11px] font-medium text-white/50 uppercase tracking-wide">Confirmed profit</div>
                   <div className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
                 </div>
@@ -1501,6 +1538,17 @@ function OverviewTab({
             )}
           </div>
         </div>
+        {/* UAE flag-colored accent strip along the bottom for a distinctly local touch */}
+        {region === "UAE" && (
+          <div className="relative mt-6 h-[3px] w-full rounded-full overflow-hidden flex opacity-70">
+            <div className="flex-[7]" style={{ background: "#FF0000" }} />
+            <div className="flex-[24] flex flex-col">
+              <div className="flex-1" style={{ background: "#00732F" }} />
+              <div className="flex-1" style={{ background: "#FFFFFF" }} />
+              <div className="flex-1" style={{ background: "#000000" }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {region !== "UAE" ? (
