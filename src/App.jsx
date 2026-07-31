@@ -1289,7 +1289,7 @@ function Dashboard({ session, onLogout, notify }) {
                   : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
               )}
               {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
-              {tab === "settings" && <SettingsTab session={session} />}
+              {tab === "settings" && <SettingsTab session={session} notify={notify} />}
               {tab === "support" && <SupportTab session={session} />}
             </>
           )}
@@ -2667,11 +2667,21 @@ function AdminOrdersPanel({ notify }) {
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [trackingDrafts, setTrackingDrafts] = useState({});
+  // Seller bank details, keyed by email — pulled from profiles so the payout
+  // account each seller filled in (and can update from Seller Details) shows
+  // right here next to their orders, no need to jump to the Sellers table.
+  const [sellerBankInfo, setSellerBankInfo] = useState({});
 
   const loadAllOrders = async () => {
     setOrdersLoading(true);
-    const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    const [{ data, error }, { data: profiles }] = await Promise.all([
+      supabase.from("orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("email, bank_name, account_title, account_number, iban"),
+    ]);
     if (!error) setAllOrders(data || []);
+    const bankMap = {};
+    (profiles || []).forEach((p) => { if (p.email) bankMap[p.email] = p; });
+    setSellerBankInfo(bankMap);
     setOrdersLoading(false);
   };
   useEffect(() => { loadAllOrders(); }, []); // eslint-disable-line
@@ -2770,7 +2780,22 @@ function AdminOrdersPanel({ notify }) {
                     >
                       {(group.seller[0] || "?").toUpperCase()}
                     </div>
-                    <div className="font-bold text-sm truncate" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{group.seller}</div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm truncate" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{group.seller}</div>
+                      {(() => {
+                        const bank = sellerBankInfo[group.seller];
+                        if (!bank || (!bank.bank_name && !bank.account_number && !bank.iban)) return null;
+                        return (
+                          <div
+                            className="flex items-center gap-1 text-[11px] text-gray-500 truncate mt-0.5"
+                            title={`Account title: ${bank.account_title || "—"}  ·  IBAN: ${bank.iban || "—"}`}
+                          >
+                            <Landmark className="w-3 h-3 flex-shrink-0" style={{ color }} />
+                            <span className="truncate">{bank.bank_name || "—"} · {bank.account_number || "—"}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                   <span className="text-[11px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: color + "22", color }}>
                     {group.orders.length} order{group.orders.length === 1 ? "" : "s"}
@@ -3000,7 +3025,7 @@ function DetailSection({ title, icon: Icon, color, rows, delay = 0 }) {
   );
 }
 
-function SettingsTab({ session }) {
+function SettingsTab({ session, notify }) {
   const initials = (session.name || session.email || "?")
     .split(" ")
     .filter(Boolean)
@@ -3020,11 +3045,48 @@ function SettingsTab({ session }) {
     { icon: Globe2, label: "Country", value: session.country || "—" },
     { icon: TrendingUp, label: "Monthly avg. orders", value: session.monthlyOrders || "—" },
   ];
+
+  // Bank details are editable — everything else on this page still isn't.
+  // savedBank reflects what's actually in Supabase; bankForm is the draft
+  // being edited. Saving writes to profiles by email, so Admin's Orders and
+  // Sellers views (which read from the same table) pick up the change too.
+  const [editingBank, setEditingBank] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
+  const [savedBank, setSavedBank] = useState({
+    bankName: session.bankName || "", accountTitle: session.accountTitle || "",
+    accountNumber: session.accountNumber || "", iban: session.iban || "",
+  });
+  const [bankForm, setBankForm] = useState(savedBank);
+
+  const startEditBank = () => { setBankForm(savedBank); setEditingBank(true); };
+  const cancelEditBank = () => { setEditingBank(false); setBankForm(savedBank); };
+  const updateBankField = (k) => (e) => setBankForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const saveBank = async () => {
+    if (!bankForm.bankName || !bankForm.accountTitle || !bankForm.accountNumber || !bankForm.iban) {
+      notify && notify("Please fill in all bank details.");
+      return;
+    }
+    setSavingBank(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        bank_name: bankForm.bankName, account_title: bankForm.accountTitle,
+        account_number: bankForm.accountNumber, iban: bankForm.iban,
+      })
+      .eq("email", session.email);
+    setSavingBank(false);
+    if (error) { notify && notify("Could not save bank details."); return; }
+    setSavedBank(bankForm);
+    setEditingBank(false);
+    notify && notify("Bank details updated.");
+  };
+
   const banking = [
-    { icon: Landmark, label: "Bank name", value: session.bankName || "—" },
-    { icon: User, label: "Account title", value: session.accountTitle || "—" },
-    { icon: Hash, label: "Account number", value: session.accountNumber || "—" },
-    { icon: Hash, label: "IBAN", value: session.iban || "—" },
+    { icon: Landmark, label: "Bank name", value: savedBank.bankName || "—" },
+    { icon: User, label: "Account title", value: savedBank.accountTitle || "—" },
+    { icon: Hash, label: "Account number", value: savedBank.accountNumber || "—" },
+    { icon: Hash, label: "IBAN", value: savedBank.iban || "—" },
   ];
 
   return (
@@ -3063,11 +3125,88 @@ function SettingsTab({ session }) {
         <DetailSection title="Personal information" icon={User} color="#3B82F6" rows={personal} delay={0} />
         <DetailSection title="Store information" icon={Store} color="#F8B400" rows={store} delay={80} />
         <div className="lg:col-span-2">
-          <DetailSection title="Banking information" icon={Landmark} color="#8B5CF6" rows={banking} delay={160} />
+          {!editingBank ? (
+            <div
+              className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-0.5"
+              style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)", animation: "dashTabIn 0.45s ease-out both", animationDelay: "160ms" }}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#8B5CF6,#8B5CF6CC)", boxShadow: "0 6px 14px #8B5CF640" }}>
+                    <Landmark className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Banking information</div>
+                </div>
+                <button
+                  onClick={startEditBank}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full transition-transform hover:scale-105"
+                  style={{ background: "rgba(139,92,246,0.12)", color: "#8B5CF6" }}
+                >
+                  Edit
+                </button>
+              </div>
+              <div>
+                {banking.map((r, i) => (
+                  <DetailRow key={r.label} icon={r.icon} label={r.label} value={r.value} color="#8B5CF6" delay={i * 60} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div
+              className="rounded-2xl p-6 bg-white"
+              style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
+            >
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#8B5CF6,#8B5CF6CC)", boxShadow: "0 6px 14px #8B5CF640" }}>
+                  <Landmark className="w-4 h-4 text-white" />
+                </div>
+                <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Edit banking information</div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <LightField label="Bank name" value={bankForm.bankName} onChange={updateBankField("bankName")} />
+                <LightField label="Account title" value={bankForm.accountTitle} onChange={updateBankField("accountTitle")} />
+                <LightField label="Account number" value={bankForm.accountNumber} onChange={updateBankField("accountNumber")} />
+                <LightField label="IBAN" value={bankForm.iban} onChange={updateBankField("iban")} />
+              </div>
+              <div className="flex items-center gap-2 mt-5">
+                <button
+                  onClick={saveBank}
+                  disabled={savingBank}
+                  className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
+                  style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: savingBank ? 0.6 : 1 }}
+                >
+                  {savingBank ? "Saving…" : "Save changes"}
+                </button>
+                <button
+                  onClick={cancelEditBank}
+                  disabled={savingBank}
+                  className="text-sm font-semibold px-5 py-2.5 rounded-full"
+                  style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <p className="text-xs text-gray-400 mt-5 px-1">Editing these fields isn't wired up yet in this prototype — say the word and I'll add it next.</p>
+      <p className="text-xs text-gray-400 mt-5 px-1">Personal and store details aren't editable yet — only banking information can be updated for now.</p>
+    </div>
+  );
+}
+
+// Light-background input used on the Seller Details page (unlike Field,
+// which is styled for the dark Auth page).
+function LightField({ label, type = "text", value, onChange, placeholder }) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500">{label}</label>
+      <input
+        type={type} value={value} onChange={onChange} placeholder={placeholder}
+        className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+        style={{ background: "#F8FAFC", border: "1px solid #E5E7EB", color: "#111827" }}
+      />
     </div>
   );
 }
