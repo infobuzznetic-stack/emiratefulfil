@@ -19,6 +19,10 @@ alter table profiles add column if not exists bank_name text;
 alter table profiles add column if not exists account_title text;
 alter table profiles add column if not exists account_number text;
 alter table profiles add column if not exists iban text;
+-- Admin approval gate: every new seller starts 'pending' and cannot use the
+-- dashboard until Admin sets this to 'approved'. Admin can also set
+-- 'deactivated' later to lock an existing seller out again.
+alter table profiles add column if not exists approval_status text not null default 'pending';
 
 -- 2. Shared product catalog (admin manages this; every seller sees the same list)
 create table if not exists products (
@@ -105,6 +109,11 @@ create policy "users can insert their own profile" on profiles
 drop policy if exists "users can update their own profile" on profiles;
 create policy "users can update their own profile" on profiles
   for update using (auth.uid() = id);
+-- Needed so Admin (who is just another signed-in user in this simple model)
+-- can approve/deactivate OTHER sellers' accounts, not just their own row.
+drop policy if exists "profiles updatable by anyone signed in" on profiles;
+create policy "profiles updatable by anyone signed in" on profiles
+  for update using (auth.role() = 'authenticated');
 
 drop policy if exists "products readable by anyone signed in" on products;
 create policy "products readable by anyone signed in" on products
