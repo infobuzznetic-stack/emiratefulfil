@@ -3441,7 +3441,29 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   );
 }
 
+function SupportChannelCard({ icon, iconBg, title, subtitle, action, delay = 0 }) {
+  return (
+    <div
+      className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-1 hover:shadow-lg"
+      style={{ border: "1px solid #E5E7EB", animation: "dashTabIn 0.45s ease-out both", animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</div>
+          <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
 function SupportTab({ session }) {
+  const email = "info.buzznetic@gmail.com";
+  const address = "99 Al Waha St - Al Qouz Third - Al Quoz - Dubai - United Arab Emirates";
   return (
     <div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
@@ -3449,7 +3471,8 @@ function SupportTab({ session }) {
           className="absolute inset-0 opacity-[0.07]"
           style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         />
-        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896" }} />
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="relative flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
             <LifeBuoy className="w-7 h-7" style={{ color: "#00e0aa" }} />
@@ -3461,25 +3484,61 @@ function SupportTab({ session }) {
         </div>
       </div>
 
-      <div className="rounded-2xl p-6 bg-white max-w-md" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,211,102,0.12)" }}>
-            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>
-          </div>
-          <div>
-            <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>WhatsApp support</div>
-            <div className="text-xs text-gray-400 mt-0.5">Usually replies within a few minutes.</div>
-          </div>
-        </div>
-        <a
-          href="https://wa.me/971568328274"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
-          style={{ background: "#25D366" }}
-        >
-          Chat on WhatsApp · +971 56 832 8274
-        </a>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <SupportChannelCard
+          delay={0}
+          iconBg="rgba(37,211,102,0.12)"
+          icon={<svg viewBox="0 0 24 24" className="w-6 h-6" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>}
+          title="WhatsApp support"
+          subtitle="+971 56 832 8274 · replies within minutes"
+          action={
+            <a
+              href="https://wa.me/971568328274"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+              style={{ background: "#25D366" }}
+            >
+              Chat on WhatsApp
+            </a>
+          }
+        />
+
+        <SupportChannelCard
+          delay={90}
+          iconBg="rgba(59,130,246,0.12)"
+          icon={<Mail className="w-6 h-6" style={{ color: "#3B82F6" }} />}
+          title="Email support"
+          subtitle="We reply within one business day."
+          action={
+            <a
+              href={`mailto:${email}`}
+              className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+              style={{ background: "#3B82F6" }}
+            >
+              {email}
+            </a>
+          }
+        />
+
+        <SupportChannelCard
+          delay={180}
+          iconBg="rgba(248,180,0,0.15)"
+          icon={<MapPin className="w-6 h-6" style={{ color: "#F8B400" }} />}
+          title="Our office"
+          subtitle="Dubai, United Arab Emirates"
+          action={
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex items-center justify-center gap-2 w-full text-xs sm:text-sm font-semibold py-3 rounded-full text-white text-center transition-transform duration-200 hover:scale-[1.02] active:scale-95 leading-snug px-2"
+              style={{ background: "#F8B400" }}
+            >
+              {address}
+            </a>
+          }
+        />
       </div>
     </div>
   );
