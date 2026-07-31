@@ -821,18 +821,18 @@ function Toast({ message }) {
 // Countries a seller can sign up from, each with its WhatsApp/mobile dial code —
 // picking a country updates the phone placeholders so the format always matches.
 const SIGNUP_COUNTRIES = [
-  { code: "UAE", label: "United Arab Emirates", dial: "+971", sample: "5x xxx xxxx" },
-  { code: "KSA", label: "Saudi Arabia", dial: "+966", sample: "5x xxx xxxx" },
-  { code: "PK", label: "Pakistan", dial: "+92", sample: "3xx xxxxxxx" },
-  { code: "QA", label: "Qatar", dial: "+974", sample: "xxxx xxxx" },
-  { code: "KW", label: "Kuwait", dial: "+965", sample: "xxxx xxxx" },
-  { code: "BH", label: "Bahrain", dial: "+973", sample: "xxxx xxxx" },
-  { code: "OM", label: "Oman", dial: "+968", sample: "xxxx xxxx" },
-  { code: "EG", label: "Egypt", dial: "+20", sample: "1xx xxx xxxx" },
-  { code: "IN", label: "India", dial: "+91", sample: "xxxxx xxxxx" },
-  { code: "GB", label: "United Kingdom", dial: "+44", sample: "7xxx xxxxxx" },
-  { code: "US", label: "United States", dial: "+1", sample: "xxx xxx xxxx" },
-  { code: "OTHER", label: "Other country", dial: "", sample: "xxx xxx xxxx" },
+  { code: "UAE", label: "United Arab Emirates", dial: "+971", sample: "5x xxx xxxx", bankSample: "e.g. Emirates NBD", ibanSample: "AE07 0331 2345..." },
+  { code: "KSA", label: "Saudi Arabia", dial: "+966", sample: "5x xxx xxxx", bankSample: "e.g. Al Rajhi Bank", ibanSample: "SA03 8000 0000..." },
+  { code: "PK", label: "Pakistan", dial: "+92", sample: "3xx xxxxxxx", bankSample: "e.g. HBL, Meezan Bank", ibanSample: "PK36 SCBL 0000..." },
+  { code: "QA", label: "Qatar", dial: "+974", sample: "xxxx xxxx", bankSample: "e.g. Qatar National Bank", ibanSample: "QA58 DOHB 0000..." },
+  { code: "KW", label: "Kuwait", dial: "+965", sample: "xxxx xxxx", bankSample: "e.g. National Bank of Kuwait", ibanSample: "KW81 CBKU 0000..." },
+  { code: "BH", label: "Bahrain", dial: "+973", sample: "xxxx xxxx", bankSample: "e.g. Ahli United Bank", ibanSample: "BH67 BMAG 0000..." },
+  { code: "OM", label: "Oman", dial: "+968", sample: "xxxx xxxx", bankSample: "e.g. Bank Muscat", ibanSample: "OM81 0180 0000..." },
+  { code: "EG", label: "Egypt", dial: "+20", sample: "1xx xxx xxxx", bankSample: "e.g. National Bank of Egypt", ibanSample: "EG38 0019 0005..." },
+  { code: "IN", label: "India", dial: "+91", sample: "xxxxx xxxxx", bankSample: "e.g. State Bank of India", ibanSample: "Account / IFSC code" },
+  { code: "GB", label: "United Kingdom", dial: "+44", sample: "7xxx xxxxxx", bankSample: "e.g. Barclays", ibanSample: "GB29 NWBK 6016..." },
+  { code: "US", label: "United States", dial: "+1", sample: "xxx xxx xxxx", bankSample: "e.g. Bank of America", ibanSample: "Routing / account no." },
+  { code: "OTHER", label: "Other country", dial: "", sample: "xxx xxx xxxx", bankSample: "e.g. your bank's name", ibanSample: "IBAN / account number" },
 ];
 const MONTHLY_ORDER_OPTIONS = ["0 – 10", "10 – 50", "50 – 100", "100 – 500", "500+"];
 
@@ -975,12 +975,12 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
                 {/* --- Bank details (for payouts) --- */}
                 <AuthSection title="Bank details" subtitle="Used to send your weekly payouts." delay="0.34s">
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="Bank name" value={form.bankName} onChange={update("bankName")} placeholder="e.g. Emirates NBD" required />
+                    <Field label="Bank name" value={form.bankName} onChange={update("bankName")} placeholder={selectedCountry.bankSample} required />
                     <Field label="Account title" value={form.accountTitle} onChange={update("accountTitle")} placeholder="Name on account" required />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Account number" value={form.accountNumber} onChange={update("accountNumber")} placeholder="0123456789" required />
-                    <Field label="IBAN" value={form.iban} onChange={update("iban")} placeholder="AE07 0331 2345..." required />
+                    <Field label="IBAN" value={form.iban} onChange={update("iban")} placeholder={selectedCountry.ibanSample} required />
                   </div>
                 </AuthSection>
               </>
