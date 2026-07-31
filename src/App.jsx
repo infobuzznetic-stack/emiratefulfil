@@ -4,7 +4,7 @@ import {
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
-  User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck,
+  User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -62,6 +62,19 @@ async function uploadProductImage(file) {
   if (!file.type.startsWith("image/")) return { url: null, error: "Please choose an image file." };
   const ext = file.name.split(".").pop() || "jpg";
   const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error: upErr } = await supabase.storage.from("public-assets").upload(path, file, { upsert: true, cacheControl: "3600" });
+  if (upErr) return { url: null, error: "Could not upload the picture." };
+  const { data } = supabase.storage.from("public-assets").getPublicUrl(path);
+  return { url: data?.publicUrl || null, error: null };
+}
+
+// Same "upload to Supabase Storage" pattern as the logo/product pictures,
+// used for photos attached to ticket messages (seller or Customer Support).
+async function uploadTicketImage(file) {
+  if (!file) return { url: null, error: "No file" };
+  if (!file.type.startsWith("image/")) return { url: null, error: "Please choose an image file." };
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `tickets/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error: upErr } = await supabase.storage.from("public-assets").upload(path, file, { upsert: true, cacheControl: "3600" });
   if (upErr) return { url: null, error: "Could not upload the picture." };
   const { data } = supabase.storage.from("public-assets").getPublicUrl(path);
@@ -813,7 +826,7 @@ async function fetchAllTickets() {
 async function fetchTicketMessages(ticketId) {
   const { data, error } = await supabase.from("ticket_messages").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: true });
   if (error) { console.error(error); return []; }
-  return data.map((m) => ({ id: m.id, ticketId: m.ticket_id, sender: m.sender, senderName: m.sender_name, body: m.body, createdAt: m.created_at }));
+  return data.map((m) => ({ id: m.id, ticketId: m.ticket_id, sender: m.sender, senderName: m.sender_name, body: m.body, imageUrl: m.image_url, createdAt: m.created_at }));
 }
 
 /* ============================================================
@@ -3895,9 +3908,18 @@ function TicketThread({ messages, loading, viewerRole }) {
               }
             >
               <div className={`text-[10px] font-semibold mb-0.5 ${mine ? "text-white/70" : "text-gray-400"}`}>
-                {m.sender === "admin" ? "Admin" : m.senderName || "Seller"}
+                {m.sender === "admin" ? "Customer Support" : m.senderName || "Seller"}
               </div>
-              <div className="text-sm leading-relaxed whitespace-pre-wrap">{m.body}</div>
+              {m.imageUrl && (
+                <img
+                  src={m.imageUrl}
+                  alt="Attachment"
+                  className="rounded-xl max-w-full mb-1.5"
+                  style={{ maxHeight: 240, cursor: "pointer" }}
+                  onClick={() => window.open(m.imageUrl, "_blank")}
+                />
+              )}
+              {m.body && <div className="text-sm leading-relaxed whitespace-pre-wrap">{m.body}</div>}
             </div>
           </div>
         );
@@ -3918,6 +3940,8 @@ function TicketsTab({ session, notify }) {
   const [newSubject, setNewSubject] = useState("");
   const [newBody, setNewBody] = useState("");
   const [creating, setCreating] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef(null);
 
   const loadTickets = async () => {
     setTicketsLoading(true);
@@ -3954,7 +3978,7 @@ function TicketsTab({ session, notify }) {
     setMessages((prev) => ({ ...prev, [id]: [{ id: "local-" + id, ticketId: id, sender: "seller", senderName: session.name || session.email, body: newBody.trim(), createdAt: new Date().toISOString() }] }));
     setNewSubject(""); setNewBody(""); setShowNewForm(false);
     setSelectedId(id);
-    notify && notify("Ticket created — Admin will reply here.");
+    notify && notify("Ticket created — Customer Support will reply here.");
   };
 
   const sendReply = async () => {
@@ -3978,6 +4002,28 @@ function TicketsTab({ session, notify }) {
     setReply("");
   };
 
+  const sendImage = async (file) => {
+    if (!file || !selectedId) return;
+    setUploadingImage(true);
+    const { url, error: upErr } = await uploadTicketImage(file);
+    if (upErr) { setUploadingImage(false); notify && notify(upErr); return; }
+    const { error } = await supabase.from("ticket_messages").insert({
+      ticket_id: selectedId, sender: "seller", sender_name: session.name || session.email, body: "", image_url: url,
+    });
+    // A seller replying to a resolved ticket reopens it, so it lands back in Customer Support's open queue.
+    const ticket = tickets.find((t) => t.id === selectedId);
+    if (!error && ticket?.status === "resolved") {
+      await supabase.from("tickets").update({ status: "open" }).eq("id", selectedId);
+      setTickets((prev) => prev.map((t) => (t.id === selectedId ? { ...t, status: "open" } : t)));
+    }
+    setUploadingImage(false);
+    if (error) { notify && notify("Could not send the picture."); return; }
+    setMessages((prev) => ({
+      ...prev,
+      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "seller", senderName: session.name || session.email, body: "", imageUrl: url, createdAt: new Date().toISOString() }],
+    }));
+  };
+
   const selectedTicket = tickets.find((t) => t.id === selectedId);
 
   return (
@@ -3993,7 +4039,7 @@ function TicketsTab({ session, notify }) {
             </div>
             <div>
               <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tickets</h1>
-              <p className="text-sm text-white/60 mt-1">Raise an issue and chat with Admin directly until it's resolved.</p>
+              <p className="text-sm text-white/60 mt-1">Raise an issue and chat with Customer Support directly until it's resolved.</p>
             </div>
           </div>
           <button
@@ -4073,6 +4119,22 @@ function TicketsTab({ session, notify }) {
               </div>
               <div className="p-4 flex items-center gap-2" style={{ borderTop: "1px solid #F3F4F6" }}>
                 <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) sendImage(f); e.target.value = ""; }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  title="Attach a picture"
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+                  style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}
+                >
+                  <ImagePlus className="w-4 h-4" />
+                </button>
+                <input
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
@@ -4102,6 +4164,8 @@ function AdminTicketsPanel({ notify }) {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef(null);
 
   const loadTickets = async () => {
     setTicketsLoading(true);
@@ -4124,15 +4188,31 @@ function AdminTicketsPanel({ notify }) {
     if (!reply.trim() || !selectedId) return;
     setSending(true);
     const { error } = await supabase.from("ticket_messages").insert({
-      ticket_id: selectedId, sender: "admin", sender_name: "Admin", body: reply.trim(),
+      ticket_id: selectedId, sender: "admin", sender_name: "Customer Support", body: reply.trim(),
     });
     setSending(false);
     if (error) { notify && notify("Could not send message."); return; }
     setMessages((prev) => ({
       ...prev,
-      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Admin", body: reply.trim(), createdAt: new Date().toISOString() }],
+      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Customer Support", body: reply.trim(), createdAt: new Date().toISOString() }],
     }));
     setReply("");
+  };
+
+  const sendImage = async (file) => {
+    if (!file || !selectedId) return;
+    setUploadingImage(true);
+    const { url, error: upErr } = await uploadTicketImage(file);
+    if (upErr) { setUploadingImage(false); notify && notify(upErr); return; }
+    const { error } = await supabase.from("ticket_messages").insert({
+      ticket_id: selectedId, sender: "admin", sender_name: "Customer Support", body: "", image_url: url,
+    });
+    setUploadingImage(false);
+    if (error) { notify && notify("Could not send the picture."); return; }
+    setMessages((prev) => ({
+      ...prev,
+      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Customer Support", body: "", imageUrl: url, createdAt: new Date().toISOString() }],
+    }));
   };
 
   const toggleResolve = async (id, currentStatus) => {
@@ -4232,10 +4312,26 @@ function AdminTicketsPanel({ notify }) {
               </div>
               <div className="p-4 flex items-center gap-2" style={{ borderTop: "1px solid #F3F4F6" }}>
                 <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) sendImage(f); e.target.value = ""; }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  title="Attach a picture"
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+                  style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}
+                >
+                  <ImagePlus className="w-4 h-4" />
+                </button>
+                <input
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
-                  placeholder="Reply as Admin…"
+                  placeholder="Reply as Customer Support…"
                   className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
                   style={{ border: "1px solid #E5E7EB" }}
                 />
