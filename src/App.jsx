@@ -1623,10 +1623,10 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
           <div className="font-bold text-sm" style={{ color: "#111827" }}>Order summary</div>
           <div className="mt-4 space-y-5">
             {items.map((it) => {
-              const subtotal = it.cost * it.qty;
+              const subtotal = it.sell * it.qty;
               const baseTotal = subtotal + DELIVERY_CHARGE;
               const codAmount = it.sell * it.qty + DELIVERY_CHARGE;
-              const itemProfit = codAmount - baseTotal;
+              const itemProfit = codAmount - (it.cost * it.qty) - DELIVERY_CHARGE;
               return (
                 <div key={it.id} className="text-sm">
                   <div className="flex items-center justify-between font-semibold" style={{ color: "#111827" }}>
@@ -1641,7 +1641,7 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
                     <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {DELIVERY_CHARGE}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between font-semibold" style={{ color: "#0B1F3A" }}>
-                    <span>Total (your cost)</span>
+                    <span>Total (actual price)</span>
                     <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {baseTotal}</span>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
