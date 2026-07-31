@@ -1575,7 +1575,7 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
   const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
   const deliveryTotal = items.length * DELIVERY_CHARGE;
   const total = itemsTotal + deliveryTotal;
-  const profitTotal = items.reduce((s, it) => s + (it.sell - it.cost) * it.qty, 0);
+  const profitTotal = items.reduce((s, it) => s + (it.sell * it.qty + DELIVERY_CHARGE) - (it.listSell * it.qty + DELIVERY_CHARGE), 0);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1623,10 +1623,10 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
           <div className="font-bold text-sm" style={{ color: "#111827" }}>Order summary</div>
           <div className="mt-4 space-y-5">
             {items.map((it) => {
-              const subtotal = it.sell * it.qty;
+              const subtotal = it.listSell * it.qty;
               const baseTotal = subtotal + DELIVERY_CHARGE;
               const codAmount = it.sell * it.qty + DELIVERY_CHARGE;
-              const itemProfit = codAmount - (it.cost * it.qty) - DELIVERY_CHARGE;
+              const itemProfit = codAmount - baseTotal;
               return (
                 <div key={it.id} className="text-sm">
                   <div className="flex items-center justify-between font-semibold" style={{ color: "#111827" }}>
