@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useContext, createContext } from "react";
 import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
@@ -12,6 +12,30 @@ import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
    Palette: Royal Navy #0B1F3A · Emerald #00C896 · Gold #F8B400
    Type: Plus Jakarta Sans (display) · Inter (body) · Space Grotesk (numerals)
 --------------------------------------------------------- */
+
+// Site logo: admin can upload a custom picture from the Admin tab (stored in
+// Supabase Storage + app_settings table). Until one is set, every spot that
+// shows the logo falls back to the original PackageCheck icon in a gradient
+// box, so nothing looks broken on a fresh install.
+const LogoContext = createContext({ logoUrl: null, setLogoUrl: () => {} });
+
+function Logo({ box = "w-9 h-9", icon = "w-5 h-5" }) {
+  const { logoUrl } = useContext(LogoContext);
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt="EmirateFulfil logo"
+        className={`${box} rounded-xl object-cover flex-shrink-0`}
+      />
+    );
+  }
+  return (
+    <div className={`${box} rounded-xl flex items-center justify-center flex-shrink-0`} style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
+      <PackageCheck className={`${icon} text-white`} />
+    </div>
+  );
+}
 
 const FONT_LINK_ID = "emiratefulfil-fonts";
 
@@ -124,9 +148,7 @@ function Navbar({ session, onNav, onLogout }) {
       </div>
       <nav className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <a href="#" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
-            <PackageCheck className="w-5 h-5 text-white" />
-          </div>
+          <Logo />
           <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
           </span>
@@ -682,9 +704,7 @@ function Footer() {
         <div className="grid md:grid-cols-5 gap-10">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
-                <PackageCheck className="w-5 h-5 text-white" />
-              </div>
+              <Logo />
               <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
               </span>
@@ -806,9 +826,7 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
     <div className="min-h-screen flex items-center justify-center px-6 py-16" style={{ background: "#081221", fontFamily: "Inter, sans-serif" }}>
       <div className="w-full max-w-md">
         <button onClick={() => onSwitch("home")} className="flex items-center gap-2.5 justify-center mb-8 w-full">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
-            <PackageCheck className="w-5 h-5 text-white" />
-          </div>
+          <Logo />
           <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
           </span>
@@ -1003,9 +1021,7 @@ function Dashboard({ session, onLogout, notify }) {
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen relative z-10" style={{ background: "#0B1F3A" }}>
         <div className="flex items-center gap-2.5 px-2">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
-            <PackageCheck className="w-5 h-5 text-white" />
-          </div>
+          <Logo />
           <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
           </span>
@@ -2396,6 +2412,35 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [sellersLoading, setSellersLoading] = useState(true);
   const [sellerSearch, setSellerSearch] = useState("");
 
+  // Site logo: pick a picture from your computer, it's uploaded to Supabase
+  // Storage and saved as the shared logo everyone sees (navbar, footer,
+  // login page, dashboard sidebar).
+  const { logoUrl, setLogoUrl } = useContext(LogoContext);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const uploadLogo = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow picking the same file again later
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { notify("Please choose an image file."); return; }
+    setLogoUploading(true);
+    const ext = file.name.split(".").pop() || "png";
+    const path = `logo-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("public-assets").upload(path, file, { upsert: true, cacheControl: "3600" });
+    if (upErr) { notify("Could not upload the picture."); setLogoUploading(false); return; }
+    const { data } = supabase.storage.from("public-assets").getPublicUrl(path);
+    const url = data?.publicUrl;
+    const { error: dbErr } = await supabase.from("app_settings").upsert({ key: "logo_url", value: url });
+    setLogoUploading(false);
+    if (dbErr) { notify("Uploaded, but could not save it as the logo."); return; }
+    setLogoUrl(url);
+    notify("Logo updated — everyone sees the new picture now.");
+  };
+  const removeLogo = async () => {
+    await supabase.from("app_settings").upsert({ key: "logo_url", value: null });
+    setLogoUrl(null);
+    notify("Logo removed — back to the default icon.");
+  };
+
   const loadAllOrders = async () => {
     setOrdersLoading(true);
     const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
@@ -2492,6 +2537,29 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <StatCard label="Total sellers signed up" value={sellers.length || sellerCount} color="#00C896" />
         <StatCard label="Products in catalog" value={catalog.length} />
         <StatCard label="Customer orders (all sellers)" value={allOrders.length} color="#F8B400" />
+      </div>
+
+      {/* Site logo: upload a picture from your computer to replace the default icon everywhere */}
+      <div className="mt-6 rounded-2xl bg-white p-5" style={{ border: "1px solid #E5E7EB" }}>
+        <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Site logo</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Replace the default icon with your own picture — it shows up in the navbar, footer, login page, and dashboard sidebar for everyone.</p>
+        <div className="mt-4 flex items-center gap-4">
+          <Logo box="w-14 h-14" icon="w-7 h-7" />
+          <div className="flex items-center gap-2">
+            <label
+              className="text-sm font-semibold px-4 py-2.5 rounded-full cursor-pointer text-white transition-transform hover:scale-105"
+              style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)", opacity: logoUploading ? 0.6 : 1 }}
+            >
+              {logoUploading ? "Uploading…" : "Upload picture"}
+              <input type="file" accept="image/*" onChange={uploadLogo} disabled={logoUploading} className="hidden" />
+            </label>
+            {logoUrl && (
+              <button onClick={removeLogo} className="text-sm font-semibold px-4 py-2.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Sellers table: every signed-up seller, with contact details and signup date */}
@@ -2749,11 +2817,25 @@ export default function EmirateFulfilApp() {
   const [session, setSession] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [logoUrl, setLogoUrl] = useState(null);
 
   const notify = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), msg.length > 60 ? 5000 : 2600);
   };
+
+  // Load the custom logo (if the admin has uploaded one) so it shows up
+  // everywhere immediately — no login required, works on the public homepage.
+  useEffect(() => {
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "logo_url")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) setLogoUrl(data.value);
+      });
+  }, []);
 
   // Restore session on page load/refresh so users stay logged in.
   // Nothing renders until this finishes, so refreshing never flashes the
@@ -2779,14 +2861,14 @@ export default function EmirateFulfilApp() {
   if (checkingAuth) return <SplashLoader />;
 
   return (
-    <>
+    <LogoContext.Provider value={{ logoUrl, setLogoUrl }}>
       <Toast message={toastMsg} />
       {view === "home" && <HomePage session={session} onNav={setView} onLogout={handleLogout} />}
       {(view === "signup" || view === "login") && (
         <AuthPage mode={view} onAuthed={handleAuthed} onSwitch={setView} notify={notify} />
       )}
       {view === "dashboard" && session && <Dashboard session={session} onLogout={handleLogout} notify={notify} />}
-    </>
+    </LogoContext.Provider>
   );
 }
 
