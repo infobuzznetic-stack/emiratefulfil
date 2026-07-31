@@ -5,6 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
+  Eye, Printer, FileText,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -827,6 +828,35 @@ async function fetchTicketMessages(ticketId) {
   const { data, error } = await supabase.from("ticket_messages").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: true });
   if (error) { console.error(error); return []; }
   return data.map((m) => ({ id: m.id, ticketId: m.ticket_id, sender: m.sender, senderName: m.sender_name, body: m.body, imageUrl: m.image_url, createdAt: m.created_at }));
+}
+
+/* ============================================================
+   SELLER INVOICES (Admin-generated tax invoice per seller)
+   Admin picks specific orders for one seller, edits the fee/VAT/COD/RTC
+   figures per row, and saves a snapshot to seller_invoices — the seller
+   then sees it read-only under their own Invoices tab.
+============================================================ */
+const INVOICE_VAT_RATE = 5; // %
+
+function genInvoiceNumber() {
+  return "INV" + Date.now().toString().slice(-9);
+}
+
+// Orders belonging to one seller that haven't been pulled into an invoice yet.
+async function fetchUninvoicedOrders(email) {
+  const { data, error } = await supabase.from("orders").select("*").eq("seller_email", email).is("invoiced_at", null).order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data.map((o) => ({
+    id: o.id, productName: o.product_name, qty: Number(o.qty),
+    sellPrice: Number(o.sell_price), deliveryCharge: o.delivery_charge != null ? Number(o.delivery_charge) : 0,
+    status: o.status, createdAt: o.created_at,
+  }));
+}
+
+async function fetchSellerInvoices(email) {
+  const { data, error } = await supabase.from("seller_invoices").select("*").eq("seller_email", email).order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data;
 }
 
 /* ============================================================
@@ -2723,6 +2753,7 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
           </div>
         </div>
       </div>
+      <SellerInvoicesPanel email={session.email} />
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} delay={0} />
         <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} delay={60} />
@@ -2770,6 +2801,449 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+// Full branded tax invoice document — shared by Admin (preview/print + mark
+// paid) and Seller (read-only view + print). Rendered as a fixed overlay so
+// it can be opened from anywhere without disturbing the page underneath.
+function InvoiceDocument({ invoice, isAdmin, onClose, onMarkStatus }) {
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
+  return (
+    <div className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto py-8 px-3" style={{ background: "rgba(11,31,58,0.6)" }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .invoice-print-area, .invoice-print-area * { visibility: visible; }
+          .invoice-print-area { position: absolute; top: 0; left: 0; width: 100%; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+      <div className="w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl">
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 px-5 py-3" style={{ borderBottom: "1px solid #E5E7EB" }}>
+          <span className="text-sm font-semibold" style={{ color: "#0B1F3A" }}>Invoice {invoice.invoice_number}</span>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => onMarkStatus(invoice.status === "paid" ? "unpaid" : "paid")}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full text-white"
+                style={{ background: invoice.status === "paid" ? "#6B7280" : "#00C896" }}
+              >
+                {invoice.status === "paid" ? "Mark unpaid" : "Mark paid"}
+              </button>
+            )}
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>
+              <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+            </button>
+            <button onClick={onClose} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Close</button>
+          </div>
+        </div>
+
+        <div className="invoice-print-area p-8" style={{ fontFamily: "Inter, sans-serif" }}>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2">
+              <Logo box="w-10 h-10" icon="w-5 h-5" />
+              <span className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-start justify-between gap-4 mt-6 text-sm">
+            <div>
+              <div className="text-xs text-gray-400">Store Name</div>
+              <div className="font-bold" style={{ color: "#0B1F3A" }}>{invoice.store_name || "—"}</div>
+              <div className="text-xs text-gray-400 mt-2">Seller Email</div>
+              <div className="text-gray-700">{invoice.seller_email}</div>
+            </div>
+            <div className="text-right">
+              <div className="font-bold" style={{ color: "#0B1F3A" }}>Tax Invoice</div>
+              {invoice.trn_no && <div className="text-xs text-gray-500">TRN No. {invoice.trn_no}</div>}
+              <div className="text-xs text-gray-500 mt-2">Invoice No. {invoice.invoice_number}</div>
+              <div className="text-xs text-gray-500">Dated: {invoice.invoice_date}</div>
+              {invoice.payment_date && <div className="text-xs text-gray-500">Payment Date: {invoice.payment_date}</div>}
+            </div>
+          </div>
+
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left" style={{ borderBottom: "2px solid #0B1F3A" }}>
+                  <th className="px-2 py-2">Order Date</th>
+                  <th className="px-2 py-2">Order ID</th>
+                  <th className="px-2 py-2">Product</th>
+                  <th className="px-2 py-2 text-right">Qty</th>
+                  <th className="px-2 py-2 text-right">Sale Price/Unit</th>
+                  <th className="px-2 py-2 text-right">Product Value (A)</th>
+                  <th className="px-2 py-2 text-right">Service Fee (B)</th>
+                  <th className="px-2 py-2 text-right">Value Excl. VAT (A+B)</th>
+                  <th className="px-2 py-2 text-right">VAT {invoice.vat_rate ?? INVOICE_VAT_RATE}%</th>
+                  <th className="px-2 py-2 text-right">Value Incl. VAT</th>
+                  <th className="px-2 py-2 text-right">COD</th>
+                  <th className="px-2 py-2 text-right">RTC Deduction</th>
+                  <th className="px-2 py-2 text-right">Payable</th>
+                  <th className="px-2 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, i) => (
+                  <tr key={it.orderId || i} style={{ borderBottom: "1px solid #F3F4F6" }}>
+                    <td className="px-2 py-2 whitespace-nowrap">{it.orderDate || "—"}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">{it.orderId}</td>
+                    <td className="px-2 py-2">{it.productName}</td>
+                    <td className="px-2 py-2 text-right">{it.qty}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.salePrice).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.productValue).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.serviceFee).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.exclVat).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.vatAmount).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.inclVat).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.cod).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{Number(it.rtcDeduction).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right font-semibold">{Number(it.payable).toFixed(2)}</td>
+                    <td className="px-2 py-2 capitalize">{it.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-bold" style={{ borderTop: "2px solid #0B1F3A" }}>
+                  <td className="px-2 py-2" colSpan={7}>Totals</td>
+                  <td className="px-2 py-2 text-right">{Number(invoice.subtotal_excl_vat).toFixed(2)}</td>
+                  <td className="px-2 py-2 text-right">{Number(invoice.vat_total).toFixed(2)}</td>
+                  <td className="px-2 py-2 text-right">{Number(invoice.subtotal_incl_vat).toFixed(2)}</td>
+                  <td className="px-2 py-2 text-right">{Number(invoice.cod_total).toFixed(2)}</td>
+                  <td className="px-2 py-2 text-right">{Number(invoice.rtc_deductions_total).toFixed(2)}</td>
+                  <td className="px-2 py-2 text-right">{Number(invoice.payable_total ?? invoice.net_payable).toFixed(2)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap items-start justify-between gap-4 mt-6">
+            <div className="text-sm">
+              <div className="font-bold" style={{ color: "#0B1F3A" }}>Bank Details</div>
+              <div className="text-xs text-gray-600 mt-1">A/C Title: {invoice.account_title || "—"}</div>
+              <div className="text-xs text-gray-600">A/C No: {invoice.account_number || "—"}</div>
+              <div className="text-xs text-gray-600">Bank Name: {invoice.bank_name || "—"}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-gray-400">Net Payable (AED)</div>
+              <div className="text-2xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{Number(invoice.net_payable).toFixed(2)}</div>
+              <div className="mt-2">
+                <span
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={invoice.status === "paid" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}
+                >
+                  {invoice.status === "paid" ? "Paid" : "Unpaid"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {invoice.company_address && <div className="text-xs text-gray-400 mt-6">{invoice.company_address}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Admin-only: build a new invoice for one seller (pick orders with checkboxes,
+// edit fee/COD/RTC per row) and browse that seller's past invoices.
+function SellerInvoiceManager({ seller, notify, onClose }) {
+  const [view, setView] = useState("create"); // create | history
+  const [uninvoiced, setUninvoiced] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [selected, setSelected] = useState({});
+  const [rowEdits, setRowEdits] = useState({});
+  const [vatRate, setVatRate] = useState(INVOICE_VAT_RATE);
+  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState("");
+  const [trnNo, setTrnNo] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [bankOverride, setBankOverride] = useState({
+    bank_name: seller.bank_name || "", account_title: seller.account_title || "", account_number: seller.account_number || "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [openInvoice, setOpenInvoice] = useState(null);
+
+  const loadOrders = async () => { setLoadingOrders(true); setUninvoiced(await fetchUninvoicedOrders(seller.email)); setLoadingOrders(false); };
+  const loadHistory = async () => { setHistoryLoading(true); setHistory(await fetchSellerInvoices(seller.email)); setHistoryLoading(false); };
+  useEffect(() => { loadOrders(); loadHistory(); }, []); // eslint-disable-line
+
+  const toggleSelect = (o) => {
+    setSelected((s) => {
+      const next = { ...s };
+      if (next[o.id]) {
+        delete next[o.id];
+      } else {
+        next[o.id] = true;
+        setRowEdits((r) => (r[o.id] ? r : {
+          ...r,
+          [o.id]: {
+            serviceFee: 0,
+            cod: o.status === "delivered" ? (o.sellPrice * o.qty + (o.deliveryCharge || 0)) : 0,
+            rtcDeduction: (o.status === "returned" || o.status === "cancelled") ? -5 : 0,
+          },
+        }));
+      }
+      return next;
+    });
+  };
+  const editRow = (id, field, value) => setRowEdits((r) => ({ ...r, [id]: { ...r[id], [field]: value } }));
+
+  const selectedOrders = uninvoiced.filter((o) => selected[o.id]);
+  const computedItems = selectedOrders.map((o) => {
+    const edit = rowEdits[o.id] || { serviceFee: 0, cod: 0, rtcDeduction: 0 };
+    const serviceFee = Number(edit.serviceFee) || 0;
+    const cod = Number(edit.cod) || 0;
+    const rtcDeduction = Number(edit.rtcDeduction) || 0;
+    const productValue = o.sellPrice * o.qty;
+    const exclVat = productValue + serviceFee;
+    const vatAmount = exclVat * (Number(vatRate) / 100);
+    const inclVat = exclVat + vatAmount;
+    const payable = cod + rtcDeduction;
+    return {
+      orderId: o.id, orderDate: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : "",
+      productName: o.productName, qty: o.qty, salePrice: o.sellPrice, productValue, serviceFee,
+      exclVat, vatAmount, inclVat, cod, rtcDeduction, payable, status: o.status,
+    };
+  });
+  const totals = computedItems.reduce((t, it) => ({
+    excl: t.excl + it.exclVat, vat: t.vat + it.vatAmount, incl: t.incl + it.inclVat,
+    cod: t.cod + it.cod, rtc: t.rtc + it.rtcDeduction, payable: t.payable + it.payable,
+  }), { excl: 0, vat: 0, incl: 0, cod: 0, rtc: 0, payable: 0 });
+
+  const saveInvoice = async () => {
+    if (!computedItems.length) { notify("Select at least one order for this invoice."); return; }
+    setSaving(true);
+    const invoice_number = genInvoiceNumber();
+    const payload = {
+      invoice_number, seller_email: seller.email, store_name: seller.store_name || seller.company || "",
+      trn_no: trnNo || null, invoice_date: invoiceDate, payment_date: paymentDate || null, vat_rate: Number(vatRate) || INVOICE_VAT_RATE,
+      items: computedItems, subtotal_excl_vat: totals.excl, vat_total: totals.vat, subtotal_incl_vat: totals.incl,
+      cod_total: totals.cod, rtc_deductions_total: totals.rtc, payable_total: totals.payable, net_payable: totals.payable,
+      bank_name: bankOverride.bank_name || null, account_title: bankOverride.account_title || null, account_number: bankOverride.account_number || null,
+      company_address: companyAddress || null, status: "unpaid",
+    };
+    const { error } = await supabase.from("seller_invoices").insert(payload);
+    if (error) { console.error(error); notify("Could not create invoice."); setSaving(false); return; }
+    await supabase.from("orders").update({ invoiced_at: new Date().toISOString() }).in("id", selectedOrders.map((o) => o.id));
+    setSaving(false);
+    notify("Invoice created — visible in the seller's Invoices tab now.");
+    setSelected({});
+    setRowEdits({});
+    loadOrders();
+    loadHistory();
+    setView("history");
+  };
+
+  const markStatus = async (invoice, status) => {
+    await supabase.from("seller_invoices").update({ status }).eq("id", invoice.id);
+    setHistory((h) => h.map((x) => (x.id === invoice.id ? { ...x, status } : x)));
+    setOpenInvoice((cur) => (cur && cur.id === invoice.id ? { ...cur, status } : cur));
+    notify(status === "paid" ? "Invoice marked paid." : "Invoice marked unpaid.");
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[85] flex items-start justify-center overflow-y-auto py-8 px-3" style={{ background: "rgba(11,31,58,0.55)" }}>
+        <div className="w-full max-w-5xl bg-white rounded-2xl overflow-hidden shadow-2xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4" style={{ borderBottom: "1px solid #E5E7EB" }}>
+            <div>
+              <div className="text-base font-extrabold" style={{ color: "#0B1F3A" }}>{seller.name || seller.email}</div>
+              <div className="text-xs text-gray-400">{seller.email}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setView("create")} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={view === "create" ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>Create invoice</button>
+              <button onClick={() => setView("history")} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={view === "history" ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>History ({history.length})</button>
+              <button onClick={onClose} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Close</button>
+            </div>
+          </div>
+
+          <div className="p-6 max-h-[75vh] overflow-y-auto">
+            {view === "create" ? (
+              <>
+                <div className="grid sm:grid-cols-4 gap-3">
+                  <div><label className="text-xs text-gray-500">Invoice date</label><input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+                  <div><label className="text-xs text-gray-500">Payment date</label><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+                  <div><label className="text-xs text-gray-500">TRN No.</label><input value={trnNo} onChange={(e) => setTrnNo(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+                  <div><label className="text-xs text-gray-500">VAT %</label><input type="number" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+                </div>
+                <div className="grid sm:grid-cols-3 gap-3 mt-3">
+                  <div><label className="text-xs text-gray-500">Bank name</label><input value={bankOverride.bank_name} onChange={(e) => setBankOverride({ ...bankOverride, bank_name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+                  <div><label className="text-xs text-gray-500">Account title</label><input value={bankOverride.account_title} onChange={(e) => setBankOverride({ ...bankOverride, account_title: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+                  <div><label className="text-xs text-gray-500">Account / IBAN</label><input value={bankOverride.account_number} onChange={(e) => setBankOverride({ ...bankOverride, account_number: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+                </div>
+                <div className="mt-3"><label className="text-xs text-gray-500">Company address (printed on invoice)</label><input value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+
+                <div className="mt-5">
+                  <div className="text-sm font-bold" style={{ color: "#0B1F3A" }}>Select orders ({uninvoiced.length} not yet invoiced)</div>
+                  {loadingOrders ? (
+                    <div className="text-sm text-gray-400 py-6 text-center">Loading orders…</div>
+                  ) : uninvoiced.length === 0 ? (
+                    <div className="text-sm text-gray-400 py-6 text-center">No un-invoiced orders for this seller.</div>
+                  ) : (
+                    <div className="mt-2 overflow-x-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-gray-400" style={{ background: "#F8FAFC" }}>
+                            <th className="px-3 py-2"></th>
+                            <th className="px-3 py-2">Order</th>
+                            <th className="px-3 py-2">Product</th>
+                            <th className="px-3 py-2">Qty</th>
+                            <th className="px-3 py-2">Sale/Unit</th>
+                            <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2">Service Fee</th>
+                            <th className="px-3 py-2">COD</th>
+                            <th className="px-3 py-2">RTC Deduction</th>
+                            <th className="px-3 py-2">Payable</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {uninvoiced.map((o) => {
+                            const isSel = !!selected[o.id];
+                            const edit = rowEdits[o.id] || { serviceFee: 0, cod: 0, rtcDeduction: 0 };
+                            const payable = (Number(edit.cod) || 0) + (Number(edit.rtcDeduction) || 0);
+                            return (
+                              <tr key={o.id} style={{ borderTop: "1px solid #F3F4F6" }}>
+                                <td className="px-3 py-2"><input type="checkbox" checked={isSel} onChange={() => toggleSelect(o)} /></td>
+                                <td className="px-3 py-2 text-gray-500">{o.id}</td>
+                                <td className="px-3 py-2">{o.productName}</td>
+                                <td className="px-3 py-2">{o.qty}</td>
+                                <td className="px-3 py-2">{o.sellPrice}</td>
+                                <td className="px-3 py-2 capitalize">{o.status}</td>
+                                <td className="px-3 py-2"><input type="number" disabled={!isSel} value={edit.serviceFee} onChange={(e) => editRow(o.id, "serviceFee", e.target.value)} className="w-20 rounded px-2 py-1" style={{ border: "1px solid #E5E7EB" }} /></td>
+                                <td className="px-3 py-2"><input type="number" disabled={!isSel} value={edit.cod} onChange={(e) => editRow(o.id, "cod", e.target.value)} className="w-20 rounded px-2 py-1" style={{ border: "1px solid #E5E7EB" }} /></td>
+                                <td className="px-3 py-2"><input type="number" disabled={!isSel} value={edit.rtcDeduction} onChange={(e) => editRow(o.id, "rtcDeduction", e.target.value)} className="w-20 rounded px-2 py-1" style={{ border: "1px solid #E5E7EB" }} /></td>
+                                <td className="px-3 py-2 font-semibold">{isSel ? payable.toFixed(2) : "—"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {computedItems.length > 0 && (
+                  <div className="mt-4 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+                    <div className="text-xs text-gray-500">
+                      {computedItems.length} order{computedItems.length === 1 ? "" : "s"} selected · VAT {vatRate}% · Excl {totals.excl.toFixed(2)} · VAT {totals.vat.toFixed(2)} · Incl {totals.incl.toFixed(2)}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-400">Net payable</div>
+                      <div className="text-lg font-extrabold" style={{ color: "#00C896" }}>AED {totals.payable.toFixed(2)}</div>
+                    </div>
+                    <button onClick={saveInvoice} disabled={saving} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white" style={{ background: "#0B1F3A", opacity: saving ? 0.6 : 1 }}>
+                      {saving ? "Creating…" : "Create invoice"}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div>
+                {historyLoading ? (
+                  <div className="text-sm text-gray-400 py-8 text-center">Loading invoices…</div>
+                ) : history.length === 0 ? (
+                  <div className="text-sm text-gray-400 py-8 text-center">No invoices created for this seller yet.</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-400" style={{ background: "#F8FAFC" }}>
+                          <th className="px-4 py-2">Invoice #</th>
+                          <th className="px-4 py-2">Date</th>
+                          <th className="px-4 py-2">Net Payable</th>
+                          <th className="px-4 py-2">Status</th>
+                          <th className="px-4 py-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.map((inv) => (
+                          <tr key={inv.id} style={{ borderTop: "1px solid #F3F4F6" }}>
+                            <td className="px-4 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{inv.invoice_number}</td>
+                            <td className="px-4 py-2 text-gray-500">{inv.invoice_date}</td>
+                            <td className="px-4 py-2 font-semibold">AED {Number(inv.net_payable).toFixed(2)}</td>
+                            <td className="px-4 py-2">
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={inv.status === "paid" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}>
+                                {inv.status === "paid" ? "Paid" : "Unpaid"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2">
+                              <button onClick={() => setOpenInvoice(inv)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}><Eye className="w-3.5 h-3.5" /> View</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {openInvoice && (
+        <InvoiceDocument invoice={openInvoice} isAdmin onClose={() => setOpenInvoice(null)} onMarkStatus={(status) => markStatus(openInvoice, status)} />
+      )}
+    </>
+  );
+}
+
+// Seller-facing, read-only: statements Admin has created for this seller —
+// shown at the top of the seller's own Invoices tab, above the per-order list.
+function SellerInvoicesPanel({ email }) {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openInvoice, setOpenInvoice] = useState(null);
+
+  useEffect(() => {
+    (async () => { setLoading(true); setInvoices(await fetchSellerInvoices(email)); setLoading(false); })();
+  }, [email]);
+
+  if (loading || invoices.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <h2 className="text-base font-extrabold mb-2 flex items-center gap-2" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <FileText className="w-4 h-4" /> Statements from Admin
+      </h2>
+      <div className="rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+              <th className="px-4 py-3">Invoice #</th>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Net Payable</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((inv) => (
+              <tr key={inv.id} style={{ borderBottom: "1px solid #FAFAFA" }}>
+                <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{inv.invoice_number}</td>
+                <td className="px-4 py-3 text-gray-500">{inv.invoice_date}</td>
+                <td className="px-4 py-3 font-semibold">AED {Number(inv.net_payable).toFixed(2)}</td>
+                <td className="px-4 py-3">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={inv.status === "paid" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}>
+                    {inv.status === "paid" ? "Paid" : "Unpaid"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <button onClick={() => setOpenInvoice(inv)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}><Eye className="w-3.5 h-3.5" /> View</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {openInvoice && <InvoiceDocument invoice={openInvoice} isAdmin={false} onClose={() => setOpenInvoice(null)} onMarkStatus={() => {}} />}
     </div>
   );
 }
@@ -3347,6 +3821,8 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [sellers, setSellers] = useState([]);
   const [sellersLoading, setSellersLoading] = useState(true);
   const [sellerSearch, setSellerSearch] = useState("");
+  // Which seller's invoice-builder modal is open (create + history) — null when closed.
+  const [invoiceManagerSeller, setInvoiceManagerSeller] = useState(null);
 
   // Site logo: pick a picture from your computer, it's uploaded to Supabase
   // Storage and saved as the shared logo everyone sees (navbar, footer,
@@ -3609,6 +4085,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <th className="px-4 py-3">Signed up</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Approval</th>
+                  <th className="px-4 py-3">Invoices</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "#F3F4F6" }}>
@@ -3666,6 +4143,15 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                         </button>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => setInvoiceManagerSeller(s)}
+                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full"
+                        style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}
+                      >
+                        <FileText className="w-3.5 h-3.5" /> Invoices
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -3673,6 +4159,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           </div>
         )}
       </div>
+
+      {invoiceManagerSeller && (
+        <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
+      )}
 
       <form onSubmit={addProduct} className="mt-8 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
         <div className="sm:col-span-2"><label className="text-xs text-gray-500">Product name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
