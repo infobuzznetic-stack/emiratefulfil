@@ -1830,28 +1830,43 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
   ];
 
   return (
-    <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
+    <div style={{ animation: "dashTabIn 0.3s ease-out both", position: "relative" }}>
+      {/* Soft color wash behind the whole page so it doesn't sit flat on white */}
+      <div className="pointer-events-none absolute -top-10 -left-16 w-[380px] h-[380px] rounded-full opacity-[0.08] blur-3xl" style={{ background: "#00C896" }} />
+      <div className="pointer-events-none absolute top-24 -right-20 w-[340px] h-[340px] rounded-full opacity-[0.07] blur-3xl" style={{ background: "#F8B400" }} />
+
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+      <div className="relative flex items-center gap-1.5 text-xs text-gray-400 mb-4">
         <button onClick={onBack} className="hover:text-gray-700 font-medium">Products</button>
         <ChevronRight className="w-3.5 h-3.5" />
         <span className="font-semibold" style={{ color: "#0B1F3A" }}>{product.name}</span>
       </div>
 
-      <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
+      <button onClick={onBack} className="relative text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
         <ChevronDown className="w-4 h-4 rotate-90" /> Back to products
       </button>
 
-      <div className="mt-5 grid lg:grid-cols-10 gap-6">
+      <div className="relative mt-5 grid lg:grid-cols-10 gap-6">
         {/* Image column with badge + mini gallery */}
         <div className="lg:col-span-4">
-          <div className="relative rounded-3xl bg-white flex items-center justify-center overflow-hidden" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
-            <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Best Seller</span>
-            {galleryImages.length > 0 ? (
-              <img src={galleryImages[activeImg] || galleryImages[0]} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
-            ) : (
-              <span style={{ fontSize: 150 }}>{product.emoji}</span>
-            )}
+          <div
+            className="relative rounded-3xl p-4"
+            style={{ background: "linear-gradient(145deg,#0B1F3A 0%,#0F2E52 45%,#0B7A5E 130%)" }}
+          >
+            <div
+              className="pointer-events-none absolute inset-0 rounded-3xl opacity-[0.08]"
+              style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "16px 16px" }}
+            />
+            <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896" }} />
+            <div className="pointer-events-none absolute -bottom-10 -left-10 w-40 h-40 rounded-full opacity-25 blur-3xl" style={{ background: "#F8B400" }} />
+            <div className="relative rounded-2xl bg-white flex items-center justify-center overflow-hidden" style={{ minHeight: 360, boxShadow: "0 20px 45px rgba(0,0,0,0.25)" }}>
+              <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)", boxShadow: "0 6px 16px rgba(248,180,0,0.4)" }}>Best Seller</span>
+              {galleryImages.length > 0 ? (
+                <img src={galleryImages[activeImg] || galleryImages[0]} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
+              ) : (
+                <span style={{ fontSize: 150 }}>{product.emoji}</span>
+              )}
+            </div>
           </div>
           {galleryImages.length > 0 && (
             <div className="mt-3 grid grid-cols-4 gap-3">
@@ -1859,8 +1874,8 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
                 <button
                   key={i}
                   onClick={() => setActiveImg(i)}
-                  className="rounded-xl bg-white flex items-center justify-center py-4 overflow-hidden"
-                  style={{ border: i === activeImg ? "2px solid #00C896" : "1px solid #E5E7EB", opacity: i === activeImg ? 1 : 0.55 }}
+                  className="rounded-xl bg-white flex items-center justify-center py-4 overflow-hidden transition-all duration-200"
+                  style={{ border: i === activeImg ? "2px solid #00C896" : "1px solid #E5E7EB", opacity: i === activeImg ? 1 : 0.55, boxShadow: i === activeImg ? "0 6px 16px rgba(0,200,150,0.25)" : "none" }}
                 >
                   <img src={url} alt={`${product.name} ${i + 1}`} className="w-full h-10 object-cover" />
                 </button>
@@ -1887,9 +1902,10 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
             )}
           </div>
 
-          <div className="mt-3 flex items-baseline gap-2">
+          <div className="mt-3 flex items-baseline gap-2 flex-wrap">
             <span className="text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</span>
             <span className="text-sm text-gray-300 line-through" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {Math.round(product.sell * 1.35)}</span>
+            <span className="text-xs font-bold px-2 py-1 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Save 26%</span>
             <span
               className="text-xs font-semibold px-2.5 py-1 rounded-full"
               style={inStock ? { background: "rgba(0,200,150,0.12)", color: "#00a67e" } : { background: "rgba(239,68,68,0.1)", color: "#EF4444" }}
@@ -1911,15 +1927,21 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
 
           {/* Trust badges */}
           <div className="mt-5 grid grid-cols-2 gap-2">
-            {trustBadges.map((b, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-                <b.icon className="w-4 h-4 flex-shrink-0" style={{ color: "#00a67e" }} />
-                <span className="text-xs font-medium text-gray-600">{b.label}</span>
-              </div>
-            ))}
+            {trustBadges.map((b, i) => {
+              const badgeColor = ["#00C896", "#F8B400", "#3B82F6", "#8B5CF6"][i % 4];
+              return (
+                <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: `${badgeColor}0D`, border: `1px solid ${badgeColor}30` }}>
+                  <b.icon className="w-4 h-4 flex-shrink-0" style={{ color: badgeColor }} />
+                  <span className="text-xs font-medium" style={{ color: "#0B1F3A" }}>{b.label}</span>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="mt-6 rounded-2xl p-5" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+          <div
+            className="mt-6 rounded-2xl p-5 relative overflow-hidden"
+            style={{ background: "linear-gradient(160deg, rgba(0,200,150,0.07), rgba(248,180,0,0.05))", border: "1px solid rgba(0,200,150,0.25)", boxShadow: "0 10px 30px rgba(11,31,58,0.06)" }}
+          >
             <div className="flex items-center gap-3">
               <label className="text-xs font-semibold text-gray-500">Quantity</label>
               <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
@@ -1933,22 +1955,23 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
               <span className="ml-1 text-xs text-gray-400">(incl. AED {DELIVERY_CHARGE} delivery)</span>
             </div>
 
-            <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <button
-                disabled={!inStock}
-                onClick={() => onAddToCart(qty)}
-                className="flex-1 text-sm font-semibold py-3.5 rounded-full bg-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-                style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
-              >
-                🛒 Add to Cart
-              </button>
+            <div className="mt-5">
               <button
                 disabled={!inStock}
                 onClick={() => onBuyNow(qty)}
-                className="flex-1 text-sm font-semibold py-3.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-                style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 24px rgba(0,200,150,0.35)" }}
+                className="w-full text-lg font-extrabold py-5 rounded-2xl text-white transition-transform duration-200 hover:scale-[1.015] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                style={{ background: inStock ? "linear-gradient(135deg,#00C896,#00a67e)" : "#D1D5DB", boxShadow: inStock ? "0 14px 34px rgba(0,200,150,0.45)" : "none" }}
               >
+                <Zap className="w-5 h-5" />
                 {inStock ? "Buy Now" : "Out of Stock"}
+              </button>
+              <button
+                disabled={!inStock}
+                onClick={() => onAddToCart(qty)}
+                className="mt-2.5 w-full text-sm font-semibold py-3 rounded-xl bg-white transition-transform duration-200 hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
+              >
+                🛒 Add to Cart
               </button>
             </div>
           </div>
