@@ -981,7 +981,56 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-16" style={{ background: "#081221", fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen flex items-center justify-center px-6 py-16 relative overflow-hidden" style={{ background: "#081221", fontFamily: "Inter, sans-serif" }}>
+      {/* ambient glow blobs */}
+      <div className="pointer-events-none absolute -top-24 -left-20 w-[380px] h-[380px] rounded-full opacity-[0.14] blur-3xl" style={{ background: "#00C896" }} />
+      <div className="pointer-events-none absolute -bottom-32 -right-16 w-[420px] h-[420px] rounded-full opacity-[0.10] blur-3xl" style={{ background: "#F8B400" }} />
+
+      {/* faint twinkling stars scattered across the page */}
+      <svg className="pointer-events-none absolute inset-0 w-full h-full opacity-70" preserveAspectRatio="none">
+        {[
+          [6, 12], [14, 30], [22, 8], [34, 22], [48, 15], [58, 34], [68, 10],
+          [78, 26], [88, 18], [94, 38], [12, 55], [30, 62], [70, 58], [90, 60],
+        ].map(([x, y], i) => (
+          <circle key={i} cx={`${x}%`} cy={`${y}%`} r={i % 3 === 0 ? 1.6 : 1.1} fill={i % 2 === 0 ? "#F8B400" : "#FFD98A"}>
+            <animate attributeName="opacity" values="0.8;0.15;0.8" dur={`${2.4 + (i % 5) * 0.6}s`} repeatCount="indefinite" />
+          </circle>
+        ))}
+      </svg>
+
+      {/* Gulf skyline silhouette along the bottom of the page */}
+      <svg
+        viewBox="0 0 900 160"
+        preserveAspectRatio="xMidYMax slice"
+        className="pointer-events-none absolute bottom-0 left-0 w-full h-40 opacity-[0.16]"
+      >
+        <path d="M0 160 L0 120 Q20 108 40 120 L40 160 Z" fill="#7FE8C9" />
+        <rect x="55" y="90" width="20" height="70" fill="#7FE8C9" />
+        <rect x="85" y="60" width="16" height="100" fill="#7FE8C9" />
+        <rect x="110" y="100" width="18" height="60" fill="#7FE8C9" />
+        {/* Burj Al Arab sail */}
+        <path d="M150 160 L150 100 Q150 55 195 42 L195 58 Q168 68 168 100 L168 160 Z" fill="#7FE8C9" />
+        <rect x="210" y="80" width="17" height="80" fill="#7FE8C9" />
+        <rect x="238" y="50" width="15" height="110" fill="#7FE8C9" />
+        {/* Burj Khalifa spire */}
+        <polygon points="420,4 438,72 458,72 458,160 386,160 386,72 404,72" fill="#F8B400" />
+        <rect x="416" y="0" width="4" height="8" fill="#F8B400" />
+        <rect x="480" y="70" width="16" height="90" fill="#7FE8C9" />
+        <rect x="506" y="45" width="14" height="115" fill="#7FE8C9" />
+        <rect x="530" y="85" width="18" height="75" fill="#7FE8C9" />
+        <rect x="560" y="60" width="15" height="100" fill="#7FE8C9" />
+        <rect x="600" y="95" width="17" height="65" fill="#7FE8C9" />
+        <rect x="630" y="70" width="14" height="90" fill="#7FE8C9" />
+        <rect x="660" y="105" width="16" height="55" fill="#7FE8C9" />
+        <rect x="700" y="80" width="15" height="80" fill="#7FE8C9" />
+        <rect x="730" y="55" width="17" height="105" fill="#7FE8C9" />
+        <rect x="770" y="95" width="14" height="65" fill="#7FE8C9" />
+        <rect x="800" y="72" width="16" height="88" fill="#7FE8C9" />
+        <rect x="840" y="100" width="18" height="60" fill="#7FE8C9" />
+        <rect x="0" y="160" width="900" height="1.5" fill="#7FE8C9" opacity="0.4" />
+      </svg>
+
+      <div className="relative z-10 w-full flex items-center justify-center">
       <div className={`w-full ${isSignup ? "max-w-2xl" : "max-w-md"}`}>
         <button onClick={() => onSwitch("home")} className="flex items-center gap-2.5 justify-center mb-8 w-full">
           <Logo />
@@ -1117,6 +1166,7 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
           )}
         </div>
         <p className="text-center text-xs text-white/25 mt-6 auth-box" style={{ animationDelay: "0.48s" }}>Demo prototype — accounts are stored for this app only, not production-secure.</p>
+      </div>
       </div>
     </div>
   );
@@ -1377,8 +1427,18 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       <div className="pointer-events-none absolute top-40 -right-32 w-[380px] h-[380px] rounded-full opacity-[0.08] blur-3xl" style={{ background: "#F8B400" }} />
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-72" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0.04), transparent)" }} />
       {/* Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen relative z-10" style={{ background: "#0B1F3A" }}>
-        <div className="flex items-center gap-2.5 px-2">
+      <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen relative z-10 overflow-hidden" style={{ background: "#0B1F3A" }}>
+        {/* faint gold diamond-lattice texture — a nod to Gulf geometric patterns */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage: "linear-gradient(45deg, #F8B400 1px, transparent 1px), linear-gradient(-45deg, #F8B400 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
+          }}
+        />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 w-48 h-48 rounded-full opacity-[0.10] blur-3xl" style={{ background: "#F8B400" }} />
+
+        <div className="relative flex items-center gap-2.5 px-2">
           <Logo />
           <span className="font-extrabold text-white text-xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Emirate<span style={{ background: "linear-gradient(90deg,#00C896,#7FE8C9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Fulfil</span>
@@ -1403,10 +1463,18 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             </button>
           ))}
         </div>
-        <div className="mt-auto pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+        <div className="relative mt-auto pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
           <div className="text-white text-base font-semibold">{session.name}</div>
           <div className="text-white/40 text-sm">{session.company || "Seller account"}</div>
           <button onClick={onLogout} className="mt-3 text-white/60 text-sm font-semibold hover:text-white">Log out</button>
+          <div className="mt-5 h-[3px] w-full rounded-full overflow-hidden flex opacity-60">
+            <div className="flex-[7]" style={{ background: "#FF0000" }} />
+            <div className="flex-[24] flex flex-col">
+              <div className="flex-1" style={{ background: "#00732F" }} />
+              <div className="flex-1" style={{ background: "#FFFFFF" }} />
+              <div className="flex-1" style={{ background: "#000000" }} />
+            </div>
+          </div>
         </div>
       </aside>
 
