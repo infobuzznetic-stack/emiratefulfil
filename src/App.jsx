@@ -964,14 +964,13 @@ function Dashboard({ session, onLogout, notify }) {
   const returned = orders.filter((o) => o.status === "returned");
   // Delivery charge is money collected from the customer, not seller profit — profit stays product-only.
   const billTotal = (o) => o.sellPrice * o.qty + (o.deliveryCharge || 0);
-  const confirmedProfit = delivered.reduce((s, o) => s + (o.sellPrice - o.listPrice) * o.qty, 0);
+  const itemProfit = (o) => (o.sellPrice - o.listPrice) * o.qty;
+  const confirmedProfit = delivered.reduce((s, o) => s + itemProfit(o), 0);
   const pendingCOD = pending.reduce((s, o) => s + billTotal(o), 0);
   const deliveredRevenue = delivered.reduce((s, o) => s + billTotal(o), 0);
-  // Cancelled and returned orders never actually get paid for by the customer, so they must not count toward invoicing.
-  const billableOrders = orders.filter((o) => o.status !== "cancelled" && o.status !== "returned");
-  const totalInvoice = billableOrders.reduce((s, o) => s + billTotal(o), 0);
-  const unpaidInvoice = billableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + billTotal(o), 0);
-  const paidInvoice = billableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + billTotal(o), 0);
+  // Invoice only reflects profit on delivered orders — pending/shipped/cancelled/returned aren't billed yet.
+  const unpaidInvoice = delivered.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + itemProfit(o), 0);
+  const paidInvoice = delivered.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + itemProfit(o), 0);
 
   // Split orders by country so the Dashboard tab can show a UAE-only or KSA-only view
   const regionOrders = orders.filter((o) => (region === "UAE" ? isUAECity(o.city) : isKSACity(o.city)));
@@ -980,11 +979,9 @@ function Dashboard({ session, onLogout, notify }) {
   const regionShipped = regionOrders.filter((o) => o.status === "shipped");
   const regionCancelled = regionOrders.filter((o) => o.status === "cancelled");
   const regionReturned = regionOrders.filter((o) => o.status === "returned");
-  const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + (o.sellPrice - o.listPrice) * o.qty, 0);
-  const regionBillableOrders = regionOrders.filter((o) => o.status !== "cancelled" && o.status !== "returned");
-  const regionTotalInvoice = regionBillableOrders.reduce((s, o) => s + billTotal(o), 0);
-  const regionUnpaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + billTotal(o), 0);
-  const regionPaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + billTotal(o), 0);
+  const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + itemProfit(o), 0);
+  const regionUnpaidInvoice = regionDelivered.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + itemProfit(o), 0);
+  const regionPaidInvoice = regionDelivered.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + itemProfit(o), 0);
   const regionDeliveredRevenue = regionDelivered.reduce((s, o) => s + billTotal(o), 0);
 
 
@@ -1079,11 +1076,11 @@ function Dashboard({ session, onLogout, notify }) {
           {tab === "overview" && (
             <OverviewTab
               session={session} orders={orders} listings={listings} catalog={catalog} setTab={setTab}
-              confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} totalInvoice={totalInvoice}
+              confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue}
               pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned}
               region={region} setRegion={setRegion}
               regionOrders={regionOrders} regionConfirmedProfit={regionConfirmedProfit}
-              regionTotalInvoice={regionTotalInvoice} regionDeliveredRevenue={regionDeliveredRevenue}
+              regionDeliveredRevenue={regionDeliveredRevenue}
               regionUnpaidInvoice={regionUnpaidInvoice} regionPaidInvoice={regionPaidInvoice}
               regionPending={regionPending} regionShipped={regionShipped} regionDelivered={regionDelivered}
               regionCancelled={regionCancelled} regionReturned={regionReturned}
@@ -1206,7 +1203,7 @@ function ComingSoonPanel({ region }) {
 function OverviewTab({
   session, orders, listings, catalog, setTab,
   region, setRegion,
-  regionOrders, regionConfirmedProfit, regionTotalInvoice,
+  regionOrders, regionConfirmedProfit,
   regionUnpaidInvoice, regionPaidInvoice,
   regionPending, regionShipped, regionDelivered, regionCancelled, regionReturned,
 }) {
@@ -1223,7 +1220,6 @@ function OverviewTab({
     { label: "Cancelled", value: regionCancelled.length, color: "#9CA3AF", icon: X },
     { label: "Returned", value: regionReturned.length, color: "#EF4444", icon: RotateCcw },
     { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
-    { label: "Total invoice", value: regionTotalInvoice, prefix: "AED ", color: "#0B1F3A", icon: PackageCheck },
     { label: "Unpaid invoice", value: regionUnpaidInvoice, prefix: "AED ", color: "#F8B400", icon: Receipt },
     { label: "Paid invoice", value: regionPaidInvoice, prefix: "AED ", color: "#00C896", icon: CheckCircle2 },
   ];
