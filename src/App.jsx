@@ -972,7 +972,6 @@ function Dashboard({ session, onLogout, notify }) {
   const NAV = [
     { id: "overview", label: "Dashboard", icon: Boxes },
     { id: "products", label: "Products", icon: Package },
-    { id: "catalog", label: "Catalog", icon: ClipboardCheck },
     { id: "categories", label: "Categories", icon: Layers },
     { id: "orders", label: "Orders", icon: Truck },
     { id: "invoices", label: "Invoices", icon: Receipt },
@@ -1079,7 +1078,6 @@ function Dashboard({ session, onLogout, notify }) {
           {(tab === "settings" || region === "UAE") && (
             <>
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} />}
-              {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
               {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
               {tab === "orders" && (
                 <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
@@ -1778,34 +1776,6 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
             <button onClick={(e) => { e.stopPropagation(); onAdd(p.id); }} className="mt-2 w-full text-xs font-medium py-1.5 text-gray-400 hover:text-gray-700">+ Add to my seller catalog</button>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function ListingsTab({ catalog, listings, onRemove }) {
-  return (
-    <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Catalog</h1>
-      <p className="text-sm text-gray-500 mt-1">Products you're actively selling.</p>
-      <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {listings.length === 0 && <div className="col-span-full text-sm text-gray-400 py-10 text-center">Nothing here yet — add products from the Products tab.</div>}
-        {listings.map((id, i) => {
-          const p = catalog.find((x) => x.id === id);
-          if (!p) return null;
-          return (
-            <div
-              key={id}
-              className="rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl"
-              style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.35s ease-out ${i * 40}ms both` }}
-            >
-              <div className="text-4xl transition-transform duration-300 hover:scale-110 inline-block">{p.emoji}</div>
-              <div className="mt-3 font-semibold text-sm">{p.name}</div>
-              <div className="mt-1 text-xs font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {p.sell - p.cost}</div>
-              <button onClick={() => onRemove(id)} className="mt-4 w-full text-xs font-semibold py-2 rounded-full text-red-500 transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #FECACA" }}>Remove</button>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
