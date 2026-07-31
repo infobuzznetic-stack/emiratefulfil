@@ -2584,17 +2584,46 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
   const totalBilled = billable.reduce((s, o) => s + o.sellPrice * o.qty + (o.deliveryCharge || 0), 0);
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
-      <p className="text-sm text-gray-500 mt-1">An invoice is generated automatically for every order you log. Admin reviews and approves each one before it counts as Paid.</p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} />
-        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} />
-        <StatCard label="Unpaid invoice" value={unpaidInvoice} prefix="AED " color="#F8B400" icon={Receipt} />
-        <StatCard label="Paid invoice" value={paidInvoice} prefix="AED " color="#00C896" icon={CheckCircle2} />
+      <div
+        className="rounded-2xl p-6 text-white relative overflow-hidden mb-6"
+        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}
+      >
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        <div
+          className="absolute -top-14 -right-10 w-56 h-56 rounded-full opacity-30 blur-3xl"
+          style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl"
+          style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }}
+        />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+            <Receipt className="w-7 h-7" style={{ color: "#00e0aa" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
+            <p className="text-sm text-white/70 mt-1">An invoice is generated automatically for every order you log. Admin reviews and approves each one before it counts as Paid.</p>
+          </div>
+        </div>
       </div>
-      <div className="mt-6 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} delay={0} />
+        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} delay={60} />
+        <StatCard label="Unpaid invoice" value={unpaidInvoice} prefix="AED " color="#F8B400" icon={Receipt} delay={120} />
+        <StatCard label="Paid invoice" value={paidInvoice} prefix="AED " color="#00C896" icon={CheckCircle2} delay={180} />
+      </div>
+      <div className="mt-6 rounded-2xl bg-white overflow-x-auto transition-all duration-500" style={{ border: "1px solid #E5E7EB", animation: "dashTabIn 0.4s ease-out 0.2s both" }}>
         {orders.length === 0 ? (
-          <div className="text-sm text-gray-400 py-10 text-center">No invoices yet — they appear here once you log an order.</div>
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.06)" }}>
+              <Receipt className="w-7 h-7" style={{ color: "#9CA3AF" }} />
+            </div>
+            <div className="text-sm text-gray-400">No invoices yet — they appear here once you log an order.</div>
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
