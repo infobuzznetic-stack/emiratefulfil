@@ -2387,69 +2387,75 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             <div
               key={p.id}
               onClick={() => openProduct(p)}
-              className="group relative rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1.5 cursor-pointer overflow-hidden"
+              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1 cursor-pointer overflow-hidden flex flex-col"
               style={{
                 border: "1px solid #E5E7EB",
                 animation: `dashTabIn 0.35s ease-out ${i * 40}ms both`,
-                boxShadow: "0 0 0 rgba(0,0,0,0)",
+                boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 16px 32px ${color}22`)}
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 0 0 rgba(0,0,0,0)")}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 20px 32px -12px ${color}33`)}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 2px rgba(16,24,40,0.04)")}
             >
-              <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
-              {isAdmin && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); startEdit(p); }}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-                  style={{ background: "#F8FAFC", border: "1px solid #E5E7EB", color: "#6B7280" }}
-                  title="Edit product"
-                >
-                  ✏️
-                </button>
-              )}
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
-                style={{ background: `${color}18` }}
-              >
-                <ProductThumb product={p} size={30} />
-              </div>
-              <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
-              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{p.category}</span>
+              {/* ── Image ── */}
+              <div className="relative w-full aspect-square flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(160deg, ${color}14, ${color}05)` }}>
+                <div className="transition-transform duration-500 ease-out group-hover:scale-105 flex items-center justify-center w-full h-full">
+                  <ProductThumb product={p} size={56} className="w-full h-full" />
+                </div>
                 <span
-                  className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                  style={inStock ? { background: "rgba(0,200,150,0.12)", color: "#00a67e" } : { background: "rgba(239,68,68,0.1)", color: "#EF4444" }}
+                  className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm"
+                  style={inStock ? { background: "rgba(255,255,255,0.92)", color: "#00a67e" } : { background: "rgba(255,255,255,0.92)", color: "#EF4444" }}
                 >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444" }} />
                   {inStock ? "In Stock" : "Out of Stock"}
                 </span>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); startEdit(p); }}
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm"
+                    style={{ background: "rgba(255,255,255,0.95)", border: "1px solid #E5E7EB", color: "#6B7280" }}
+                    title="Edit product"
+                  >
+                    ✏️
+                  </button>
+                )}
               </div>
-              <div className="mt-2 text-lg font-bold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
 
-              {/* ── Quantity counter ── */}
-              <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <span className="text-xs text-gray-400 font-medium">Qty</span>
-                <div className="flex items-center rounded-full" style={{ border: "1px solid #E5E7EB" }}>
-                  <button
-                    onClick={() => setQty(p.id, qty - 1)}
-                    className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
-                  >−</button>
-                  <span className="w-6 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
-                  <button
-                    onClick={() => setQty(p.id, qty + 1)}
-                    className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
-                  >+</button>
+              {/* ── Content ── */}
+              <div className="p-4 flex flex-col flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{p.category}</span>
+                <div className="mt-1 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
+                <div className="mt-2 text-xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>
+                  AED {Number(p.sell).toLocaleString()}
                 </div>
-              </div>
 
-              <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                <button disabled={!inStock} onClick={() => addToCart(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
-                  🛒 Add to Cart
-                </button>
-                <button disabled={!inStock} onClick={() => buyNow(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
-                  {inStock ? "Buy Now" : "Out of Stock"}
+                {/* ── Quantity counter ── */}
+                <div className="mt-3 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-xs text-gray-400 font-medium">Quantity</span>
+                  <div className="flex items-center rounded-full" style={{ border: "1px solid #E5E7EB" }}>
+                    <button
+                      onClick={() => setQty(p.id, qty - 1)}
+                      className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
+                    >−</button>
+                    <span className="w-6 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
+                    <button
+                      onClick={() => setQty(p.id, qty + 1)}
+                      className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
+                    >+</button>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2 mt-auto pt-3" onClick={(e) => e.stopPropagation()}>
+                  <button disabled={!inStock} onClick={() => addToCart(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
+                    Add to Cart
+                  </button>
+                  <button disabled={!inStock} onClick={() => buyNow(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100" style={{ background: inStock ? "linear-gradient(135deg,#00C896,#00a67e)" : "#D1D5DB" }}>
+                    {inStock ? "Buy Now" : "Unavailable"}
+                  </button>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1 text-center transition-colors" style={{ color: "#9CA3AF" }}>
+                  View full details →
                 </button>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1.5 text-gray-500 hover:text-gray-800">View product →</button>
             </div>
           );
         })}
