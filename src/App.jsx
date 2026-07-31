@@ -1096,7 +1096,7 @@ function Dashboard({ session, onLogout, notify }) {
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} />}
               {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
               {tab === "orders" && (
-                <OrdersTab orders={orders} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
+                <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue} returnedCount={returned.length} />
               )}
               {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
               {tab === "settings" && <SettingsTab session={session} />}
@@ -1943,14 +1943,14 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
   );
 }
 
-function OrdersTab({ orders, confirmedProfit, pendingCOD, returnedCount }) {
+function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount }) {
   return (
     <div>
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Orders &amp; COD tracking</h1>
       <p className="text-sm text-gray-500 mt-1">Track your COD orders and their status as they move.</p>
       <div className="grid sm:grid-cols-3 gap-4 mt-6">
         <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" />
-        <StatCard label="Pending COD value" value={pendingCOD} prefix="AED " color="#F8B400" />
+        <StatCard label="Paid COD" value={deliveredRevenue} prefix="AED " color="#00C896" />
         <StatCard label="Returned" value={returnedCount} color="#EF4444" />
       </div>
       <div className="mt-8 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
