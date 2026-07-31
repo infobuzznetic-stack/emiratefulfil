@@ -1358,7 +1358,7 @@ function Dashboard({ session, onLogout, notify }) {
                   ? <AdminOrdersPanel notify={notify} />
                   : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
               )}
-              {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
+              {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
               {tab === "support" && <SupportTab session={session} />}
               {tab === "tickets" && (
@@ -2720,11 +2720,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     </div>
   );
 }
-function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
-  // Cancelled orders were never billed, so they're excluded from every invoice total below.
-  // Amount billed = product price + the flat delivery charge (delivery isn't seller profit, but it is part of what's invoiced).
-  const billable = orders.filter((o) => o.status !== "cancelled");
-  const totalBilled = billable.reduce((s, o) => s + o.sellPrice * o.qty + (o.deliveryCharge || 0), 0);
+function InvoicesTab({ session }) {
   return (
     <div>
       <div
@@ -2749,58 +2745,11 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
           </div>
           <div>
             <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
-            <p className="text-sm text-white/70 mt-1">An invoice is generated automatically for every order you log. Admin reviews and approves each one before it counts as Paid.</p>
+            <p className="text-sm text-white/70 mt-1">Tax invoices Admin has created for you show up here.</p>
           </div>
         </div>
       </div>
-      <SellerInvoicesPanel email={session.email} />
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} delay={0} />
-        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} delay={60} />
-        <StatCard label="Unpaid invoice" value={unpaidInvoice} prefix="AED " color="#F8B400" icon={Receipt} delay={120} />
-        <StatCard label="Paid invoice" value={paidInvoice} prefix="AED " color="#00C896" icon={CheckCircle2} delay={180} />
-      </div>
-      <div className="mt-6 rounded-2xl bg-white overflow-x-auto transition-all duration-500" style={{ border: "1px solid #E5E7EB", animation: "dashTabIn 0.4s ease-out 0.2s both" }}>
-        {orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-14 text-center">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.06)" }}>
-              <Receipt className="w-7 h-7" style={{ color: "#9CA3AF" }} />
-            </div>
-            <div className="text-sm text-gray-400">No invoices yet — they appear here once you log an order.</div>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <th className="px-4 py-3">Invoice #</th>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Buyer</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Order status</th>
-                <th className="px-4 py-3">Payment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o, i) => (
-                <tr
-                  key={o.id}
-                  className="transition-colors duration-200 hover:bg-gray-50"
-                  style={{ borderBottom: "1px solid #FAFAFA", animation: `dashTabIn 0.3s ease-out ${i * 30}ms both` }}
-                >
-                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>INV-{o.id}</td>
-                  <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
-                  <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                    {(o.status === "cancelled" || o.status === "returned") ? "AED 0" : `AED ${o.sellPrice * o.qty + (o.deliveryCharge || 0)}`}
-                  </td>
-                  <td className="px-4 py-3"><StatusPill status={o.status} /></td>
-                  <td className="px-4 py-3">{o.status === "cancelled" ? <span className="text-xs text-gray-300">—</span> : <PaymentPill status={o.paymentStatus} />}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <SellerInvoicesPanel email={session.email} showEmptyState />
     </div>
   );
 }
@@ -3197,7 +3146,7 @@ function SellerInvoiceManager({ seller, notify, onClose }) {
 
 // Seller-facing, read-only: statements Admin has created for this seller —
 // shown at the top of the seller's own Invoices tab, above the per-order list.
-function SellerInvoicesPanel({ email }) {
+function SellerInvoicesPanel({ email, showEmptyState = false }) {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openInvoice, setOpenInvoice] = useState(null);
@@ -3206,7 +3155,22 @@ function SellerInvoicesPanel({ email }) {
     (async () => { setLoading(true); setInvoices(await fetchSellerInvoices(email)); setLoading(false); })();
   }, [email]);
 
-  if (loading || invoices.length === 0) return null;
+  if (loading) {
+    return showEmptyState ? (
+      <div className="rounded-2xl bg-white text-sm text-gray-400 py-14 text-center" style={{ border: "1px solid #E5E7EB" }}>Loading invoices…</div>
+    ) : null;
+  }
+  if (invoices.length === 0) {
+    if (!showEmptyState) return null;
+    return (
+      <div className="flex flex-col items-center justify-center py-14 text-center rounded-2xl bg-white" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.06)" }}>
+          <Receipt className="w-7 h-7" style={{ color: "#9CA3AF" }} />
+        </div>
+        <div className="text-sm text-gray-400">No invoices yet — Admin will create one for you here once it's ready.</div>
+      </div>
+    );
+  }
 
   return (
     <div className="mb-6">
