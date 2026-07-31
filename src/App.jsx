@@ -2787,6 +2787,7 @@ function AdminOrdersPanel({ notify }) {
                         <th className="px-4 py-3">Email / Phone</th>
                         <th className="px-4 py-3">Address / Emirate</th>
                         <th className="px-4 py-3">Amount</th>
+                        <th className="px-4 py-3">Profit</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Payment</th>
                         <th className="px-4 py-3">Tracking #</th>
@@ -2807,6 +2808,9 @@ function AdminOrdersPanel({ notify }) {
                             <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
                           </td>
                           <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
+                          <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>
+                            AED {(o.status === "cancelled" || o.status === "returned") ? 0 : (Number(o.sell_price) - Number(o.list_price != null ? o.list_price : o.sell_price)) * o.qty}
+                          </td>
                           <td className="px-4 py-3">
                             <select
                               value={o.status}
