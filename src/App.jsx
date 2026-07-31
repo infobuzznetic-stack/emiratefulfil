@@ -2074,7 +2074,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
       images, image_url: images[0] || null,
       stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
     }).eq("id", id);
-    if (error) { notify && notify("Could not save changes."); return; }
+    if (error) { console.error("Product save failed:", error); notify && notify(`Could not save: ${error.message || "unknown error"}`); return; }
     notify && notify("Product updated.");
     cancelEdit();
     onCatalogChanged && onCatalogChanged();
@@ -2712,7 +2712,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       images, image_url: images[0] || null,
       stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
     }).eq("id", id);
-    if (error) { notify("Could not save changes."); return; }
+    if (error) { console.error("Product save failed:", error); notify(`Could not save: ${error.message || "unknown error"}`); return; }
     notify("Product updated.");
     cancelEdit();
     onCatalogChanged();
