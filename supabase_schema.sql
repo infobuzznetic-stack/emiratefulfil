@@ -10,6 +10,15 @@ create table if not exists profiles (
   country text,
   created_at timestamptz default now()
 );
+-- Safe to re-run: adds these columns if this table already existed without them.
+-- Collected once at signup so Admin has everything needed to onboard and pay a seller.
+alter table profiles add column if not exists store_name text;
+alter table profiles add column if not exists monthly_orders text;
+alter table profiles add column if not exists whatsapp text;
+alter table profiles add column if not exists bank_name text;
+alter table profiles add column if not exists account_title text;
+alter table profiles add column if not exists account_number text;
+alter table profiles add column if not exists iban text;
 
 -- 2. Shared product catalog (admin manages this; every seller sees the same list)
 create table if not exists products (
@@ -151,14 +160,21 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, name, phone, company, country)
+  insert into public.profiles (id, email, name, phone, company, country, store_name, monthly_orders, whatsapp, bank_name, account_title, account_number, iban)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
     new.raw_user_meta_data->>'phone',
     new.raw_user_meta_data->>'company',
-    new.raw_user_meta_data->>'country'
+    new.raw_user_meta_data->>'country',
+    new.raw_user_meta_data->>'store_name',
+    new.raw_user_meta_data->>'monthly_orders',
+    new.raw_user_meta_data->>'whatsapp',
+    new.raw_user_meta_data->>'bank_name',
+    new.raw_user_meta_data->>'account_title',
+    new.raw_user_meta_data->>'account_number',
+    new.raw_user_meta_data->>'iban'
   )
   on conflict (id) do nothing;
   return new;
