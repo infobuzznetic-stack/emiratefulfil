@@ -3,7 +3,7 @@ import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
-  Layers, Receipt, Clock, CreditCard, LifeBuoy, Send,
+  Layers, Receipt, Clock, CreditCard, LifeBuoy,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1619,8 +1619,8 @@ function OverviewTab({
               </div>
               <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
                 <div className="font-bold text-sm mb-1" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>This week</div>
-                <div className="text-3xl font-bold mt-2" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{ordersThisWeek}</div>
-                <div className="text-xs text-gray-400 mt-1">order{ordersThisWeek === 1 ? "" : "s"} logged in the last 7 days</div>
+                <div className="text-3xl font-bold mt-2" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{regionOrdersThisWeek}</div>
+                <div className="text-xs text-gray-400 mt-1">order{regionOrdersThisWeek === 1 ? "" : "s"} logged in the last 7 days</div>
               </div>
             </div>
           </div>
@@ -2536,79 +2536,6 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     </div>
   );
 }
-function CategoriesTab({ catalog, listings, onAdd }) {
-  const [openCat, setOpenCat] = useState(null);
-  const categories = Array.from(new Set(catalog.map((p) => p.category || "General")));
-
-  return (
-    <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Categories</h1>
-      <p className="text-sm text-gray-500 mt-1">Browse products grouped by category.</p>
-      <div className="mt-6 space-y-3">
-        {categories.length === 0 && <div className="text-sm text-gray-400 py-10 text-center">No categories yet.</div>}
-        {categories.map((cat, i) => {
-          const items = catalog.filter((p) => (p.category || "General") === cat);
-          const isOpen = openCat === cat;
-          return (
-            <div
-              key={cat}
-              className="rounded-2xl bg-white overflow-hidden transition-all duration-300 ease-out"
-              style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.35s ease-out ${i * 50}ms both` }}
-            >
-              <button
-                onClick={() => setOpenCat(isOpen ? null : cat)}
-                className="w-full flex items-center justify-between px-5 py-4 transition-colors duration-200 hover:bg-gray-50 active:scale-[0.99]"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.12)" }}>
-                    <Layers className="w-4.5 h-4.5" style={{ color: "#00C896" }} />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-semibold text-sm" style={{ color: "#111827" }}>{cat}</div>
-                    <div className="text-xs text-gray-400">{items.length} product{items.length === 1 ? "" : "s"}</div>
-                  </div>
-                </div>
-                <ChevronDown className="w-4 h-4 text-gray-400 transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
-              </button>
-              <div
-                className="transition-all duration-300 ease-out overflow-hidden"
-                style={{ maxHeight: isOpen ? `${items.length * 90 + 40}px` : "0px" }}
-              >
-                <div className="px-5 pb-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {items.map((p) => {
-                    const already = listings.includes(p.id);
-                    return (
-                      <div key={p.id} className="rounded-xl p-4 flex items-center justify-between gap-3" style={{ border: "1px solid #F3F4F6" }}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
-                            <ProductThumb product={p} size={22} />
-                          </div>
-                          <div>
-                            <div className="font-semibold text-sm">{p.name}</div>
-                            <div className="text-xs text-gray-400">AED {p.sell}</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => onAdd(p.id)}
-                          disabled={already}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.05] active:scale-95 disabled:opacity-40"
-                          style={{ background: "#0B1F3A" }}
-                        >
-                          {already ? "Added" : "+ Add"}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
   // Cancelled orders were never billed, so they're excluded from every invoice total below.
   // Amount billed = product price + the flat delivery charge (delivery isn't seller profit, but it is part of what's invoiced).
