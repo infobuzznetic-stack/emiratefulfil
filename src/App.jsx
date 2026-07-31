@@ -2396,6 +2396,28 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     onCatalogChanged();
   };
 
+  // Inline product editing — click Edit on a card to turn it into a small
+  // form, Save writes the changes straight to Supabase.
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "" });
+  };
+  const cancelEdit = () => { setEditingId(null); setEditForm(null); };
+  const saveEdit = async (id) => {
+    if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify("Fill in name, cost and sell price."); return; }
+    const { error } = await supabase.from("products").update({
+      name: editForm.name, category: editForm.category || "General",
+      cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell),
+      emoji: editForm.emoji || "📦", description: editForm.description || null,
+    }).eq("id", id);
+    if (error) { notify("Could not save changes."); return; }
+    notify("Product updated.");
+    cancelEdit();
+    onCatalogChanged();
+  };
+
   const sellerOrderCount = (email) => allOrders.filter((o) => o.seller_email === email).length;
   const filteredSellers = sellers.filter((s) => {
     const q = sellerSearch.trim().toLowerCase();
@@ -2487,11 +2509,35 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.map((p) => (
           <div key={p.id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-            <div className="text-4xl">{p.emoji}</div>
-            <div className="mt-3 font-semibold text-sm">{p.name}</div>
-            <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
-            <div className="mt-1 text-xs text-gray-500">Cost AED {p.cost} · Sell AED {p.sell}</div>
-            <button onClick={() => deleteProduct(p.id)} className="mt-4 w-full text-xs font-semibold py-2 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Remove from catalog</button>
+            {editingId === p.id ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
+                  <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="flex-1 rounded-lg px-2 py-1.5 text-sm font-semibold" style={{ border: "1px solid #E5E7EB" }} />
+                </div>
+                <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} placeholder="Category" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                <div className="flex items-center gap-2">
+                  <input type="number" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} placeholder="Cost" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                  <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                </div>
+                <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => saveEdit(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
+                  <button onClick={cancelEdit} className="flex-1 text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-4xl">{p.emoji}</div>
+                <div className="mt-3 font-semibold text-sm">{p.name}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
+                <div className="mt-1 text-xs text-gray-500">Cost AED {p.cost} · Sell AED {p.sell}</div>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => startEdit(p)} className="flex-1 text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
+                  <button onClick={() => deleteProduct(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Remove</button>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
