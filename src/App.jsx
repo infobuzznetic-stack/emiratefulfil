@@ -4034,7 +4034,8 @@ function TicketsTab({ session, notify }) {
         <div className="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="relative flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+            <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+              <span className="absolute inset-0 rounded-2xl" style={{ boxShadow: "0 0 0 1px rgba(0,224,170,0.35)" }} />
               <MessageCircle className="w-7 h-7" style={{ color: "#00e0aa" }} />
             </div>
             <div>
@@ -4044,8 +4045,8 @@ function TicketsTab({ session, notify }) {
           </div>
           <button
             onClick={() => setShowNewForm((v) => !v)}
-            className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
-            style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}
+            className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95"
+            style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 22px rgba(0,200,150,0.35)" }}
           >
             {showNewForm ? "Cancel" : "+ New ticket"}
           </button>
@@ -4053,18 +4054,42 @@ function TicketsTab({ session, notify }) {
       </div>
 
       {showNewForm && (
-        <div className="rounded-2xl bg-white p-5 mb-6" style={{ border: "1px solid #E5E7EB" }}>
-          <div className="font-bold text-sm mb-3" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>New ticket</div>
-          <div className="space-y-3">
+        <div className="relative overflow-hidden rounded-2xl bg-white p-5 mb-6 animate-[dashTabIn_0.35s_ease-out]" style={{ border: "1px solid #E5E7EB", boxShadow: "0 12px 30px rgba(11,31,58,0.06)" }}>
+          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: "linear-gradient(90deg,#00C896,#F8B400)" }} />
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
+              <Sparkles className="w-[18px] h-[18px]" style={{ color: "#00a67e" }} />
+            </div>
+            <div className="font-bold text-sm" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Raise a new ticket</div>
+          </div>
+          <div className="space-y-3.5">
             <div>
-              <label className="text-xs text-gray-500">Subject</label>
-              <input value={newSubject} onChange={(e) => setNewSubject(e.target.value)} placeholder="e.g. Payout for order ORD123456 is late" className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none" style={{ border: "1px solid #E5E7EB" }} />
+              <label className="text-xs font-semibold text-gray-500">Subject</label>
+              <input
+                value={newSubject}
+                onChange={(e) => setNewSubject(e.target.value)}
+                placeholder="e.g. Payout for order ORD123456 is late"
+                className="mt-1.5 w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
+                style={{ border: "1px solid #E5E7EB" }}
+              />
             </div>
             <div>
-              <label className="text-xs text-gray-500">Message</label>
-              <textarea value={newBody} onChange={(e) => setNewBody(e.target.value)} rows={4} placeholder="Describe the issue in detail…" className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none resize-none" style={{ border: "1px solid #E5E7EB" }} />
+              <label className="text-xs font-semibold text-gray-500">Message</label>
+              <textarea
+                value={newBody}
+                onChange={(e) => setNewBody(e.target.value)}
+                rows={4}
+                placeholder="Describe the issue in detail…"
+                className="mt-1.5 w-full rounded-xl px-4 py-2.5 text-sm outline-none resize-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
+                style={{ border: "1px solid #E5E7EB" }}
+              />
             </div>
-            <button onClick={createTicket} disabled={creating} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: creating ? 0.6 : 1 }}>
+            <button
+              onClick={createTicket}
+              disabled={creating}
+              className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95 disabled:hover:scale-100"
+              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: creating ? 0.6 : 1, boxShadow: "0 8px 20px rgba(0,200,150,0.3)" }}
+            >
               {creating ? "Submitting…" : "Submit ticket"}
             </button>
           </div>
@@ -4073,48 +4098,77 @@ function TicketsTab({ session, notify }) {
 
       <div className="grid lg:grid-cols-5 gap-5">
         {/* Ticket list */}
-        <div className="lg:col-span-2 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
-          <div className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
-            Your tickets ({tickets.length})
+        <div className="lg:col-span-2 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB", boxShadow: "0 12px 30px rgba(11,31,58,0.05)" }}>
+          <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: "1px solid #F3F4F6" }}>
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Your tickets</span>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(11,31,58,0.06)", color: "#0B1F3A" }}>{tickets.length}</span>
           </div>
           {ticketsLoading ? (
-            <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
+            <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
           ) : tickets.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-400">No tickets yet — raise one if you need help.</div>
+            <div className="p-8 text-center">
+              <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.05)" }}>
+                <MessageCircle className="w-6 h-6" style={{ color: "#9CA3AF" }} />
+              </div>
+              <div className="text-sm text-gray-400">No tickets yet — raise one if you need help.</div>
+            </div>
           ) : (
             <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
-              {tickets.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => openTicket(t.id)}
-                  className="w-full text-left px-5 py-3.5 transition-colors hover:bg-gray-50"
-                  style={selectedId === t.id ? { background: "rgba(0,200,150,0.06)" } : {}}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold truncate" style={{ color: "#111827" }}>{t.subject}</span>
-                    <TicketStatusPill status={t.status} />
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-1">{t.id} · {new Date(t.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
-                </button>
-              ))}
+              {tickets.map((t) => {
+                const isSelected = selectedId === t.id;
+                const isOpen = t.status !== "resolved";
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => openTicket(t.id)}
+                    className="relative w-full text-left px-5 py-4 flex items-start gap-3 transition-all duration-200 hover:bg-gray-50"
+                    style={isSelected ? { background: "rgba(0,200,150,0.06)" } : {}}
+                  >
+                    {isSelected && <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: "linear-gradient(180deg,#00C896,#00a67e)" }} />}
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{ background: isOpen ? "linear-gradient(135deg,#F8B400,#e0a200)" : "linear-gradient(135deg,#00C896,#00a67e)" }}
+                    >
+                      <MessageCircle className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold truncate" style={{ color: "#111827" }}>{t.subject}</span>
+                        <TicketStatusPill status={t.status} />
+                      </div>
+                      <div className="text-[11px] text-gray-400 mt-1">{t.id} · {new Date(t.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Conversation */}
-        <div className="lg:col-span-3 rounded-2xl bg-white overflow-hidden flex flex-col" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
+        <div className="lg:col-span-3 rounded-2xl bg-white overflow-hidden flex flex-col" style={{ border: "1px solid #E5E7EB", minHeight: 360, boxShadow: "0 12px 30px rgba(11,31,58,0.05)" }}>
           {!selectedTicket ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">Select a ticket to see the conversation.</div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.08)" }}>
+                <MessageCircle className="w-7 h-7" style={{ color: "#00a67e" }} />
+              </div>
+              <div className="text-sm text-gray-400">Select a ticket to see the conversation.</div>
+            </div>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-2 px-5 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <div className="min-w-0">
-                  <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>{selectedTicket.subject}</div>
-                  <div className="text-[11px] text-gray-400">{selectedTicket.id}</div>
+              <div className="flex items-center justify-between gap-3 px-5 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#0B1F3A,#0F2E52)" }}>
+                    <LifeBuoy className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>{selectedTicket.subject}</div>
+                    <div className="text-[11px] text-gray-400">{selectedTicket.id}</div>
+                  </div>
                 </div>
                 <TicketStatusPill status={selectedTicket.status} />
               </div>
-              <div className="flex-1 p-5 overflow-y-auto" style={{ maxHeight: 420 }}>
+              <div className="flex-1 p-5 overflow-y-auto" style={{ maxHeight: 420, background: "linear-gradient(180deg,#FAFBFC,#ffffff)" }}>
                 <TicketThread messages={messages[selectedId]} loading={messagesLoading} viewerRole="seller" />
               </div>
               <div className="p-4 flex items-center gap-2" style={{ borderTop: "1px solid #F3F4F6" }}>
@@ -4129,20 +4183,20 @@ function TicketsTab({ session, notify }) {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImage}
                   title="Attach a picture"
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40"
-                  style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+                  style={{ border: "1px solid #E5E7EB", color: uploadingImage ? "#00a67e" : "#6B7280" }}
                 >
-                  <ImagePlus className="w-4 h-4" />
+                  <ImagePlus className={`w-4 h-4 ${uploadingImage ? "animate-pulse" : ""}`} />
                 </button>
                 <input
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
                   placeholder="Type a reply…"
-                  className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
+                  className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
                   style={{ border: "1px solid #E5E7EB" }}
                 />
-                <button onClick={sendReply} disabled={sending || !reply.trim()} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105 disabled:opacity-40" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                <button onClick={sendReply} disabled={sending || !reply.trim()} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 6px 16px rgba(0,200,150,0.3)" }}>
                   Send
                 </button>
               </div>
