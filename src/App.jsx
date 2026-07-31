@@ -1467,10 +1467,10 @@ function OverviewTab({
   ];
 
   const quickActions = [
-    { label: "Add product", tab: "products", icon: Package, color: "#00C896" },
-    { label: "Log order", tab: "orders", icon: Truck, color: "#3B82F6" },
+    { label: "Order Product", tab: "products", icon: Package, color: "#00C896" },
+    { label: "See Orders", tab: "orders", icon: Truck, color: "#3B82F6" },
     { label: "View invoices", tab: "invoices", icon: PackageCheck, color: "#F8B400" },
-    { label: "Browse categories", tab: "categories", icon: ClipboardCheck, color: "#0B1F3A" },
+    { label: "Contact Customer Support", tab: "categories", icon: ClipboardCheck, color: "#0B1F3A" },
   ];
 
   return (
