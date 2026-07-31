@@ -1053,7 +1053,7 @@ function Dashboard({ session, onLogout, notify }) {
 
       {/* Main */}
       <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
-        <div key={tab} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
+        <div key={tab + region} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
           {tab === "overview" && (
             <OverviewTab
               session={session} orders={orders} listings={listings} catalog={catalog} setTab={setTab}
@@ -1067,14 +1067,23 @@ function Dashboard({ session, onLogout, notify }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} />}
-          {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
-          {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
-          {tab === "orders" && (
-            <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
+          {/* Settings and Admin aren't country-specific, so they stay open regardless of the region switch.
+              Every other tab is UAE-only for now — switching to KSA/Qatar shows Coming Soon everywhere. */}
+          {tab !== "overview" && tab !== "settings" && tab !== "admin" && region !== "UAE" && (
+            <ComingSoonPanel region={region} />
           )}
-          {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
-          {tab === "settings" && <SettingsTab session={session} />}
+          {(tab === "settings" || region === "UAE") && (
+            <>
+              {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} />}
+              {tab === "catalog" && <ListingsTab catalog={catalog} listings={listings} onRemove={removeListing} />}
+              {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
+              {tab === "orders" && (
+                <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
+              )}
+              {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
+              {tab === "settings" && <SettingsTab session={session} />}
+            </>
+          )}
           {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
         </div>
       </main>
