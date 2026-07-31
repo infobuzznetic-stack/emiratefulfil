@@ -3058,9 +3058,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     <div>{o.customer_email || "—"}</div>
                     <div className="text-gray-400">{o.customer_phone || ""}</div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs max-w-[180px]">
-                    <div>{o.city || "—"}</div>
-                    <div className="text-gray-400 truncate" title={o.customer_address}>{o.customer_address || ""}</div>
+                  <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
+                    <div className="text-gray-700 font-medium">{o.city || "—"}</div>
+                    <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
                   </td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
                   <td className="px-4 py-3">
