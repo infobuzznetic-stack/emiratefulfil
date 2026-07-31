@@ -161,3 +161,38 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- 5. Site settings (currently just the logo picture the admin can upload).
+--    Readable by everyone — including logged-out visitors on the homepage —
+--    but only signed-in users can write to it, matching the other tables.
+create table if not exists app_settings (
+  key text primary key,
+  value text,
+  updated_at timestamptz default now()
+);
+alter table app_settings enable row level security;
+
+drop policy if exists "app_settings readable by anyone" on app_settings;
+create policy "app_settings readable by anyone" on app_settings
+  for select using (true);
+drop policy if exists "app_settings writable by anyone signed in" on app_settings;
+create policy "app_settings writable by anyone signed in" on app_settings
+  for insert with check (auth.role() = 'authenticated');
+drop policy if exists "app_settings updatable by anyone signed in" on app_settings;
+create policy "app_settings updatable by anyone signed in" on app_settings
+  for update using (auth.role() = 'authenticated');
+
+-- Storage bucket for the uploaded logo (and any other public site pictures).
+insert into storage.buckets (id, name, public)
+values ('public-assets', 'public-assets', true)
+on conflict (id) do nothing;
+
+drop policy if exists "public-assets are publicly readable" on storage.objects;
+create policy "public-assets are publicly readable" on storage.objects
+  for select using (bucket_id = 'public-assets');
+drop policy if exists "public-assets uploadable by signed in users" on storage.objects;
+create policy "public-assets uploadable by signed in users" on storage.objects
+  for insert with check (bucket_id = 'public-assets' and auth.role() = 'authenticated');
+drop policy if exists "public-assets updatable by signed in users" on storage.objects;
+create policy "public-assets updatable by signed in users" on storage.objects
+  for update using (bucket_id = 'public-assets' and auth.role() = 'authenticated');
