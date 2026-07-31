@@ -897,6 +897,7 @@ const MONTHLY_ORDER_OPTIONS = ["0 – 10", "10 – 50", "50 – 100", "100 – 5
 
 function AuthPage({ mode, onAuthed, onSwitch, notify }) {
   const isSignup = mode === "signup";
+  const isForgot = mode === "forgot";
   const [form, setForm] = useState({
     name: "", phone: "", country: "UAE", email: "", password: "",
     storeName: "", monthlyOrders: "", whatsapp: "",
@@ -912,6 +913,14 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
     e.preventDefault();
     setBusy(true);
     const email = form.email.trim().toLowerCase();
+    if (isForgot) {
+      if (!email) { notify("Please enter your email."); setBusy(false); return; }
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+      if (error) { notify(error.message); setBusy(false); return; }
+      notify("If an account exists for that email, a reset link has been sent. Please check your inbox.");
+      setBusy(false);
+      return;
+    }
     if (isSignup) {
       if (!form.name || !email || !form.password || !form.storeName || !form.monthlyOrders || !form.phone || !form.whatsapp || !form.bankName || !form.accountTitle || !form.accountNumber || !form.iban) {
         notify("Please fill in all required fields.");
@@ -986,9 +995,11 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", animationDelay: "0.05s" }}
         >
           <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            {isSignup ? "Create your seller account" : "Welcome back"}
+            {isSignup ? "Create your seller account" : isForgot ? "Reset your password" : "Welcome back"}
           </h2>
-          <p className="text-sm text-white/45 mt-1">{isSignup ? "Tell us about your store so we can get you selling." : "Log in to your seller portal."}</p>
+          <p className="text-sm text-white/45 mt-1">
+            {isSignup ? "Tell us about your store so we can get you selling." : isForgot ? "Enter your email and we'll send you a link to reset it." : "Log in to your seller portal."}
+          </p>
 
           <form onSubmit={submit} className="mt-6 space-y-5">
             {isSignup && (
@@ -1059,10 +1070,19 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
               </>
             )}
 
-            {!isSignup && (
+            {isForgot && (
+              <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@example.com" required />
+            )}
+
+            {!isSignup && !isForgot && (
               <>
                 <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@example.com" required />
                 <Field label="Password" type="password" value={form.password} onChange={update("password")} placeholder="••••••••" required />
+                <div className="text-right -mt-2">
+                  <button type="button" onClick={() => onSwitch("forgot")} className="text-xs font-semibold" style={{ color: "#00C896" }}>
+                    Forgot password?
+                  </button>
+                </div>
               </>
             )}
 
@@ -1072,18 +1092,77 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
               className="w-full font-semibold py-3 rounded-full mt-2 transition-transform hover:scale-[1.02] disabled:opacity-60 auth-box"
               style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#04140f", animationDelay: "0.42s" }}
             >
-              {busy ? "Please wait…" : isSignup ? "Create account" : "Log in"}
+              {busy ? "Please wait…" : isSignup ? "Create account" : isForgot ? "Send reset link" : "Log in"}
             </button>
           </form>
 
-          <p className="text-center text-sm text-white/45 mt-5">
-            {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
-            <button onClick={() => onSwitch(isSignup ? "login" : "signup")} className="font-semibold" style={{ color: "#00C896" }}>
-              {isSignup ? "Log in" : "Sign up"}
-            </button>
-          </p>
+          {isForgot ? (
+            <p className="text-center text-sm text-white/45 mt-5">
+              <button onClick={() => onSwitch("login")} className="font-semibold" style={{ color: "#00C896" }}>
+                Back to log in
+              </button>
+            </p>
+          ) : (
+            <p className="text-center text-sm text-white/45 mt-5">
+              {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+              <button onClick={() => onSwitch(isSignup ? "login" : "signup")} className="font-semibold" style={{ color: "#00C896" }}>
+                {isSignup ? "Log in" : "Sign up"}
+              </button>
+            </p>
+          )}
         </div>
         <p className="text-center text-xs text-white/25 mt-6 auth-box" style={{ animationDelay: "0.48s" }}>Demo prototype — accounts are stored for this app only, not production-secure.</p>
+      </div>
+    </div>
+  );
+}
+
+// Shown when the seller clicks the reset link from their email — Supabase
+// signs them into a temporary "recovery" session, and this lets them pick
+// a new password via supabase.auth.updateUser().
+function ResetPasswordPage({ onDone, notify }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  useGoogleFonts();
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!password || password.length < 6) { notify("Password must be at least 6 characters."); return; }
+    if (password !== confirm) { notify("Passwords don't match."); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (error) { notify(error.message); return; }
+    notify("Password updated. You're all set.");
+    onDone();
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6 py-16" style={{ background: "#081221", fontFamily: "Inter, sans-serif" }}>
+      <div className="w-full max-w-md">
+        <div className="flex items-center gap-2.5 justify-center mb-8 w-full">
+          <Logo />
+          <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
+          </span>
+        </div>
+        <div className="rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Set a new password</h2>
+          <p className="text-sm text-white/45 mt-1">Choose a new password for your account.</p>
+          <form onSubmit={submit} className="mt-6 space-y-5">
+            <Field label="New password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+            <Field label="Confirm password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" required />
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full font-semibold py-3 rounded-full mt-2 transition-transform hover:scale-[1.02] disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#04140f" }}
+            >
+              {busy ? "Please wait…" : "Update password"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -4951,7 +5030,7 @@ function FloatingWhatsApp() {
 
 export default function EmirateFulfilApp() {
   useGoogleFonts();
-  const [view, setView] = useState("home"); // home | signup | login | dashboard
+  const [view, setView] = useState("home"); // home | signup | login | forgot | reset-password | dashboard
   const [session, setSession] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -5009,6 +5088,17 @@ export default function EmirateFulfilApp() {
     });
   }, []);
 
+  // When a seller clicks the "reset password" link in their email, Supabase
+  // redirects back here and fires this event with a temporary session —
+  // that's our cue to show the "set a new password" screen instead of
+  // whatever page they'd otherwise land on.
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setView("reset-password");
+    });
+    return () => listener?.subscription?.unsubscribe();
+  }, []);
+
   const handleAuthed = (s) => { setSession(s); setView("dashboard"); };
   const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); setView("home"); };
 
@@ -5018,8 +5108,11 @@ export default function EmirateFulfilApp() {
     <LogoContext.Provider value={{ logoUrl, setLogoUrl }}>
       <Toast message={toastMsg} />
       {view === "home" && <HomePage session={session} onNav={setView} onLogout={handleLogout} />}
-      {(view === "signup" || view === "login") && (
+      {(view === "signup" || view === "login" || view === "forgot") && (
         <AuthPage mode={view} onAuthed={handleAuthed} onSwitch={setView} notify={notify} />
+      )}
+      {view === "reset-password" && (
+        <ResetPasswordPage notify={notify} onDone={() => { supabase.auth.signOut(); setView("login"); }} />
       )}
       {view === "dashboard" && session && <Dashboard session={session} onLogout={handleLogout} notify={notify} />}
       <FloatingWhatsApp />
