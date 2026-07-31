@@ -773,7 +773,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url }));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [] }));
 }
 async function fetchListings(email) {
   const { data, error } = await supabase.from("listings").select("product_id").eq("seller_email", email);
@@ -1553,6 +1553,9 @@ function reviewsForProduct(product) {
 function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = [], onOpenProduct }) {
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState("description");
+  const galleryImages = Array.isArray(product.images) && product.images.length ? product.images : (product.image_url ? [product.image_url] : []);
+  const [activeImg, setActiveImg] = useState(0);
+  useEffect(() => { setActiveImg(0); }, [product.id]);
   const category = product.category || "Product";
   const description = product.description || `${product.name} is one of our best-selling ${category.toLowerCase()} items — carefully sourced, quality-checked, and shipped from our regional warehouse. It's fulfilled across every emirate with cash-on-delivery, so customers can pay when the order arrives at their door.`;
   const highlights = [
@@ -1601,23 +1604,26 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
         <div className="lg:col-span-4">
           <div className="relative rounded-3xl bg-white flex items-center justify-center overflow-hidden" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
             <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Best Seller</span>
-            {product.image_url ? (
-              <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
+            {galleryImages.length > 0 ? (
+              <img src={galleryImages[activeImg] || galleryImages[0]} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
             ) : (
               <span style={{ fontSize: 150 }}>{product.emoji}</span>
             )}
           </div>
-          <div className="mt-3 grid grid-cols-4 gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl bg-white flex items-center justify-center py-4 overflow-hidden" style={{ border: i === 0 ? "2px solid #00C896" : "1px solid #E5E7EB", opacity: i === 0 ? 1 : 0.55 }}>
-                {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} className="w-full h-10 object-cover" />
-                ) : (
-                  <span style={{ fontSize: 26 }}>{product.emoji}</span>
-                )}
-              </div>
-            ))}
-          </div>
+          {galleryImages.length > 0 && (
+            <div className="mt-3 grid grid-cols-4 gap-3">
+              {galleryImages.map((url, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveImg(i)}
+                  className="rounded-xl bg-white flex items-center justify-center py-4 overflow-hidden"
+                  style={{ border: i === activeImg ? "2px solid #00C896" : "1px solid #E5E7EB", opacity: i === activeImg ? 1 : 0.55 }}
+                >
+                  <img src={url} alt={`${product.name} ${i + 1}`} className="w-full h-10 object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-3">
@@ -1994,26 +2000,35 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   const [editImageUploading, setEditImageUploading] = useState(false);
   const startEdit = (p) => {
     setEditingId(p.id);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", image_url: p.image_url || "" });
+    const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
-  const uploadEditImage = async (e) => {
-    const file = e.target.files?.[0];
+  const uploadEditImages = async (e) => {
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
+    const room = 4 - (editForm.images || []).length;
+    if (room <= 0) { notify && notify("You can add up to 4 pictures per product."); return; }
     setEditImageUploading(true);
-    const { url, error } = await uploadProductImage(file);
+    const uploaded = [];
+    for (const file of files.slice(0, room)) {
+      const { url, error } = await uploadProductImage(file);
+      if (error) { notify && notify(error); continue; }
+      if (url) uploaded.push(url);
+    }
     setEditImageUploading(false);
-    if (error) { notify && notify(error); return; }
-    setEditForm((f) => ({ ...f, image_url: url }));
+    if (uploaded.length) setEditForm((f) => ({ ...f, images: [...(f.images || []), ...uploaded] }));
   };
+  const removeEditImage = (idx) => setEditForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
   const saveEdit = async (id) => {
     if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify && notify("Fill in name, cost and sell price."); return; }
+    const images = editForm.images || [];
     const { error } = await supabase.from("products").update({
       name: editForm.name, category: editForm.category || "General",
       cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell),
       emoji: editForm.emoji || "📦", description: editForm.description || null,
-      image_url: editForm.image_url || null,
+      images, image_url: images[0] || null,
     }).eq("id", id);
     if (error) { notify && notify("Could not save changes."); return; }
     notify && notify("Product updated.");
@@ -2158,18 +2173,21 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
               >
                 <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-                      <ProductThumb product={editForm} size={26} />
-                    </div>
-                    <label className="text-xs font-semibold px-3 py-2 rounded-full cursor-pointer text-center" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: editImageUploading ? 0.6 : 1 }}>
-                      {editImageUploading ? "Uploading…" : "Upload picture"}
-                      <input type="file" accept="image/*" onChange={uploadEditImage} disabled={editImageUploading} className="hidden" />
-                    </label>
-                    {editForm.image_url && (
-                      <button onClick={() => setEditForm({ ...editForm, image_url: "" })} className="text-xs font-semibold text-red-500">Remove</button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(editForm.images || []).map((url, idx) => (
+                      <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid #E5E7EB" }}>
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button onClick={() => removeEditImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center text-white text-[10px]" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
+                      </div>
+                    ))}
+                    {(editForm.images || []).length < 4 && (
+                      <label className="text-xs font-semibold px-3 py-2 rounded-full cursor-pointer text-center" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: editImageUploading ? 0.6 : 1 }}>
+                        {editImageUploading ? "Uploading…" : "Upload pictures"}
+                        <input type="file" accept="image/*" multiple onChange={uploadEditImages} disabled={editImageUploading} className="hidden" />
+                      </label>
                     )}
                   </div>
+                  <p className="text-[11px] text-gray-400">{(editForm.images || []).length}/4 pictures</p>
                   <div className="flex items-center gap-2">
                     <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} title="Fallback emoji (shown until a picture is uploaded)" className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
                     <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="flex-1 rounded-lg px-2 py-1.5 text-sm font-semibold" style={{ border: "1px solid #E5E7EB" }} />
@@ -2473,18 +2491,25 @@ function SettingsTab({ session }) {
 }
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", image_url: "" });
+  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [] });
   const [formImageUploading, setFormImageUploading] = useState(false);
-  const uploadFormImage = async (e) => {
-    const file = e.target.files?.[0];
+  const uploadFormImages = async (e) => {
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
+    const room = 4 - (form.images || []).length;
+    if (room <= 0) { notify("You can add up to 4 pictures per product."); return; }
     setFormImageUploading(true);
-    const { url, error } = await uploadProductImage(file);
+    const uploaded = [];
+    for (const file of files.slice(0, room)) {
+      const { url, error } = await uploadProductImage(file);
+      if (error) { notify(error); continue; }
+      if (url) uploaded.push(url);
+    }
     setFormImageUploading(false);
-    if (error) { notify(error); return; }
-    setForm((f) => ({ ...f, image_url: url }));
+    if (uploaded.length) setForm((f) => ({ ...f, images: [...(f.images || []), ...uploaded] }));
   };
+  const removeFormImage = (idx) => setForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [sellers, setSellers] = useState([]);
@@ -2561,13 +2586,14 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     e.preventDefault();
     if (!form.name || !form.cost || !form.sell) { notify("Fill in name, cost and sell price."); return; }
     const id = "p" + Date.now().toString().slice(-8);
+    const images = form.images || [];
     const { error } = await supabase.from("products").insert({
       id, name: form.name, category: form.category || "General",
       cost: parseFloat(form.cost), sell: parseFloat(form.sell), emoji: form.emoji || "📦",
-      description: form.description || null, image_url: form.image_url || null,
+      description: form.description || null, images, image_url: images[0] || null,
     });
     if (error) { notify("Could not add product."); return; }
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", image_url: "" });
+    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [] });
     notify("Product added to catalog.");
     onCatalogChanged();
   };
@@ -2585,26 +2611,35 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [editImageUploading, setEditImageUploading] = useState(false);
   const startEdit = (p) => {
     setEditingId(p.id);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", image_url: p.image_url || "" });
+    const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
-  const uploadEditImage = async (e) => {
-    const file = e.target.files?.[0];
+  const uploadEditImages = async (e) => {
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
+    const room = 4 - (editForm.images || []).length;
+    if (room <= 0) { notify("You can add up to 4 pictures per product."); return; }
     setEditImageUploading(true);
-    const { url, error } = await uploadProductImage(file);
+    const uploaded = [];
+    for (const file of files.slice(0, room)) {
+      const { url, error } = await uploadProductImage(file);
+      if (error) { notify(error); continue; }
+      if (url) uploaded.push(url);
+    }
     setEditImageUploading(false);
-    if (error) { notify(error); return; }
-    setEditForm((f) => ({ ...f, image_url: url }));
+    if (uploaded.length) setEditForm((f) => ({ ...f, images: [...(f.images || []), ...uploaded] }));
   };
+  const removeEditImage = (idx) => setEditForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
   const saveEdit = async (id) => {
     if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify("Fill in name, cost and sell price."); return; }
+    const images = editForm.images || [];
     const { error } = await supabase.from("products").update({
       name: editForm.name, category: editForm.category || "General",
       cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell),
       emoji: editForm.emoji || "📦", description: editForm.description || null,
-      image_url: editForm.image_url || null,
+      images, image_url: images[0] || null,
     }).eq("id", id);
     if (error) { notify("Could not save changes."); return; }
     notify("Product updated.");
@@ -2719,17 +2754,25 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Emoji (fallback)</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div className="sm:col-span-6 flex items-center gap-3">
-          <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-            <ProductThumb product={form} size={26} />
-          </div>
-          <label className="text-sm font-semibold px-4 py-2 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: formImageUploading ? 0.6 : 1 }}>
-            {formImageUploading ? "Uploading…" : "Upload product picture"}
-            <input type="file" accept="image/*" onChange={uploadFormImage} disabled={formImageUploading} className="hidden" />
-          </label>
-          {form.image_url && (
-            <button type="button" onClick={() => setForm({ ...form, image_url: "" })} className="text-sm font-semibold text-red-500">Remove</button>
+        <div className="sm:col-span-6 flex items-center gap-3 flex-wrap">
+          {(form.images || []).map((url, idx) => (
+            <div key={idx} className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px solid #E5E7EB" }}>
+              <img src={url} alt="" className="w-full h-full object-cover" />
+              <button type="button" onClick={() => removeFormImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center text-white text-xs" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
+            </div>
+          ))}
+          {(form.images || []).length === 0 && (
+            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+              <ProductThumb product={form} size={26} />
+            </div>
           )}
+          {(form.images || []).length < 4 && (
+            <label className="text-sm font-semibold px-4 py-2 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: formImageUploading ? 0.6 : 1 }}>
+              {formImageUploading ? "Uploading…" : "Upload pictures (up to 4)"}
+              <input type="file" accept="image/*" multiple onChange={uploadFormImages} disabled={formImageUploading} className="hidden" />
+            </label>
+          )}
+          <span className="text-xs text-gray-400">{(form.images || []).length}/4</span>
         </div>
         <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
@@ -2740,15 +2783,21 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           <div key={p.id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
             {editingId === p.id ? (
               <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-                    <ProductThumb product={editForm} size={22} />
-                  </div>
-                  <label className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: editImageUploading ? 0.6 : 1 }}>
-                    {editImageUploading ? "Uploading…" : "Upload picture"}
-                    <input type="file" accept="image/*" onChange={uploadEditImage} disabled={editImageUploading} className="hidden" />
-                  </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(editForm.images || []).map((url, idx) => (
+                    <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid #E5E7EB" }}>
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <button onClick={() => removeEditImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center text-white text-[10px]" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
+                    </div>
+                  ))}
+                  {(editForm.images || []).length < 4 && (
+                    <label className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: editImageUploading ? 0.6 : 1 }}>
+                      {editImageUploading ? "Uploading…" : "Upload pictures"}
+                      <input type="file" accept="image/*" multiple onChange={uploadEditImages} disabled={editImageUploading} className="hidden" />
+                    </label>
+                  )}
                 </div>
+                <p className="text-[11px] text-gray-400">{(editForm.images || []).length}/4 pictures</p>
                 <div className="flex items-center gap-2">
                   <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} title="Fallback emoji" className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
                   <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="flex-1 rounded-lg px-2 py-1.5 text-sm font-semibold" style={{ border: "1px solid #E5E7EB" }} />
