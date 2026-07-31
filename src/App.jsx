@@ -1096,7 +1096,7 @@ function Dashboard({ session, onLogout, notify }) {
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} />}
               {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
               {tab === "orders" && (
-                <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
+                <OrdersTab orders={orders} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
               )}
               {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
               {tab === "settings" && <SettingsTab session={session} />}
@@ -1943,44 +1943,19 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
   );
 }
 
-function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, pendingCOD, returnedCount }) {
-  const [form, setForm] = useState({ productId: catalog[0]?.id, qty: 1, sellPrice: "", buyer: "", city: "" });
-  const submit = (e) => {
-    e.preventDefault();
-    const product = catalog.find((p) => p.id === form.productId);
-    onAddOrder({
-      productId: product.id, productName: product.name,
-      qty: parseInt(form.qty) || 1,
-      sellPrice: parseFloat(form.sellPrice) || product.sell,
-      costPrice: product.cost, listPrice: product.sell, buyer: form.buyer, city: form.city,
-    });
-    setForm({ productId: catalog[0]?.id, qty: 1, sellPrice: "", buyer: "", city: "" });
-  };
+function OrdersTab({ orders, confirmedProfit, pendingCOD, returnedCount }) {
   return (
     <div>
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Orders &amp; COD tracking</h1>
-      <p className="text-sm text-gray-500 mt-1">Log new COD orders and update their status as they move.</p>
+      <p className="text-sm text-gray-500 mt-1">Track your COD orders and their status as they move.</p>
       <div className="grid sm:grid-cols-3 gap-4 mt-6">
         <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" />
         <StatCard label="Pending COD value" value={pendingCOD} prefix="AED " color="#F8B400" />
         <StatCard label="Returned" value={returnedCount} color="#EF4444" />
       </div>
-      <form onSubmit={submit} className="mt-8 rounded-2xl p-6 bg-white grid sm:grid-cols-5 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="sm:col-span-2">
-          <label className="text-xs text-gray-500">Product</label>
-          <select value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }}>
-            {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-        <div><label className="text-xs text-gray-500">Qty</label><input type="number" min="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Sell price (AED)</label><input type="number" placeholder="auto" value={form.sellPrice} onChange={(e) => setForm({ ...form, sellPrice: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Buyer city</label><input placeholder="Dubai" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div className="sm:col-span-4"><label className="text-xs text-gray-500">Buyer name</label><input placeholder="Optional" value={form.buyer} onChange={(e) => setForm({ ...form, buyer: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <button className="text-sm font-semibold py-2.5 rounded-full" style={{ background: "#00C896", color: "#04140f" }}>+ Add order</button>
-      </form>
       <div className="mt-8 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
         {orders.length === 0 ? (
-          <div className="text-sm text-gray-400 py-10 text-center">No orders yet — add one above.</div>
+          <div className="text-sm text-gray-400 py-10 text-center">No orders yet — place one from the Products tab.</div>
         ) : (
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
