@@ -968,8 +968,6 @@ function Dashboard({ session, onLogout, notify }) {
   const confirmedProfit = delivered.reduce((s, o) => s + itemProfit(o), 0);
   const pendingCOD = pending.reduce((s, o) => s + billTotal(o), 0);
   const deliveredRevenue = delivered.reduce((s, o) => s + billTotal(o), 0);
-  // Paid COD only counts delivered orders Admin has approved as paid — not just delivered.
-  const paidCOD = delivered.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + billTotal(o), 0);
   // Invoice only reflects profit on delivered orders — pending/shipped/cancelled/returned aren't billed yet.
   const unpaidInvoice = delivered.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + itemProfit(o), 0);
   const paidInvoice = delivered.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + itemProfit(o), 0);
@@ -1098,7 +1096,7 @@ function Dashboard({ session, onLogout, notify }) {
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} />}
               {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
               {tab === "orders" && (
-                <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidCOD} returnedCount={returned.length} />
+                <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
               )}
               {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
               {tab === "settings" && <SettingsTab session={session} />}
