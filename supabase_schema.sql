@@ -62,6 +62,9 @@ alter table orders add column if not exists tracking_number text;
 -- Payment status: 'unpaid' until Admin reviews & approves the invoice, then 'paid'.
 -- Sellers cannot set this themselves — only Admin can approve it.
 alter table orders add column if not exists payment_status text not null default 'unpaid';
+-- Flat delivery/handling charge collected from the customer on top of the product price.
+-- Counted in invoice totals, but never in seller profit.
+alter table orders add column if not exists delivery_charge numeric not null default 18;
 
 -- Enable Row Level Security
 alter table profiles enable row level security;
