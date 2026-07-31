@@ -1403,7 +1403,7 @@ function LiveClock() {
   const dateLabel = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   const timeLabel = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const hour = now.getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
   return { dateLabel, timeLabel, greeting };
 }
 
@@ -1432,14 +1432,15 @@ function ComingSoonPanel({ region }) {
 function OverviewTab({
   session, orders, listings, catalog, setTab,
   region, setRegion,
-  regionOrders, regionConfirmedProfit,
+  regionOrders, regionConfirmedProfit, regionDeliveredRevenue,
   regionUnpaidInvoice, regionPaidInvoice,
   regionPending, regionShipped, regionDelivered, regionCancelled, regionReturned,
 }) {
   const topListing = catalog.find((p) => p.id === listings[0]);
   const { dateLabel, timeLabel, greeting } = LiveClock();
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const ordersThisWeek = orders.filter((o) => o.createdAt && new Date(o.createdAt).getTime() >= sevenDaysAgo).length;
+  const regionOrdersThisWeek = regionOrders.filter((o) => o.createdAt && new Date(o.createdAt).getTime() >= sevenDaysAgo).length;
+  const avgOrderValue = regionDelivered.length ? Math.round(regionDeliveredRevenue / regionDelivered.length) : 0;
 
   const cards = [
     { label: "Total orders", value: regionOrders.length, color: "#0B1F3A", icon: Boxes },
@@ -1451,6 +1452,9 @@ function OverviewTab({
     { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
     { label: "Unpaid invoice", value: regionUnpaidInvoice, prefix: "AED ", color: "#F8B400", icon: Receipt },
     { label: "Paid invoice", value: regionPaidInvoice, prefix: "AED ", color: "#00C896", icon: CheckCircle2 },
+    { label: "Orders this week", value: regionOrdersThisWeek, color: "#3B82F6", icon: Clock },
+    { label: "Avg. order value", value: avgOrderValue, prefix: "AED ", color: "#8B5CF6", icon: CreditCard },
+    { label: "Products listed", value: listings.length, color: "#F8B400", icon: Layers },
   ];
   const breakdown = [
     { label: "Pending", count: regionPending.length, color: "#F8B400" },
