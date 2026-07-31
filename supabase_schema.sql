@@ -65,6 +65,10 @@ alter table orders add column if not exists payment_status text not null default
 -- Flat delivery/handling charge collected from the customer on top of the product price.
 -- Counted in invoice totals, but never in seller profit.
 alter table orders add column if not exists delivery_charge numeric not null default 18;
+-- The catalog's listed sell price at the time of order (used to calculate seller's
+-- profit as: what the customer actually paid minus this listed price — not minus
+-- the wholesale cost, which stays admin-only).
+alter table orders add column if not exists list_price numeric;
 
 -- Enable Row Level Security
 alter table profiles enable row level security;
