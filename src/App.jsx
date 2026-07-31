@@ -1588,46 +1588,57 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
 
         <div className="md:col-span-2 rounded-2xl p-6 bg-white h-fit" style={{ border: "1px solid #E5E7EB" }}>
           <div className="font-bold text-sm" style={{ color: "#111827" }}>Order summary</div>
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-5">
             {items.map((it) => {
-              const extra = (it.sell - it.listSell) * it.qty;
-              const itemProfit = (it.sell - it.cost) * it.qty;
+              const subtotal = it.cost * it.qty;
+              const baseTotal = subtotal + DELIVERY_CHARGE;
+              const codAmount = it.sell * it.qty + DELIVERY_CHARGE;
+              const itemProfit = codAmount - baseTotal;
               return (
                 <div key={it.id} className="text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">{it.name} <span className="text-gray-400">×{it.qty}</span></span>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {it.sell * it.qty}</span>
+                  <div className="flex items-center justify-between font-semibold" style={{ color: "#111827" }}>
+                    <span>{it.name} <span className="text-gray-400 font-normal">×{it.qty}</span></span>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <label className="text-xs text-gray-400 whitespace-nowrap">Selling price (AED, per unit)</label>
+                  <div className="mt-2 flex items-center justify-between text-gray-500">
+                    <span>Subtotal</span>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {subtotal}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-gray-500">
+                    <span>Shipping</span>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {DELIVERY_CHARGE}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between font-semibold" style={{ color: "#0B1F3A" }}>
+                    <span>Total (your cost)</span>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {baseTotal}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <label className="text-xs text-gray-500 whitespace-nowrap">COD Amount (what customer pays)</label>
                     <input
-                      type="number" min="0" value={it.sell}
-                      onChange={(e) => onUpdateItemPrice(it.id, parseFloat(e.target.value) || 0)}
-                      className="w-24 rounded-lg px-2 py-1 text-sm text-right"
+                      type="number" min="0" value={codAmount}
+                      onChange={(e) => {
+                        const entered = parseFloat(e.target.value) || 0;
+                        const newSell = (entered - DELIVERY_CHARGE) / it.qty;
+                        onUpdateItemPrice(it.id, newSell);
+                      }}
+                      className="w-24 rounded-lg px-2 py-1.5 text-sm text-right font-semibold"
                       style={{ border: "1px solid #E5E7EB" }}
                     />
                   </div>
-                  <div className="mt-1 text-xs text-gray-400">
-                    Catalog price AED {it.listSell}
-                    {extra > 0 && <span className="ml-1.5 font-semibold" style={{ color: "#00a67e" }}>· +AED {extra} extra profit</span>}
-                    {extra < 0 && <span className="ml-1.5 font-semibold text-red-500">· AED {Math.abs(extra)} below catalog price</span>}
+                  <div className="mt-1.5 flex items-center justify-between text-xs font-semibold" style={{ color: "#00a67e" }}>
+                    <span>Your profit is</span>
+                    <span>AED {itemProfit.toFixed(2)}</span>
                   </div>
-                  <div className="mt-1 text-xs" style={{ color: "#00a67e" }}>Your profit on this item: AED {itemProfit}</div>
                 </div>
               );
             })}
           </div>
           <div className="mt-4 pt-4 space-y-2 text-sm" style={{ borderTop: "1px solid #F3F4F6" }}>
-            <div className="flex items-center justify-between text-gray-500">
-              <span>Delivery charge{items.length > 1 ? ` (${items.length} × AED ${DELIVERY_CHARGE})` : ""}</span>
-              <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {deliveryTotal}</span>
-            </div>
             <div className="flex items-center justify-between font-bold" style={{ color: "#0B1F3A" }}>
               <span>Total (cash to collect)</span>
               <span style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {total}</span>
             </div>
             <div className="flex items-center justify-between text-xs" style={{ color: "#00a67e" }}>
-              <span>Your total profit (delivery charge excluded)</span>
+              <span>Your total profit</span>
               <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {profitTotal}</span>
             </div>
           </div>
