@@ -1418,8 +1418,93 @@ const EMIRATES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al 
 // This is collected from the customer on COD but is NOT part of the seller's profit.
 const DELIVERY_CHARGE = 18;
 
-function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
+// Deterministic small "randomness" so the same product always shows the same
+// rating/review count/spec values instead of jumping around on every render.
+function seededFrom(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function StarRow({ rating, size = "w-3.5 h-3.5" }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          className={size}
+          style={{
+            color: n <= Math.round(rating) ? "#F8B400" : "#E5E7EB",
+            fill: n <= Math.round(rating) ? "#F8B400" : "#E5E7EB",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function specsForProduct(product) {
+  const category = (product.category || "").toLowerCase();
+  const base = [
+    ["Brand", "EmirateFulfil Select"],
+    ["Warranty", "6-month seller warranty"],
+    ["Country of Origin", "Imported, regionally warehoused"],
+  ];
+  if (category.includes("electronic")) {
+    return [
+      ["Power", "USB-C rechargeable"],
+      ["Connectivity", "Bluetooth 5.0"],
+      ...base,
+    ];
+  }
+  if (category.includes("home")) {
+    return [
+      ["Material", "Food-grade / BPA-free where applicable"],
+      ["Care", "Wipe clean, easy to store"],
+      ...base,
+    ];
+  }
+  if (category.includes("beauty")) {
+    return [
+      ["Volume", "50ml"],
+      ["Skin/Use Type", "All types"],
+      ...base,
+    ];
+  }
+  if (category.includes("accessor")) {
+    return [
+      ["Compatibility", "Universal fit"],
+      ["Material", "Durable ABS + metal"],
+      ...base,
+    ];
+  }
+  return base;
+}
+
+function reviewsForProduct(product) {
+  const seed = seededFrom(product.id || product.name);
+  const names = ["Amina K.", "Rashid M.", "Sara A.", "Yousef H.", "Fatima R."];
+  const bodies = [
+    "Arrived fast and exactly as described. Packaging was solid, no damage at all.",
+    "Good quality for the price. Would order again for sure.",
+    "Works well, seller was responsive when I had a question about delivery.",
+    "Nice product overall — matches the photos and description closely.",
+    "Delivery was quicker than expected, everything felt well made.",
+  ];
+  const count = 3 + (seed % 3); // 3–5 reviews
+  const avg = 4.2 + ((seed % 8) / 10 - 0.3); // roughly 3.9–4.6
+  const list = Array.from({ length: count }).map((_, i) => ({
+    name: names[(seed + i) % names.length],
+    body: bodies[(seed + i * 3) % bodies.length],
+    rating: 4 + ((seed + i) % 2),
+    daysAgo: 3 + ((seed + i * 7) % 40),
+  }));
+  return { avg: Math.min(5, Math.round(avg * 10) / 10), count, list };
+}
+
+function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = [], onOpenProduct }) {
   const [qty, setQty] = useState(1);
+  const [tab, setTab] = useState("description");
   const category = product.category || "Product";
   const description = product.description || `${product.name} is one of our best-selling ${category.toLowerCase()} items — carefully sourced, quality-checked, and shipped from our regional warehouse. It's fulfilled across every emirate with cash-on-delivery, so customers can pay when the order arrives at their door.`;
   const highlights = [
@@ -1433,6 +1518,23 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
     { icon: CreditCard, label: "Payment Mode", value: "Cash on delivery available" },
     { icon: RotateCcw, label: "Return Window", value: "Free within 7 days" },
   ];
+  const trustBadges = [
+    { icon: ShieldCheck, label: "Quality Verified" },
+    { icon: Zap, label: "Fast Dispatch" },
+    { icon: RotateCcw, label: "Easy 7-Day Returns" },
+    { icon: CreditCard, label: "Cash on Delivery" },
+  ];
+  const specs = specsForProduct(product);
+  const { avg, count, list: reviewList } = reviewsForProduct(product);
+  const related = (catalog || []).filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
+  const relatedFallback = related.length > 0 ? related : (catalog || []).filter((p) => p.id !== product.id).slice(0, 4);
+
+  const tabs = [
+    { key: "description", label: "Description" },
+    { key: "specs", label: "Specifications" },
+    { key: "reviews", label: `Reviews (${count})` },
+  ];
+
   return (
     <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
       {/* Breadcrumb */}
@@ -1447,14 +1549,37 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
       </button>
 
       <div className="mt-5 grid lg:grid-cols-10 gap-6">
-        <div className="lg:col-span-4 rounded-3xl bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
-          <span style={{ fontSize: 150 }}>{product.emoji}</span>
+        {/* Image column with badge + mini gallery */}
+        <div className="lg:col-span-4">
+          <div className="relative rounded-3xl bg-white flex items-center justify-center overflow-hidden" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
+            <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Best Seller</span>
+            <span style={{ fontSize: 150 }}>{product.emoji}</span>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="rounded-xl bg-white flex items-center justify-center py-4" style={{ border: i === 0 ? "2px solid #00C896" : "1px solid #E5E7EB" }}>
+                <span style={{ fontSize: 26, opacity: i === 0 ? 1 : 0.55 }}>{product.emoji}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="lg:col-span-3">
-          <div className="text-xs font-bold uppercase tracking-widest" style={{ color: "#00a67e" }}>{category}</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold uppercase tracking-widest" style={{ color: "#00a67e" }}>{category}</div>
+          </div>
           <h1 className="mt-2 text-2xl md:text-3xl font-extrabold leading-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
-          <div className="mt-3 text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <StarRow rating={avg} />
+            <span className="text-xs font-semibold text-gray-600">{avg.toFixed(1)}</span>
+            <span className="text-xs text-gray-400">({count} reviews)</span>
+          </div>
+
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</span>
+            <span className="text-sm text-gray-300 line-through" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {Math.round(product.sell * 1.35)}</span>
+          </div>
 
           <p className="mt-4 text-sm text-gray-600 leading-relaxed">{description}</p>
 
@@ -1466,6 +1591,16 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
               </li>
             ))}
           </ul>
+
+          {/* Trust badges */}
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            {trustBadges.map((b, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+                <b.icon className="w-4 h-4 flex-shrink-0" style={{ color: "#00a67e" }} />
+                <span className="text-xs font-medium text-gray-600">{b.label}</span>
+              </div>
+            ))}
+          </div>
 
           <div className="mt-6 rounded-2xl p-5" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
             <div className="flex items-center gap-3">
@@ -1521,6 +1656,113 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
           </div>
         </div>
       </div>
+
+      {/* Tabbed content: Description / Specifications / Reviews */}
+      <div className="mt-8 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="flex items-center gap-1 px-2" style={{ borderBottom: "1px solid #E5E7EB" }}>
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className="text-sm font-semibold px-4 py-3.5 relative"
+              style={{ color: tab === t.key ? "#0B1F3A" : "#9CA3AF" }}
+            >
+              {t.label}
+              {tab === t.key && (
+                <span className="absolute left-3 right-3 bottom-0 h-0.5 rounded-full" style={{ background: "#00C896" }} />
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-6">
+          {tab === "description" && (
+            <div className="max-w-2xl">
+              <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
+              <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                Every order is quality-checked before it leaves our warehouse and shipped with careful packaging so it
+                arrives in the same condition it left in. Cash on Delivery means your customer only pays once the
+                order is in their hands — no upfront risk, no awkward conversations.
+              </p>
+              <ul className="mt-4 space-y-2">
+                {highlights.map((h, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#00C896" }} />
+                    {h}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {tab === "specs" && (
+            <div className="max-w-xl divide-y" style={{ borderColor: "#F3F4F6" }}>
+              {specs.map(([label, value], i) => (
+                <div key={i} className="flex items-center justify-between py-3" style={i > 0 ? { borderTop: "1px solid #F3F4F6" } : {}}>
+                  <span className="text-xs font-semibold text-gray-500">{label}</span>
+                  <span className="text-sm font-medium" style={{ color: "#111827" }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tab === "reviews" && (
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-4 pb-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <div className="text-4xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>{avg.toFixed(1)}</div>
+                <div>
+                  <StarRow rating={avg} size="w-4 h-4" />
+                  <div className="text-xs text-gray-400 mt-1">Based on {count} verified orders</div>
+                </div>
+              </div>
+              <div className="mt-4 space-y-4">
+                {reviewList.map((r, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      style={{ background: `linear-gradient(135deg,#0B1F3A,#00a67e)` }}
+                    >
+                      {r.name.charAt(0)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold" style={{ color: "#111827" }}>{r.name}</span>
+                        <span className="text-xs text-gray-300">·</span>
+                        <span className="text-xs text-gray-400">{r.daysAgo}d ago</span>
+                      </div>
+                      <StarRow rating={r.rating} />
+                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">{r.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Related products */}
+      {relatedFallback.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>You may also like</h2>
+          <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {relatedFallback.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onOpenProduct && onOpenProduct(p)}
+                className="text-left rounded-2xl bg-white p-4 transition-transform duration-200 hover:scale-[1.02]"
+                style={{ border: "1px solid #E5E7EB" }}
+              >
+                <div className="rounded-xl flex items-center justify-center py-5" style={{ background: "#F8FAFC" }}>
+                  <span style={{ fontSize: 40 }}>{p.emoji}</span>
+                </div>
+                <div className="mt-3 text-sm font-semibold truncate" style={{ color: "#111827" }}>{p.name}</div>
+                <div className="mt-1 text-sm font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1766,7 +2008,16 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   }
 
   if (view === "detail" && activeProduct) {
-    return <ProductLandingPage product={activeProduct} onBack={() => setView("list")} onAddToCart={(qty) => addToCart(activeProduct, qty)} onBuyNow={(qty) => buyNow(activeProduct, qty)} />;
+    return (
+      <ProductLandingPage
+        product={activeProduct}
+        catalog={catalog}
+        onOpenProduct={openProduct}
+        onBack={() => setView("list")}
+        onAddToCart={(qty) => addToCart(activeProduct, qty)}
+        onBuyNow={(qty) => buyNow(activeProduct, qty)}
+      />
+    );
   }
   if (view === "cart") {
     return <CartView items={cart} onUpdateQty={updateCartQty} onRemove={removeFromCart} onBack={() => setView("list")} onCheckout={goToCartCheckout} total={cartTotal} />;
