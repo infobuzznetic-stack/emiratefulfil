@@ -738,6 +738,7 @@ async function fetchOrders(email) {
     sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price), buyer: o.buyer, city: o.city, status: o.status,
     customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address,
     trackingNumber: o.tracking_number, paymentStatus: o.payment_status || "unpaid",
+    deliveryCharge: o.delivery_charge != null ? Number(o.delivery_charge) : DELIVERY_CHARGE,
     createdAt: o.created_at,
   }));
 }
@@ -920,12 +921,12 @@ function Dashboard({ session, onLogout, notify }) {
     setListings(listings.filter((x) => x !== id));
   };
   const addOrder = async (order) => {
-    const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10), status: "pending", paymentStatus: "unpaid" };
+    const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10), status: "pending", paymentStatus: "unpaid", deliveryCharge: order.deliveryCharge ?? DELIVERY_CHARGE };
     const { error } = await supabase.from("orders").insert({
       id: newOrder.id, seller_email: session.email, product_id: newOrder.productId, product_name: newOrder.productName,
       qty: newOrder.qty, sell_price: newOrder.sellPrice, cost_price: newOrder.costPrice, buyer: newOrder.buyer, city: newOrder.city,
       customer_email: newOrder.customerEmail || null, customer_phone: newOrder.customerPhone || null, customer_address: newOrder.customerAddress || null,
-      status: "pending", payment_status: "unpaid",
+      status: "pending", payment_status: "unpaid", delivery_charge: newOrder.deliveryCharge,
     });
     if (error) { notify("Could not save order."); return null; }
     setOrders([newOrder, ...orders]);
@@ -942,14 +943,16 @@ function Dashboard({ session, onLogout, notify }) {
   const shipped = orders.filter((o) => o.status === "shipped");
   const cancelled = orders.filter((o) => o.status === "cancelled");
   const returned = orders.filter((o) => o.status === "returned");
+  // Delivery charge is money collected from the customer, not seller profit — profit stays product-only.
+  const billTotal = (o) => o.sellPrice * o.qty + (o.deliveryCharge || 0);
   const confirmedProfit = delivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
-  const pendingCOD = pending.reduce((s, o) => s + o.sellPrice * o.qty, 0);
-  const deliveredRevenue = delivered.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const pendingCOD = pending.reduce((s, o) => s + billTotal(o), 0);
+  const deliveredRevenue = delivered.reduce((s, o) => s + billTotal(o), 0);
   // Cancelled orders never billed a customer, so they must not count toward invoicing.
   const billableOrders = orders.filter((o) => o.status !== "cancelled");
-  const totalInvoice = billableOrders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
-  const unpaidInvoice = billableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
-  const paidInvoice = billableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const totalInvoice = billableOrders.reduce((s, o) => s + billTotal(o), 0);
+  const unpaidInvoice = billableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + billTotal(o), 0);
+  const paidInvoice = billableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + billTotal(o), 0);
 
   // Split orders by country so the Dashboard tab can show a UAE-only or KSA-only view
   const regionOrders = orders.filter((o) => (region === "UAE" ? isUAECity(o.city) : isKSACity(o.city)));
@@ -960,10 +963,11 @@ function Dashboard({ session, onLogout, notify }) {
   const regionReturned = regionOrders.filter((o) => o.status === "returned");
   const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
   const regionBillableOrders = regionOrders.filter((o) => o.status !== "cancelled");
-  const regionTotalInvoice = regionBillableOrders.reduce((s, o) => s + o.sellPrice * o.qty, 0);
-  const regionUnpaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
-  const regionPaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + o.sellPrice * o.qty, 0);
-  const regionDeliveredRevenue = regionDelivered.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const regionTotalInvoice = regionBillableOrders.reduce((s, o) => s + billTotal(o), 0);
+  const regionUnpaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + billTotal(o), 0);
+  const regionPaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + billTotal(o), 0);
+  const regionDeliveredRevenue = regionDelivered.reduce((s, o) => s + billTotal(o), 0);
+
 
   const NAV = [
     { id: "overview", label: "Dashboard", icon: Boxes },
@@ -1397,6 +1401,9 @@ function PaymentPill({ status }) {
 
 /* ---------------- Storefront: product landing page, cart, checkout ---------------- */
 const EMIRATES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al Khaimah", "Umm Al Quwain", "Al Ain"];
+// Flat delivery/handling charge added on top of the product's selling price.
+// This is collected from the customer on COD but is NOT part of the seller's profit.
+const DELIVERY_CHARGE = 18;
 
 function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
   const [qty, setQty] = useState(1);
@@ -1532,7 +1539,10 @@ function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
 function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
   const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "" });
   const [busy, setBusy] = useState(false);
-  const total = items.reduce((s, it) => s + it.sell * it.qty, 0);
+  const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
+  const deliveryTotal = items.length * DELIVERY_CHARGE;
+  const total = itemsTotal + deliveryTotal;
+  const profitTotal = items.reduce((s, it) => s + (it.sell - it.cost) * it.qty, 0);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1581,6 +1591,7 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
           <div className="mt-4 space-y-4">
             {items.map((it) => {
               const extra = (it.sell - it.listSell) * it.qty;
+              const itemProfit = (it.sell - it.cost) * it.qty;
               return (
                 <div key={it.id} className="text-sm">
                   <div className="flex items-center justify-between">
@@ -1601,13 +1612,24 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
                     {extra > 0 && <span className="ml-1.5 font-semibold" style={{ color: "#00a67e" }}>· +AED {extra} extra profit</span>}
                     {extra < 0 && <span className="ml-1.5 font-semibold text-red-500">· AED {Math.abs(extra)} below catalog price</span>}
                   </div>
+                  <div className="mt-1 text-xs" style={{ color: "#00a67e" }}>Your profit on this item: AED {itemProfit}</div>
                 </div>
               );
             })}
           </div>
-          <div className="mt-4 pt-4 flex items-center justify-between text-sm font-bold" style={{ borderTop: "1px solid #F3F4F6", color: "#0B1F3A" }}>
-            <span>Total</span>
-            <span style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {total}</span>
+          <div className="mt-4 pt-4 space-y-2 text-sm" style={{ borderTop: "1px solid #F3F4F6" }}>
+            <div className="flex items-center justify-between text-gray-500">
+              <span>Delivery charge{items.length > 1 ? ` (${items.length} × AED ${DELIVERY_CHARGE})` : ""}</span>
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {deliveryTotal}</span>
+            </div>
+            <div className="flex items-center justify-between font-bold" style={{ color: "#0B1F3A" }}>
+              <span>Total (cash to collect)</span>
+              <span style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {total}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs" style={{ color: "#00a67e" }}>
+              <span>Your total profit (delivery charge excluded)</span>
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {profitTotal}</span>
+            </div>
           </div>
           <div className="mt-3 text-xs text-gray-400">Cash on delivery — payment collected on arrival.</div>
         </div>
@@ -1660,7 +1682,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
     for (const item of checkoutItems) {
       const result = await onPlaceOrder({
         productId: item.id, productName: item.name, qty: item.qty,
-        sellPrice: item.sell, costPrice: item.cost,
+        sellPrice: item.sell, costPrice: item.cost, deliveryCharge: DELIVERY_CHARGE,
         buyer: customer.name, city: customer.emirate,
         customerPhone: customer.phone, customerAddress: customer.address,
       });
@@ -1851,8 +1873,9 @@ function CategoriesTab({ catalog, listings, onAdd }) {
 
 function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
   // Cancelled orders were never billed, so they're excluded from every invoice total below.
+  // Amount billed = product price + the flat delivery charge (delivery isn't seller profit, but it is part of what's invoiced).
   const billable = orders.filter((o) => o.status !== "cancelled");
-  const totalBilled = billable.reduce((s, o) => s + o.sellPrice * o.qty, 0);
+  const totalBilled = billable.reduce((s, o) => s + o.sellPrice * o.qty + (o.deliveryCharge || 0), 0);
   return (
     <div>
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
@@ -1889,7 +1912,7 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
                   <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
                   <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                    {o.status === "cancelled" ? "AED 0" : `AED ${o.sellPrice * o.qty}`}
+                    {o.status === "cancelled" ? "AED 0" : `AED ${o.sellPrice * o.qty + (o.deliveryCharge || 0)}`}
                   </td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
                   <td className="px-4 py-3">{o.status === "cancelled" ? <span className="text-xs text-gray-300">—</span> : <PaymentPill status={o.paymentStatus} />}</td>
@@ -1945,7 +1968,7 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
               <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
-              <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th>
+              <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th>
             </tr></thead>
             <tbody>
               {orders.map((o) => (
@@ -1954,6 +1977,7 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
                   <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
                   <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
+                  <td className="px-4 py-3 text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</td>
                   <td className="px-4 py-3" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.costPrice) * o.qty}</td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{o.trackingNumber || <span className="text-gray-300">Not assigned yet</span>}</td>
@@ -2145,7 +2169,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     <div>{o.city || "—"}</div>
                     <div className="text-gray-400 truncate" title={o.customer_address}>{o.customer_address || ""}</div>
                   </td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.status === "cancelled" ? 0 : o.sell_price * o.qty}</td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.status === "cancelled" ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
                   <td className="px-4 py-3">
                     <select
                       value={o.status}
