@@ -2334,6 +2334,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "" });
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [sellers, setSellers] = useState([]);
+  const [sellersLoading, setSellersLoading] = useState(true);
+  const [sellerSearch, setSellerSearch] = useState("");
 
   const loadAllOrders = async () => {
     setOrdersLoading(true);
@@ -2341,7 +2344,15 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     if (!error) setAllOrders(data || []);
     setOrdersLoading(false);
   };
-  useEffect(() => { loadAllOrders(); }, []); // eslint-disable-line
+  // Every seller who has ever signed up, newest first — this is what powers
+  // the Sellers table below (name, email, phone, company, country, joined date).
+  const loadSellers = async () => {
+    setSellersLoading(true);
+    const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+    if (!error) setSellers(data || []);
+    setSellersLoading(false);
+  };
+  useEffect(() => { loadAllOrders(); loadSellers(); }, []); // eslint-disable-line
 
   const setAdminOrderStatus = async (id, status) => {
     await supabase.from("orders").update({ status }).eq("id", id);
@@ -2385,15 +2396,82 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     onCatalogChanged();
   };
 
+  const sellerOrderCount = (email) => allOrders.filter((o) => o.seller_email === email).length;
+  const filteredSellers = sellers.filter((s) => {
+    const q = sellerSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (s.email || "").toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q) || (s.company || "").toLowerCase().includes(q);
+  });
+
   return (
     <div>
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Admin</h1>
       <p className="text-sm text-gray-500 mt-1">Manage the shared product catalog every seller sees, and track signups.</p>
 
       <div className="grid sm:grid-cols-3 gap-4 mt-6">
-        <StatCard label="Total sellers signed up" value={sellerCount} color="#00C896" />
+        <StatCard label="Total sellers signed up" value={sellers.length || sellerCount} color="#00C896" />
         <StatCard label="Products in catalog" value={catalog.length} />
         <StatCard label="Customer orders (all sellers)" value={allOrders.length} color="#F8B400" />
+      </div>
+
+      {/* Sellers table: every signed-up seller, with contact details and signup date */}
+      <div className="mt-8 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+          <div>
+            <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Sellers ({sellers.length})</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Every account that has signed up, newest first.</p>
+          </div>
+          <input
+            value={sellerSearch}
+            onChange={(e) => setSellerSearch(e.target.value)}
+            placeholder="Search by name, email, or company…"
+            className="text-sm rounded-full px-4 py-2 w-full sm:w-72"
+            style={{ border: "1px solid #E5E7EB" }}
+          />
+        </div>
+        {sellersLoading ? (
+          <div className="p-8 text-center text-sm text-gray-400">Loading sellers…</div>
+        ) : filteredSellers.length === 0 ? (
+          <div className="p-8 text-center text-sm text-gray-400">No sellers found.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-400 uppercase tracking-wide" style={{ background: "#F8FAFC" }}>
+                  <th className="px-5 py-3">Seller</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Phone</th>
+                  <th className="px-4 py-3">Company</th>
+                  <th className="px-4 py-3">Country</th>
+                  <th className="px-4 py-3">Orders</th>
+                  <th className="px-4 py-3">Signed up</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "#F3F4F6" }}>
+                {filteredSellers.map((s) => (
+                  <tr key={s.id}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#0B1F3A,#00a67e)" }}>
+                          {(s.name || s.email || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-semibold" style={{ color: "#111827" }}>{s.name || "—"}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{s.email}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.phone || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.company || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.country || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{sellerOrderCount(s.email)}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {s.created_at ? new Date(s.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <form onSubmit={addProduct} className="mt-8 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
