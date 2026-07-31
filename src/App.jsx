@@ -1647,9 +1647,9 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <label className="text-xs text-gray-500 whitespace-nowrap">COD Amount (what customer pays)</label>
                     <input
-                      type="number" min="0" value={codAmount}
+                      type="number" min={baseTotal} value={codAmount}
                       onChange={(e) => {
-                        const entered = parseFloat(e.target.value) || 0;
+                        const entered = Math.max(parseFloat(e.target.value) || 0, baseTotal);
                         const newSell = (entered - DELIVERY_CHARGE) / it.qty;
                         onUpdateItemPrice(it.id, newSell);
                       }}
