@@ -735,7 +735,9 @@ async function fetchOrders(email) {
   if (error) { console.error(error); return []; }
   return data.map((o) => ({
     id: o.id, productId: o.product_id, productName: o.product_name, qty: o.qty,
-    sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price), buyer: o.buyer, city: o.city, status: o.status,
+    sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price),
+    listPrice: o.list_price != null ? Number(o.list_price) : Number(o.sell_price),
+    buyer: o.buyer, city: o.city, status: o.status,
     customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address,
     trackingNumber: o.tracking_number, paymentStatus: o.payment_status || "unpaid",
     deliveryCharge: o.delivery_charge != null ? Number(o.delivery_charge) : DELIVERY_CHARGE,
@@ -941,7 +943,7 @@ function Dashboard({ session, onLogout, notify }) {
     const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10), status: "pending", paymentStatus: "unpaid", deliveryCharge: order.deliveryCharge ?? DELIVERY_CHARGE };
     const { error } = await supabase.from("orders").insert({
       id: newOrder.id, seller_email: session.email, product_id: newOrder.productId, product_name: newOrder.productName,
-      qty: newOrder.qty, sell_price: newOrder.sellPrice, cost_price: newOrder.costPrice, buyer: newOrder.buyer, city: newOrder.city,
+      qty: newOrder.qty, sell_price: newOrder.sellPrice, cost_price: newOrder.costPrice, list_price: newOrder.listPrice ?? newOrder.sellPrice, buyer: newOrder.buyer, city: newOrder.city,
       customer_email: newOrder.customerEmail || null, customer_phone: newOrder.customerPhone || null, customer_address: newOrder.customerAddress || null,
       status: "pending", payment_status: "unpaid", delivery_charge: newOrder.deliveryCharge,
     });
@@ -962,7 +964,7 @@ function Dashboard({ session, onLogout, notify }) {
   const returned = orders.filter((o) => o.status === "returned");
   // Delivery charge is money collected from the customer, not seller profit — profit stays product-only.
   const billTotal = (o) => o.sellPrice * o.qty + (o.deliveryCharge || 0);
-  const confirmedProfit = delivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
+  const confirmedProfit = delivered.reduce((s, o) => s + (o.sellPrice - o.listPrice) * o.qty, 0);
   const pendingCOD = pending.reduce((s, o) => s + billTotal(o), 0);
   const deliveredRevenue = delivered.reduce((s, o) => s + billTotal(o), 0);
   // Cancelled orders never billed a customer, so they must not count toward invoicing.
@@ -978,7 +980,7 @@ function Dashboard({ session, onLogout, notify }) {
   const regionShipped = regionOrders.filter((o) => o.status === "shipped");
   const regionCancelled = regionOrders.filter((o) => o.status === "cancelled");
   const regionReturned = regionOrders.filter((o) => o.status === "returned");
-  const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
+  const regionConfirmedProfit = regionDelivered.reduce((s, o) => s + (o.sellPrice - o.listPrice) * o.qty, 0);
   const regionBillableOrders = regionOrders.filter((o) => o.status !== "cancelled");
   const regionTotalInvoice = regionBillableOrders.reduce((s, o) => s + billTotal(o), 0);
   const regionUnpaidInvoice = regionBillableOrders.filter((o) => o.paymentStatus !== "paid").reduce((s, o) => s + billTotal(o), 0);
@@ -1729,7 +1731,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     for (const item of checkoutItems) {
       const result = await onPlaceOrder({
         productId: item.id, productName: item.name, qty: item.qty,
-        sellPrice: item.sell, costPrice: item.cost, deliveryCharge: DELIVERY_CHARGE,
+        sellPrice: item.sell, costPrice: item.cost, listPrice: item.listSell, deliveryCharge: DELIVERY_CHARGE,
         buyer: customer.name, city: customer.emirate,
         customerPhone: customer.phone, customerAddress: customer.address,
       });
@@ -1954,7 +1956,7 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
       productId: product.id, productName: product.name,
       qty: parseInt(form.qty) || 1,
       sellPrice: parseFloat(form.sellPrice) || product.sell,
-      costPrice: product.cost, buyer: form.buyer, city: form.city,
+      costPrice: product.cost, listPrice: product.sell, buyer: form.buyer, city: form.city,
     });
     setForm({ productId: catalog[0]?.id, qty: 1, sellPrice: "", buyer: "", city: "" });
   };
@@ -1997,7 +1999,7 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
                   <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
                   <td className="px-4 py-3 text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</td>
-                  <td className="px-4 py-3" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.costPrice) * o.qty}</td>
+                  <td className="px-4 py-3" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{o.trackingNumber || <span className="text-gray-300">Not assigned yet</span>}</td>
                 </tr>
@@ -2012,7 +2014,7 @@ function OrdersTab({ catalog, orders, onAddOrder, onSetStatus, confirmedProfit, 
 
 function WalletTab({ confirmedProfit, pending, notify }) {
   const [amount, setAmount] = useState("");
-  const inTransit = pending.reduce((s, o) => s + (o.sellPrice - o.costPrice) * o.qty, 0);
+  const inTransit = pending.reduce((s, o) => s + (o.sellPrice - o.listPrice) * o.qty, 0);
   const requestPayout = () => {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) { notify("Enter a valid amount."); return; }
