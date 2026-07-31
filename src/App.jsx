@@ -1946,13 +1946,26 @@ function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
 function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount }) {
   return (
     <div>
-      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Orders &amp; COD tracking</h1>
-      <p className="text-sm text-gray-500 mt-1">Track your COD orders and their status as they move.</p>
-      <div className="grid sm:grid-cols-3 gap-4 mt-6">
-        <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" />
-        <StatCard label="Paid COD" value={deliveredRevenue} prefix="AED " color="#00C896" />
-        <StatCard label="Returned" value={returnedCount} color="#EF4444" />
+      <div
+        className="rounded-2xl p-6 text-white relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg,#0B1F3A,#0F2E52 55%,#00997a)" }}
+      >
+        <div
+          className="absolute -right-10 -top-10 w-40 h-40 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(0,200,150,0.35), transparent 70%)" }}
+        />
+        <h1 className="text-2xl font-extrabold relative" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          Orders &amp; COD tracking
+        </h1>
+        <p className="text-sm text-white/70 mt-1 relative">Track your COD orders and their status as they move.</p>
       </div>
+
+      <div className="grid sm:grid-cols-3 gap-4 mt-6">
+        <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" icon={ShieldCheck} delay={0} />
+        <StatCard label="Paid COD" value={deliveredRevenue} prefix="AED " color="#3B82F6" icon={CreditCard} delay={100} />
+        <StatCard label="Returned" value={returnedCount} color="#EF4444" icon={RotateCcw} delay={200} />
+      </div>
+
       <div className="mt-8 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
         {orders.length === 0 ? (
           <div className="text-sm text-gray-400 py-10 text-center">No orders yet — place one from the Products tab.</div>
@@ -1963,14 +1976,18 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount })
               <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th>
             </tr></thead>
             <tbody>
-              {orders.map((o) => (
-                <tr key={o.id} style={{ borderBottom: "1px solid #FAFAFA" }}>
+              {orders.map((o, i) => (
+                <tr
+                  key={o.id}
+                  className="transition-colors duration-200 hover:bg-[#F5FBF9]"
+                  style={{ borderBottom: "1px solid #FAFAFA", animation: `dashTabIn 0.4s ease-out ${i * 60}ms both` }}
+                >
                   <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
                   <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
                   <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
                   <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
                   <td className="px-4 py-3 text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</td>
-                  <td className="px-4 py-3" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
+                  <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{o.trackingNumber || <span className="text-gray-300">Not assigned yet</span>}</td>
                 </tr>
