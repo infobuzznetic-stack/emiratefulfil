@@ -1190,8 +1190,8 @@ function Dashboard({ session, onLogout, notify }) {
       <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen relative z-10" style={{ background: "#0B1F3A" }}>
         <div className="flex items-center gap-2.5 px-2">
           <Logo />
-          <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
+          <span className="font-extrabold text-white text-xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            Emirate<span style={{ background: "linear-gradient(90deg,#00C896,#7FE8C9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Fulfil</span>
           </span>
         </div>
         <div className="mt-8 space-y-1">
