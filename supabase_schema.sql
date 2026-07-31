@@ -24,6 +24,11 @@ create table if not exists products (
 );
 -- Safe to re-run: adds the column if this table already existed without it.
 alter table products add column if not exists description text;
+-- Product picture: single main image (kept for backward compatibility — always
+-- mirrors images[0] below, so any old code that only knows about image_url still works).
+alter table products add column if not exists image_url text;
+-- Product gallery: up to 4 pictures per product, stored as a JSON array of URLs.
+alter table products add column if not exists images jsonb default '[]'::jsonb;
 
 -- 3. Which products each seller has added to "My Listings"
 create table if not exists listings (
