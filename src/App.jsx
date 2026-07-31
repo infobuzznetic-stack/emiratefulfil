@@ -2050,7 +2050,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   };
   const removeEditImage = (idx) => setEditForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
   const saveEdit = async (id) => {
-    if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify && notify("Fill in name, cost and sell price."); return; }
+    if (!editForm.name || editForm.sell === "") { notify && notify("Fill in name, cost and sell price."); return; }
     const images = editForm.images || [];
     const { error } = await supabase.from("products").update({
       name: editForm.name, category: editForm.category || "General",
