@@ -293,6 +293,7 @@ function Hero({ onSignup }) {
       <style>{`
         @keyframes blobMove { 0%,100%{ transform: translate(0,0) scale(1);} 33%{ transform: translate(30px,-40px) scale(1.08);} 66%{ transform: translate(-25px,25px) scale(0.96);} }
         @keyframes floatY { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-16px);} }
+        @keyframes boatDrift { 0%,100%{ transform: translateX(0);} 50%{ transform: translateX(24px);} }
         @keyframes shimmer { 0%{ background-position: -200% 0;} 100%{ background-position: 200% 0;} }
       `}</style>
 
@@ -1540,10 +1541,14 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
         <div className="text-xs font-medium text-gray-500">{label}</div>
         {Icon && (
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-500"
-            style={{ background: color + "1A", transform: hover ? "rotate(-8deg) scale(1.1)" : "rotate(0deg) scale(1)" }}
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500"
+            style={{
+              background: hover ? `linear-gradient(135deg, ${color}, ${color}CC)` : color + "1A",
+              boxShadow: hover ? `0 8px 18px -4px ${color}80` : "none",
+              transform: hover ? "rotate(-8deg) scale(1.1)" : "rotate(0deg) scale(1)",
+            }}
           >
-            <Icon className="w-4.5 h-4.5" style={{ color }} />
+            <Icon className="w-5 h-5 transition-colors duration-500" style={{ color: hover ? "#fff" : color }} />
           </div>
         )}
       </div>
@@ -1685,22 +1690,60 @@ function OverviewTab({
         <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="absolute top-1/2 left-10 w-40 h-40 rounded-full opacity-10 blur-3xl -translate-y-1/2" style={{ background: "#3B82F6", animation: "floatY 7s ease-in-out infinite" }} />
 
-        {/* UAE skyline silhouette — a subtle Burj Khalifa touch, hidden on small screens so it never crowds the text */}
+        {/* UAE skyline scene — Burj Khalifa + Burj Al Arab sail + a dhow on the water,
+            with a scatter of twinkling stars overhead. Hidden on small screens so it
+            never crowds the text. */}
         {region === "UAE" && (
-          <svg
-            viewBox="0 0 220 160"
-            className="hidden md:block absolute bottom-0 right-4 w-44 h-32 opacity-25 pointer-events-none"
-            style={{ animation: "floatY 8s ease-in-out infinite" }}
-          >
-            <rect x="6" y="110" width="18" height="50" fill="#7FE8C9" />
-            <rect x="30" y="90" width="14" height="70" fill="#7FE8C9" />
-            <rect x="50" y="120" width="16" height="40" fill="#7FE8C9" />
-            <polygon points="100,10 112,60 130,60 130,160 70,160 70,60 88,60" fill="#F8B400" />
-            <rect x="94" y="0" width="4" height="14" fill="#F8B400" />
-            <rect x="150" y="95" width="16" height="65" fill="#7FE8C9" />
-            <rect x="172" y="75" width="14" height="85" fill="#7FE8C9" />
-            <rect x="192" y="105" width="18" height="55" fill="#7FE8C9" />
-          </svg>
+          <>
+            <svg
+              viewBox="0 0 340 170"
+              className="hidden md:block absolute bottom-0 right-0 w-[26rem] h-40 opacity-35 pointer-events-none"
+              style={{ animation: "floatY 8s ease-in-out infinite" }}
+            >
+              {/* stars */}
+              <circle cx="30" cy="18" r="1.6" fill="#F8B400" opacity="0.9"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="2.4s" repeatCount="indefinite" /></circle>
+              <circle cx="70" cy="30" r="1.2" fill="#FFD98A" opacity="0.7"><animate attributeName="opacity" values="0.7;0.15;0.7" dur="3.1s" repeatCount="indefinite" /></circle>
+              <circle cx="180" cy="14" r="1.4" fill="#F8B400" opacity="0.8"><animate attributeName="opacity" values="0.8;0.2;0.8" dur="2.8s" repeatCount="indefinite" /></circle>
+              <circle cx="250" cy="24" r="1.2" fill="#FFD98A" opacity="0.6"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="3.6s" repeatCount="indefinite" /></circle>
+
+              {/* Burj Al Arab — sail silhouette */}
+              <path d="M18 160 L18 90 Q18 40 58 30 L58 45 Q34 55 34 90 L34 160 Z" fill="#7FE8C9" opacity="0.9" />
+              <rect x="14" y="158" width="28" height="4" fill="#7FE8C9" opacity="0.9" />
+
+              {/* mid skyline */}
+              <rect x="66" y="110" width="16" height="50" fill="#7FE8C9" />
+              <rect x="88" y="85" width="13" height="75" fill="#7FE8C9" />
+              <rect x="106" y="118" width="15" height="42" fill="#7FE8C9" />
+
+              {/* Burj Khalifa — tapered spire */}
+              <polygon points="176,6 190,64 206,64 206,160 146,160 146,64 162,64" fill="#F8B400" />
+              <rect x="172" y="0" width="4" height="10" fill="#F8B400" />
+
+              {/* mid-right skyline */}
+              <rect x="220" y="98" width="15" height="62" fill="#7FE8C9" />
+              <rect x="242" y="78" width="13" height="82" fill="#7FE8C9" />
+              <rect x="262" y="112" width="17" height="48" fill="#7FE8C9" />
+              <rect x="286" y="92" width="14" height="68" fill="#7FE8C9" />
+
+              {/* waterline */}
+              <rect x="0" y="160" width="340" height="1.5" fill="#7FE8C9" opacity="0.5" />
+
+              {/* dhow boat gliding along the waterline */}
+              <g style={{ animation: "boatDrift 14s ease-in-out infinite" }}>
+                <path d="M0 160 Q10 154 22 160 Z" fill="#F8B400" opacity="0.85" />
+                <path d="M6 160 L6 146 L15 160 Z" fill="#F8B400" opacity="0.85" />
+              </g>
+            </svg>
+
+            {/* soft gold desert-dune wave along the very bottom edge of the card */}
+            <svg
+              viewBox="0 0 500 40"
+              preserveAspectRatio="none"
+              className="absolute bottom-0 left-0 w-full h-8 opacity-[0.12] pointer-events-none"
+            >
+              <path d="M0 30 Q60 10 130 24 T260 20 T390 26 T500 16 L500 40 L0 40 Z" fill="#F8B400" />
+            </svg>
+          </>
         )}
 
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
