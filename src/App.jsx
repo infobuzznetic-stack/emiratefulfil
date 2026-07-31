@@ -818,23 +818,56 @@ function Toast({ message }) {
 /* ============================================================
    AUTH PAGE (Signup / Login)
 ============================================================ */
+// Countries a seller can sign up from, each with its WhatsApp/mobile dial code —
+// picking a country updates the phone placeholders so the format always matches.
+const SIGNUP_COUNTRIES = [
+  { code: "UAE", label: "United Arab Emirates", dial: "+971", sample: "5x xxx xxxx" },
+  { code: "KSA", label: "Saudi Arabia", dial: "+966", sample: "5x xxx xxxx" },
+  { code: "PK", label: "Pakistan", dial: "+92", sample: "3xx xxxxxxx" },
+  { code: "QA", label: "Qatar", dial: "+974", sample: "xxxx xxxx" },
+  { code: "KW", label: "Kuwait", dial: "+965", sample: "xxxx xxxx" },
+  { code: "BH", label: "Bahrain", dial: "+973", sample: "xxxx xxxx" },
+  { code: "OM", label: "Oman", dial: "+968", sample: "xxxx xxxx" },
+  { code: "EG", label: "Egypt", dial: "+20", sample: "1xx xxx xxxx" },
+  { code: "IN", label: "India", dial: "+91", sample: "xxxxx xxxxx" },
+  { code: "GB", label: "United Kingdom", dial: "+44", sample: "7xxx xxxxxx" },
+  { code: "US", label: "United States", dial: "+1", sample: "xxx xxx xxxx" },
+  { code: "OTHER", label: "Other country", dial: "", sample: "xxx xxx xxxx" },
+];
+const MONTHLY_ORDER_OPTIONS = ["0 – 10", "10 – 50", "50 – 100", "100 – 500", "500+"];
+
 function AuthPage({ mode, onAuthed, onSwitch, notify }) {
   const isSignup = mode === "signup";
-  const [form, setForm] = useState({ name: "", phone: "", company: "", country: "UAE", email: "", password: "" });
+  const [form, setForm] = useState({
+    name: "", phone: "", country: "UAE", email: "", password: "",
+    storeName: "", monthlyOrders: "", whatsapp: "",
+    bankName: "", accountTitle: "", accountNumber: "", iban: "",
+  });
   const [busy, setBusy] = useState(false);
   useGoogleFonts();
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const selectedCountry = SIGNUP_COUNTRIES.find((c) => c.code === form.country) || SIGNUP_COUNTRIES[0];
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     const email = form.email.trim().toLowerCase();
     if (isSignup) {
-      if (!form.name || !email || !form.password) { notify("Please fill in all required fields."); setBusy(false); return; }
+      if (!form.name || !email || !form.password || !form.storeName || !form.monthlyOrders || !form.phone || !form.whatsapp || !form.bankName || !form.accountTitle || !form.accountNumber || !form.iban) {
+        notify("Please fill in all required fields.");
+        setBusy(false);
+        return;
+      }
       const { data, error } = await supabase.auth.signUp({
         email, password: form.password,
-        options: { data: { name: form.name, phone: form.phone, company: form.company, country: form.country } },
+        options: {
+          data: {
+            name: form.name, phone: form.phone, company: form.storeName, country: form.country,
+            store_name: form.storeName, monthly_orders: form.monthlyOrders, whatsapp: form.whatsapp,
+            bank_name: form.bankName, account_title: form.accountTitle, account_number: form.accountNumber, iban: form.iban,
+          },
+        },
       });
       if (error) { notify(error.message); setBusy(false); return; }
       notify("Thanks for signing up, " + form.name.split(" ")[0] + "! Please check your email to verify your account, then log in.");
@@ -851,7 +884,12 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
       }
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
       const displayName = profile?.name || email.split("@")[0];
-      onAuthed({ email, name: displayName, company: profile?.company, country: profile?.country });
+      onAuthed({
+        email, name: displayName, company: profile?.company, country: profile?.country,
+        storeName: profile?.store_name, monthlyOrders: profile?.monthly_orders, whatsapp: profile?.whatsapp,
+        phone: profile?.phone, bankName: profile?.bank_name, accountTitle: profile?.account_title,
+        accountNumber: profile?.account_number, iban: profile?.iban,
+      });
       notify("Welcome back, " + displayName.split(" ")[0] + ".");
     }
     setBusy(false);
@@ -867,36 +905,99 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
           </span>
         </button>
 
-        <div className="rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <style>{`
+          @keyframes authFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+          .auth-box { animation: authFadeUp 0.5s ease both; }
+        `}</style>
+
+        <div
+          className="rounded-2xl p-8 auth-box"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", animationDelay: "0.05s" }}
+        >
           <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {isSignup ? "Create your seller account" : "Welcome back"}
           </h2>
-          <p className="text-sm text-white/45 mt-1">{isSignup ? "Start selling on COD in under a minute." : "Log in to your seller portal."}</p>
+          <p className="text-sm text-white/45 mt-1">{isSignup ? "Tell us about your store so we can get you selling." : "Log in to your seller portal."}</p>
 
-          <form onSubmit={submit} className="mt-6 space-y-4">
+          <form onSubmit={submit} className="mt-6 space-y-5">
             {isSignup && (
               <>
-                <Field label="Full name" value={form.name} onChange={update("name")} placeholder="Ahmed Khan" required />
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Phone" value={form.phone} onChange={update("phone")} placeholder="+971 5x xxx xxxx" />
-                  <div>
-                    <label className="text-xs text-white/50">Country</label>
-                    <select value={form.country} onChange={update("country")} className="mt-1 w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                      <option value="UAE" style={{ color: "#000" }}>UAE</option>
-                      <option value="KSA" style={{ color: "#000" }}>KSA</option>
-                    </select>
+                {/* --- Your details --- */}
+                <AuthSection title="Your details" delay="0.1s">
+                  <Field label="Full name" value={form.name} onChange={update("name")} placeholder="Ahmed Khan" required />
+                  <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@example.com" required />
+                  <Field label="Password" type="password" value={form.password} onChange={update("password")} placeholder="••••••••" required />
+                </AuthSection>
+
+                {/* --- Store details --- */}
+                <AuthSection title="Store details" delay="0.18s">
+                  <Field label="Store name" value={form.storeName} onChange={update("storeName")} placeholder="Your store name" required />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-white/50">Country</label>
+                      <select
+                        value={form.country}
+                        onChange={update("country")}
+                        className="mt-1 w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                      >
+                        {SIGNUP_COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code} style={{ color: "#000" }}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50">Monthly avg. orders</label>
+                      <select
+                        value={form.monthlyOrders}
+                        onChange={update("monthlyOrders")}
+                        required
+                        className="mt-1 w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                      >
+                        <option value="" disabled style={{ color: "#666" }}>Select…</option>
+                        {MONTHLY_ORDER_OPTIONS.map((o) => (
+                          <option key={o} value={o} style={{ color: "#000" }}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
-                <Field label="Company (optional)" value={form.company} onChange={update("company")} placeholder="Your store name" />
+                </AuthSection>
+
+                {/* --- Contact numbers --- */}
+                <AuthSection title="Contact numbers" delay="0.26s">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Mobile" value={form.phone} onChange={update("phone")} placeholder={`${selectedCountry.dial} ${selectedCountry.sample}`} required />
+                    <Field label="WhatsApp" value={form.whatsapp} onChange={update("whatsapp")} placeholder={`${selectedCountry.dial} ${selectedCountry.sample}`} required />
+                  </div>
+                </AuthSection>
+
+                {/* --- Bank details (for payouts) --- */}
+                <AuthSection title="Bank details" subtitle="Used to send your weekly payouts." delay="0.34s">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Bank name" value={form.bankName} onChange={update("bankName")} placeholder="e.g. Emirates NBD" required />
+                    <Field label="Account title" value={form.accountTitle} onChange={update("accountTitle")} placeholder="Name on account" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Account number" value={form.accountNumber} onChange={update("accountNumber")} placeholder="0123456789" required />
+                    <Field label="IBAN" value={form.iban} onChange={update("iban")} placeholder="AE07 0331 2345..." required />
+                  </div>
+                </AuthSection>
               </>
             )}
-            <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@example.com" required />
-            <Field label="Password" type="password" value={form.password} onChange={update("password")} placeholder="••••••••" required />
+
+            {!isSignup && (
+              <>
+                <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@example.com" required />
+                <Field label="Password" type="password" value={form.password} onChange={update("password")} placeholder="••••••••" required />
+              </>
+            )}
+
             <button
               type="submit"
               disabled={busy}
-              className="w-full font-semibold py-3 rounded-full mt-2 transition-transform hover:scale-[1.02] disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#04140f" }}
+              className="w-full font-semibold py-3 rounded-full mt-2 transition-transform hover:scale-[1.02] disabled:opacity-60 auth-box"
+              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#04140f", animationDelay: "0.42s" }}
             >
               {busy ? "Please wait…" : isSignup ? "Create account" : "Log in"}
             </button>
@@ -909,7 +1010,7 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
             </button>
           </p>
         </div>
-        <p className="text-center text-xs text-white/25 mt-6">Demo prototype — accounts are stored for this app only, not production-secure.</p>
+        <p className="text-center text-xs text-white/25 mt-6 auth-box" style={{ animationDelay: "0.48s" }}>Demo prototype — accounts are stored for this app only, not production-secure.</p>
       </div>
     </div>
   );
@@ -924,6 +1025,23 @@ function Field({ label, type = "text", value, onChange, placeholder, required })
         className="mt-1 w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none"
         style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
       />
+    </div>
+  );
+}
+
+// A labeled "box" grouping a few related signup fields together, with its
+// own staggered fade-in so each section animates in one after another.
+function AuthSection({ title, subtitle, delay = "0s", children }) {
+  return (
+    <div
+      className="auth-box rounded-xl p-4 space-y-3"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", animationDelay: delay }}
+    >
+      <div>
+        <div className="text-xs font-bold uppercase tracking-wide" style={{ color: "#00C896" }}>{title}</div>
+        {subtitle && <div className="text-xs text-white/35 mt-0.5">{subtitle}</div>}
+      </div>
+      {children}
     </div>
   );
 }
@@ -2547,7 +2665,12 @@ function SettingsTab({ session }) {
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Settings</h1>
       <p className="text-sm text-gray-500 mt-1">Your account details.</p>
       <div className="mt-6 rounded-2xl p-6 bg-white max-w-lg space-y-4" style={{ border: "1px solid #E5E7EB" }}>
-        {[["Full name", session.name], ["Email", session.email], ["Company", session.company || "—"], ["Country", session.country || "—"]].map(([label, value]) => (
+        {[
+          ["Full name", session.name], ["Email", session.email], ["Store name", session.storeName || session.company || "—"],
+          ["Country", session.country || "—"], ["Mobile", session.phone || "—"], ["WhatsApp", session.whatsapp || "—"],
+          ["Monthly avg. orders", session.monthlyOrders || "—"], ["Bank name", session.bankName || "—"],
+          ["Account title", session.accountTitle || "—"], ["Account number", session.accountNumber || "—"], ["IBAN", session.iban || "—"],
+        ].map(([label, value]) => (
           <div key={label}>
             <label className="text-xs text-gray-500">{label}</label>
             <div className="mt-1 text-sm font-semibold" style={{ color: "#111827" }}>{value}</div>
@@ -2777,7 +2900,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const filteredSellers = sellers.filter((s) => {
     const q = sellerSearch.trim().toLowerCase();
     if (!q) return true;
-    return (s.email || "").toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q) || (s.company || "").toLowerCase().includes(q);
+    return (s.email || "").toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q) || (s.company || "").toLowerCase().includes(q) || (s.store_name || "").toLowerCase().includes(q);
   });
 
   return (
@@ -2950,9 +3073,12 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                 <tr className="text-left text-xs text-gray-400 uppercase tracking-wide" style={{ background: "#F8FAFC" }}>
                   <th className="px-5 py-3">Seller</th>
                   <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Company</th>
+                  <th className="px-4 py-3">Mobile</th>
+                  <th className="px-4 py-3">WhatsApp</th>
+                  <th className="px-4 py-3">Store</th>
                   <th className="px-4 py-3">Country</th>
+                  <th className="px-4 py-3">Avg. orders/mo</th>
+                  <th className="px-4 py-3">Bank</th>
                   <th className="px-4 py-3">Orders</th>
                   <th className="px-4 py-3">Signed up</th>
                 </tr>
@@ -2970,8 +3096,21 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     </td>
                     <td className="px-4 py-3 text-gray-600">{s.email}</td>
                     <td className="px-4 py-3 text-gray-500">{s.phone || "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.company || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.whatsapp || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.store_name || s.company || "—"}</td>
                     <td className="px-4 py-3 text-gray-500">{s.country || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.monthly_orders || "—"}</td>
+                    <td className="px-4 py-3">
+                      {s.bank_name || s.account_number || s.iban ? (
+                        <div className="text-xs text-gray-500 leading-tight" title={`IBAN: ${s.iban || "—"}`}>
+                          <div className="font-semibold" style={{ color: "#111827" }}>{s.bank_name || "—"}</div>
+                          <div>{s.account_title || "—"}</div>
+                          <div>{s.account_number || "—"}</div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{sellerOrderCount(s.email)}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                       {s.created_at ? new Date(s.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}
@@ -3215,7 +3354,12 @@ export default function EmirateFulfilApp() {
         const authUser = data.session?.user;
         if (authUser) {
           const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
-          setSession({ email: authUser.email, name: profile?.name || authUser.email.split("@")[0], company: profile?.company, country: profile?.country });
+          setSession({
+            email: authUser.email, name: profile?.name || authUser.email.split("@")[0], company: profile?.company, country: profile?.country,
+            storeName: profile?.store_name, monthlyOrders: profile?.monthly_orders, whatsapp: profile?.whatsapp,
+            phone: profile?.phone, bankName: profile?.bank_name, accountTitle: profile?.account_title,
+            accountNumber: profile?.account_number, iban: profile?.iban,
+          });
           setView("dashboard");
         }
       } finally {
