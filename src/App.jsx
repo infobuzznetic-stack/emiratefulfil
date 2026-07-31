@@ -1284,9 +1284,9 @@ function Dashboard({ session, onLogout, notify }) {
           ))}
         </div>
         <div className="mt-auto pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-          <div className="text-white text-sm font-semibold">{session.name}</div>
-          <div className="text-white/40 text-xs">{session.company || "Seller account"}</div>
-          <button onClick={onLogout} className="mt-3 text-white/60 text-xs font-semibold hover:text-white">Log out</button>
+          <div className="text-white text-base font-semibold">{session.name}</div>
+          <div className="text-white/40 text-sm">{session.company || "Seller account"}</div>
+          <button onClick={onLogout} className="mt-3 text-white/60 text-sm font-semibold hover:text-white">Log out</button>
         </div>
       </aside>
 
