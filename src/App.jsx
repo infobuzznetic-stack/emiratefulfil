@@ -3,7 +3,7 @@ import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
-  Layers, Receipt,
+  Layers, Receipt, Clock, CreditCard,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1429,34 +1429,47 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
     "Cash on Delivery available in every emirate",
     "Quality-checked before packing, easy 7-day returns",
   ];
+  const deliveryDetails = [
+    { icon: Truck, label: "Shipping Charges", value: `AED ${DELIVERY_CHARGE}` },
+    { icon: Clock, label: "Delivery Time", value: "1 – 3 days" },
+    { icon: CreditCard, label: "Payment Mode", value: "Cash on delivery available" },
+    { icon: RotateCcw, label: "Return Window", value: "Free within 7 days" },
+  ];
   return (
     <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+        <button onClick={onBack} className="hover:text-gray-700 font-medium">Products</button>
+        <ChevronRight className="w-3.5 h-3.5" />
+        <span className="font-semibold" style={{ color: "#0B1F3A" }}>{product.name}</span>
+      </div>
+
       <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
         <ChevronDown className="w-4 h-4 rotate-90" /> Back to products
       </button>
 
-      <div className="mt-5 grid md:grid-cols-2 gap-10">
-        <div className="rounded-3xl bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB", minHeight: 400 }}>
-          <span style={{ fontSize: 170 }}>{product.emoji}</span>
+      <div className="mt-5 grid lg:grid-cols-10 gap-6">
+        <div className="lg:col-span-4 rounded-3xl bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
+          <span style={{ fontSize: 150 }}>{product.emoji}</span>
         </div>
 
-        <div>
+        <div className="lg:col-span-3">
           <div className="text-xs font-bold uppercase tracking-widest" style={{ color: "#00a67e" }}>{category}</div>
-          <h1 className="mt-2 text-3xl md:text-4xl font-extrabold leading-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
-          <div className="mt-4 text-4xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</div>
+          <h1 className="mt-2 text-2xl md:text-3xl font-extrabold leading-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
+          <div className="mt-3 text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</div>
 
-          <p className="mt-5 text-base text-gray-600 leading-relaxed">{description}</p>
+          <p className="mt-4 text-sm text-gray-600 leading-relaxed">{description}</p>
 
-          <ul className="mt-5 space-y-2">
+          <ul className="mt-4 space-y-2">
             {highlights.map((h, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                <CheckCircle2 className="w-4.5 h-4.5 flex-shrink-0 mt-0.5" style={{ color: "#00C896" }} />
+              <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#00C896" }} />
                 {h}
               </li>
             ))}
           </ul>
 
-          <div className="mt-7 rounded-2xl p-5" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+          <div className="mt-6 rounded-2xl p-5" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
             <div className="flex items-center gap-3">
               <label className="text-xs font-semibold text-gray-500">Quantity</label>
               <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
@@ -1464,10 +1477,10 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
                 <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
                 <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
               </div>
-              <span className="ml-auto text-sm text-gray-500">
-                Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
-                <span className="block text-xs text-gray-400 text-right">(incl. AED {DELIVERY_CHARGE} delivery)</span>
-              </span>
+            </div>
+            <div className="mt-2 text-sm text-gray-500">
+              Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
+              <span className="ml-1 text-xs text-gray-400">(incl. AED {DELIVERY_CHARGE} delivery)</span>
             </div>
 
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
@@ -1488,25 +1501,27 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Trust strip */}
-      <div className="mt-10 grid sm:grid-cols-3 gap-4">
-        {[
-          { icon: Truck, title: "Fast delivery", desc: "Across all seven emirates" },
-          { icon: ClipboardCheck, title: "Cash on delivery", desc: "Pay when it arrives" },
-          { icon: RotateCcw, title: "Easy returns", desc: "7-day return window" },
-        ].map((f, i) => (
-          <div key={i} className="rounded-2xl p-5 bg-white flex items-center gap-3" style={{ border: "1px solid #E5E7EB" }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
-              <f.icon className="w-5 h-5" style={{ color: "#00a67e" }} />
-            </div>
-            <div>
-              <div className="text-sm font-semibold" style={{ color: "#111827" }}>{f.title}</div>
-              <div className="text-xs text-gray-400">{f.desc}</div>
+        {/* Delivery Details sidebar */}
+        <div className="lg:col-span-3 rounded-2xl bg-white h-fit overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+          <div className="h-1.5" style={{ background: "linear-gradient(90deg,#F8B400,#00C896)" }} />
+          <div className="p-5">
+            <div className="text-center font-extrabold text-sm mb-4" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Delivery Details</div>
+            <div className="space-y-0">
+              {deliveryDetails.map((d, i) => (
+                <div key={d.label} className="flex items-center gap-3 py-3" style={i > 0 ? { borderTop: "1px solid #F3F4F6" } : {}}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
+                    <d.icon className="w-4.5 h-4.5" style={{ color: "#00a67e" }} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold" style={{ color: "#111827" }}>{d.label}</div>
+                    <div className="text-xs text-gray-500">{d.value}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
