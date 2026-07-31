@@ -1,3 +1,264 @@
+import React, { useState, useRef } from 'react';
+import { 
+  LayoutDashboard, 
+  ShoppingBag, 
+  Grid, 
+  ShoppingCart, 
+  FileText, 
+  Settings, 
+  ShieldCheck, 
+  Pencil, 
+  Globe 
+} from 'lucide-react';
+
+// Exact 8 Products from your live site
+const INITIAL_PRODUCTS = [
+  {
+    id: 1,
+    name: 'Smart LED Ring Light 10"',
+    category: 'Electronics',
+    categoryBadgeClass: 'bg-indigo-100 text-indigo-600',
+    price: 129,
+    icon: '💡'
+  },
+  {
+    id: 2,
+    name: 'Wireless Earbuds Pro X',
+    category: 'Electronics',
+    categoryBadgeClass: 'bg-indigo-100 text-indigo-600',
+    price: 169,
+    icon: '🎧'
+  },
+  {
+    id: 3,
+    name: 'Portable Blender Bottle',
+    category: 'Home',
+    categoryBadgeClass: 'bg-amber-100 text-amber-600',
+    price: 99,
+    icon: '🧃'
+  },
+  {
+    id: 4,
+    name: 'Magnetic Car Phone Mount',
+    category: 'Accessories',
+    categoryBadgeClass: 'bg-purple-100 text-purple-600',
+    price: 59,
+    icon: '📱'
+  },
+  {
+    id: 5,
+    name: 'Arabic Oud Perfume 50ml',
+    category: 'Beauty',
+    categoryBadgeClass: 'bg-pink-100 text-pink-600',
+    price: 149,
+    icon: '🧴'
+  },
+  {
+    id: 6,
+    name: 'Smart Fitness Band S3',
+    category: 'Electronics',
+    categoryBadgeClass: 'bg-indigo-100 text-indigo-600',
+    price: 159,
+    icon: '⌚'
+  },
+  {
+    id: 7,
+    name: 'Non-Stick Cookware Set',
+    category: 'Home',
+    categoryBadgeClass: 'bg-amber-100 text-amber-600',
+    price: 249,
+    icon: '🍳'
+  },
+  {
+    id: 8,
+    name: 'LED Galaxy Star Projector',
+    category: 'Home',
+    categoryBadgeClass: 'bg-amber-100 text-amber-600',
+    price: 119,
+    icon: '🌌'
+  }
+];
+
+export default function App() {
+  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [activeNav, setActiveNav] = useState('Products');
+  const [selectedProductId, setSelectedProductId] = useState(null);
+
+  // File Upload Reference for Pencil Icon
+  const fileInputRef = useRef(null);
+
+  // Handle Pencil Click
+  const handlePencilClick = (id) => {
+    setSelectedProductId(id);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Handle Image Upload Action
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file && selectedProductId !== null) {
+      const imageUrl = URL.createObjectURL(file);
+      setProducts(prevProducts =>
+        prevProducts.map(product =>
+          product.id === selectedProductId
+            ? { ...product, customImage: imageUrl }
+            : product
+        )
+      );
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen bg-[#f3f4f6] font-sans">
+      {/* Hidden File Input for Image Change */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleImageChange} 
+        accept="image/*" 
+        className="hidden" 
+      />
+
+      {/* SIDEBAR */}
+      <aside className="w-60 bg-[#071729] text-gray-300 flex flex-col justify-between p-4">
+        <div>
+          {/* Logo */}
+          <div className="flex items-center gap-2 px-2 py-3 mb-6">
+            <div className="bg-emerald-500/20 p-1.5 rounded-lg border border-emerald-500/30">
+              <span className="text-emerald-400 font-bold text-lg">EF</span>
+            </div>
+            <span className="text-white font-bold text-lg">EmirateFulfil</span>
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="space-y-1">
+            {[
+              { name: 'Dashboard', icon: LayoutDashboard },
+              { name: 'Products', icon: ShoppingBag },
+              { name: 'Categories', icon: Grid },
+              { name: 'Orders', icon: ShoppingCart },
+              { name: 'Invoices', icon: FileText },
+              { name: 'Settings', icon: Settings },
+              { name: 'Admin', icon: ShieldCheck },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeNav === item.name;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => setActiveNav(item.name)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-emerald-500/10 text-emerald-400 border-l-4 border-emerald-400'
+                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {item.name}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User Info Footer */}
+        <div className="border-t border-slate-800 pt-4 px-2">
+          <p className="text-sm font-semibold text-white">muhammad ibrahim</p>
+          <p className="text-xs text-slate-500">fuiaushdui</p>
+          <button className="text-xs text-slate-400 hover:text-rose-400 mt-2 block">
+            Log out
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 p-8">
+        {/* Top Banner Header */}
+        <div className="bg-[#0b5c55] text-white rounded-2xl p-6 mb-8 flex items-center justify-between shadow-sm">
+          <div>
+            <h1 className="text-2xl font-bold">Products</h1>
+            <p className="text-emerald-100 text-sm mt-1">
+              Click a product to view it, or add it to cart / buy it now for a customer.
+            </p>
+          </div>
+          <button className="bg-emerald-800/50 hover:bg-emerald-800 border border-emerald-500/30 text-white px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4" />
+            Cart
+          </button>
+        </div>
+
+        {/* Product Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className="bg-white rounded-2xl p-5 border border-slate-200/70 shadow-sm relative flex flex-col justify-between"
+            >
+              {/* Pencil Icon Button */}
+              <button
+                onClick={() => handlePencilClick(product.id)}
+                title="Change Product Image"
+                className="absolute top-4 right-4 bg-white border border-slate-200 hover:border-emerald-500 text-slate-400 hover:text-emerald-600 p-1.5 rounded-full shadow-sm transition-all z-10"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Product Info */}
+              <div>
+                {/* Product Image Box */}
+                <div className="w-full h-28 bg-amber-50/50 rounded-2xl mb-4 flex items-center justify-center text-4xl overflow-hidden border border-slate-100 relative">
+                  {product.customImage ? (
+                    <img 
+                      src={product.customImage} 
+                      alt={product.name} 
+                      className="w-full h-full object-cover rounded-2xl" 
+                    />
+                  ) : (
+                    <span>{product.icon}</span>
+                  )}
+                </div>
+
+                {/* Title */}
+                <h3 className="font-semibold text-slate-800 text-sm mb-1.5 leading-snug">
+                  {product.name}
+                </h3>
+
+                {/* Category Badge */}
+                <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md mb-3 ${product.categoryBadgeClass}`}>
+                  {product.category}
+                </span>
+
+                {/* Price */}
+                <div className="text-base font-bold text-slate-900 mb-4">
+                  AED {product.price}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <button className="text-xs border border-slate-300 hover:bg-slate-50 text-slate-700 py-2 rounded-xl font-medium transition-colors flex items-center justify-center gap-1">
+                    <ShoppingCart className="w-3 h-3" />
+                    Add to Cart
+                  </button>
+                  <button className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl font-medium transition-colors">
+                    Buy Now
+                  </button>
+                </div>
+
+                <button className="w-full text-center text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                  View product &rarr;
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
 import React, { useEffect, useRef, useState, useContext, createContext } from "react";
 import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
