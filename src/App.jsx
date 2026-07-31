@@ -1447,7 +1447,10 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow }) {
                 <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
                 <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
               </div>
-              <span className="ml-auto text-sm text-gray-500">Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty}</b></span>
+              <span className="ml-auto text-sm text-gray-500">
+                Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
+                <span className="block text-xs text-gray-400 text-right">(incl. AED {DELIVERY_CHARGE} delivery)</span>
+              </span>
             </div>
 
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
