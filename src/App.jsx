@@ -1770,27 +1770,6 @@ function specsForProduct(product) {
   return base;
 }
 
-function reviewsForProduct(product) {
-  const seed = seededFrom(product.id || product.name);
-  const names = ["Amina K.", "Rashid M.", "Sara A.", "Yousef H.", "Fatima R."];
-  const bodies = [
-    "Arrived fast and exactly as described. Packaging was solid, no damage at all.",
-    "Good quality for the price. Would order again for sure.",
-    "Works well, seller was responsive when I had a question about delivery.",
-    "Nice product overall — matches the photos and description closely.",
-    "Delivery was quicker than expected, everything felt well made.",
-  ];
-  const count = 3 + (seed % 3); // 3–5 reviews
-  const avg = 4.2 + ((seed % 8) / 10 - 0.3); // roughly 3.9–4.6
-  const list = Array.from({ length: count }).map((_, i) => ({
-    name: names[(seed + i) % names.length],
-    body: bodies[(seed + i * 3) % bodies.length],
-    rating: 4 + ((seed + i) % 2),
-    daysAgo: 3 + ((seed + i * 7) % 40),
-  }));
-  return { avg: Math.min(5, Math.round(avg * 10) / 10), count, list };
-}
-
 function daysAgoFromDate(iso) {
   if (!iso) return 0;
   const diff = Date.now() - new Date(iso).getTime();
@@ -1832,15 +1811,14 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
     { icon: CreditCard, label: "Cash on Delivery" },
   ];
   const specs = specsForProduct(product);
-  const sampleReviews = reviewsForProduct(product);
-  const hasRealReviews = Array.isArray(dbReviews) && dbReviews.length > 0;
-  const reviewList = hasRealReviews
+  // Reviews are real only — no more auto-generated sample reviews. Until a
+  // product has an actual review (added by Admin), the tab just shows "no
+  // reviews yet" instead of made-up names/ratings.
+  const reviewList = Array.isArray(dbReviews)
     ? dbReviews.map((r) => ({ name: r.name, body: r.body, rating: r.rating, daysAgo: daysAgoFromDate(r.createdAt) }))
-    : sampleReviews.list;
-  const count = hasRealReviews ? dbReviews.length : sampleReviews.count;
-  const avg = hasRealReviews
-    ? Math.round((dbReviews.reduce((s, r) => s + r.rating, 0) / dbReviews.length) * 10) / 10
-    : sampleReviews.avg;
+    : [];
+  const count = reviewList.length;
+  const avg = count > 0 ? Math.round((reviewList.reduce((s, r) => s + r.rating, 0) / count) * 10) / 10 : 0;
   const inStock = (product.stock ?? 0) > 0;
   const related = (catalog || []).filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
   const relatedFallback = related.length > 0 ? related : (catalog || []).filter((p) => p.id !== product.id).slice(0, 4);
@@ -1898,9 +1876,15 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
           <h1 className="mt-2 text-2xl md:text-3xl font-extrabold leading-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
 
           <div className="mt-2 flex items-center gap-2">
-            <StarRow rating={avg} />
-            <span className="text-xs font-semibold text-gray-600">{avg.toFixed(1)}</span>
-            <span className="text-xs text-gray-400">({count} reviews)</span>
+            {count > 0 ? (
+              <>
+                <StarRow rating={avg} />
+                <span className="text-xs font-semibold text-gray-600">{avg.toFixed(1)}</span>
+                <span className="text-xs text-gray-400">({count} reviews)</span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">No reviews yet</span>
+            )}
           </div>
 
           <div className="mt-3 flex items-baseline gap-2">
@@ -2043,34 +2027,40 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
 
           {tab === "reviews" && (
             <div className="max-w-2xl">
-              <div className="flex items-center gap-4 pb-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <div className="text-4xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>{avg.toFixed(1)}</div>
-                <div>
-                  <StarRow rating={avg} size="w-4 h-4" />
-                  <div className="text-xs text-gray-400 mt-1">Based on {count} verified orders</div>
-                </div>
-              </div>
-              <div className="mt-4 space-y-4">
-                {reviewList.map((r, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                      style={{ background: `linear-gradient(135deg,#0B1F3A,#00a67e)` }}
-                    >
-                      {r.name.charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold" style={{ color: "#111827" }}>{r.name}</span>
-                        <span className="text-xs text-gray-300">·</span>
-                        <span className="text-xs text-gray-400">{r.daysAgo}d ago</span>
-                      </div>
-                      <StarRow rating={r.rating} />
-                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">{r.body}</p>
+              {count === 0 ? (
+                <div className="text-sm text-gray-400 py-6">No reviews yet — be the first to order and review this product.</div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-4 pb-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                    <div className="text-4xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>{avg.toFixed(1)}</div>
+                    <div>
+                      <StarRow rating={avg} size="w-4 h-4" />
+                      <div className="text-xs text-gray-400 mt-1">Based on {count} verified orders</div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="mt-4 space-y-4">
+                    {reviewList.map((r, i) => (
+                      <div key={i} className="flex gap-3">
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                          style={{ background: `linear-gradient(135deg,#0B1F3A,#00a67e)` }}
+                        >
+                          {r.name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold" style={{ color: "#111827" }}>{r.name}</span>
+                            <span className="text-xs text-gray-300">·</span>
+                            <span className="text-xs text-gray-400">{r.daysAgo}d ago</span>
+                          </div>
+                          <StarRow rating={r.rating} />
+                          <p className="text-xs text-gray-600 mt-1 leading-relaxed">{r.body}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
