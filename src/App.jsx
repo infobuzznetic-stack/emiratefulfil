@@ -886,17 +886,34 @@ function isKSACity(city) {
 }
 
 /* ============================================================
+   LOCAL PERSISTENCE — keeps the seller on the same tab/cart after a refresh
+============================================================ */
+function readLocal(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeLocal(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+}
+
+/* ============================================================
    SELLER DASHBOARD
 ============================================================ */
 function Dashboard({ session, onLogout, notify }) {
   const isAdmin = ADMIN_EMAILS.includes(session.email);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(() => readLocal("ef_tab", "overview"));
   const [region, setRegion] = useState("UAE"); // UAE | KSA — which country's dashboard is showing
   const [catalog, setCatalog] = useState([]);
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
   const [sellerCount, setSellerCount] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Remember which sidebar tab the seller was on, so refreshing the page doesn't bounce them back to Dashboard.
+  useEffect(() => { writeLocal("ef_tab", tab); }, [tab]);
 
   const reload = async () => {
     setCatalog(await fetchCatalog());
@@ -1077,7 +1094,7 @@ function Dashboard({ session, onLogout, notify }) {
           )}
           {(tab === "settings" || region === "UAE") && (
             <>
-              {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} />}
+              {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} />}
               {tab === "categories" && <CategoriesTab catalog={catalog} listings={listings} onAdd={addListing} />}
               {tab === "orders" && (
                 <OrdersTab catalog={catalog} orders={orders} onAddOrder={addOrder} onSetStatus={setOrderStatus} confirmedProfit={confirmedProfit} pendingCOD={pendingCOD} returnedCount={returned.length} />
@@ -1650,13 +1667,16 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
   );
 }
 
-function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders }) {
+function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, sellerEmail }) {
   const [view, setView] = useState("list"); // list | detail | cart | checkout | success
   const [activeProduct, setActiveProduct] = useState(null);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => readLocal(`ef_cart_${sellerEmail}`, []));
   const [checkoutItems, setCheckoutItems] = useState([]);
   const [checkoutFrom, setCheckoutFrom] = useState("detail"); // where "Back" should return to
   const [placedOrders, setPlacedOrders] = useState([]);
+
+  // Keep the cart across a page refresh — nothing is lost if the seller reloads mid-checkout.
+  useEffect(() => { writeLocal(`ef_cart_${sellerEmail}`, cart); }, [cart, sellerEmail]);
 
   const addToCart = (product, qty) => {
     setCart((prev) => {
