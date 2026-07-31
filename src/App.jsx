@@ -3,7 +3,7 @@ import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
-  Layers, Receipt, Clock, CreditCard, LifeBuoy,
+  Receipt, Clock, CreditCard, LifeBuoy,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1454,7 +1454,6 @@ function OverviewTab({
     { label: "Paid invoice", value: regionPaidInvoice, prefix: "AED ", color: "#00C896", icon: CheckCircle2 },
     { label: "Orders this week", value: regionOrdersThisWeek, color: "#3B82F6", icon: Clock },
     { label: "Avg. order value", value: avgOrderValue, prefix: "AED ", color: "#8B5CF6", icon: CreditCard },
-    { label: "Products listed", value: listings.length, color: "#F8B400", icon: Layers },
   ];
   const breakdown = [
     { label: "Pending", count: regionPending.length, color: "#F8B400" },
@@ -1488,6 +1487,24 @@ function OverviewTab({
         <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
         <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="absolute top-1/2 left-10 w-40 h-40 rounded-full opacity-10 blur-3xl -translate-y-1/2" style={{ background: "#3B82F6", animation: "floatY 7s ease-in-out infinite" }} />
+
+        {/* UAE skyline silhouette — a subtle Burj Khalifa touch, hidden on small screens so it never crowds the text */}
+        {region === "UAE" && (
+          <svg
+            viewBox="0 0 220 160"
+            className="hidden md:block absolute bottom-0 right-4 w-44 h-32 opacity-25 pointer-events-none"
+            style={{ animation: "floatY 8s ease-in-out infinite" }}
+          >
+            <rect x="6" y="110" width="18" height="50" fill="#7FE8C9" />
+            <rect x="30" y="90" width="14" height="70" fill="#7FE8C9" />
+            <rect x="50" y="120" width="16" height="40" fill="#7FE8C9" />
+            <polygon points="100,10 112,60 130,60 130,160 70,160 70,60 88,60" fill="#F8B400" />
+            <rect x="94" y="0" width="4" height="14" fill="#F8B400" />
+            <rect x="150" y="95" width="16" height="65" fill="#7FE8C9" />
+            <rect x="172" y="75" width="14" height="85" fill="#7FE8C9" />
+            <rect x="192" y="105" width="18" height="55" fill="#7FE8C9" />
+          </svg>
+        )}
 
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
           <div>
