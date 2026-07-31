@@ -1135,6 +1135,17 @@ function Dashboard({ session, onLogout, notify }) {
     });
     if (error) { notify("Could not save order."); return null; }
     setOrders([newOrder, ...orders]);
+
+    // Every order pulls straight from stock, so once enough orders land the
+    // product flips to Out of Stock on its own — Admin never has to zero it
+    // out by hand.
+    const product = catalog.find((p) => p.id === newOrder.productId);
+    if (product) {
+      const newStock = Math.max(0, (Number(product.stock) || 0) - Number(newOrder.qty || 0));
+      const { error: stockError } = await supabase.from("products").update({ stock: newStock }).eq("id", newOrder.productId);
+      if (!stockError) setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
+    }
+
     notify("Order added — tracking as Pending.");
     return newOrder;
   };
@@ -1930,7 +1941,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
               <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
                 <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
-                <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
+                <button onClick={() => setQty((q) => Math.min((product.stock ?? 0) || 1, q + 1))} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
               </div>
             </div>
             <div className="mt-2 text-sm text-gray-500">
@@ -2554,7 +2565,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                     >−</button>
                     <span className="w-6 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
                     <button
-                      onClick={() => setQty(p.id, qty + 1)}
+                      onClick={() => setQty(p.id, Math.min((p.stock ?? 0) || 1, qty + 1))}
                       className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
                     >+</button>
                   </div>
