@@ -2019,13 +2019,19 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   const [activeProduct, setActiveProduct] = useState(null);
   const [cart, setCart] = useState(() => readLocal(`ef_cart_${sellerEmail}`, []));
   const [checkoutItems, setCheckoutItems] = useState([]);
-  const [checkoutFrom, setCheckoutFrom] = useState("detail"); // where "Back" should return to
+  const [checkoutFrom, setCheckoutFrom] = useState("detail");
   const [placedOrders, setPlacedOrders] = useState([]);
 
-  // Admin-only inline product editing, right from this grid.
+  // Admin-only inline product editing
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [editImageUploading, setEditImageUploading] = useState(false);
+
+  // Per-card quantity counters (productId → qty)
+  const [cardQtys, setCardQtys] = useState({});
+  const getQty = (id) => cardQtys[id] || 1;
+  const setQty = (id, q) => setCardQtys((prev) => ({ ...prev, [id]: Math.max(1, q) }));
+
   const startEdit = (p) => {
     setEditingId(p.id);
     const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
@@ -2050,11 +2056,11 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   };
   const removeEditImage = (idx) => setEditForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
   const saveEdit = async (id) => {
-    if (!editForm.name || editForm.sell === "") { notify && notify("Fill in name, cost and sell price."); return; }
+    if (!editForm.name || editForm.sell === "") { notify && notify("Fill in name and sell price."); return; }
     const images = editForm.images || [];
     const { error } = await supabase.from("products").update({
       name: editForm.name, category: editForm.category || "General",
-      cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell),
+      cost: parseFloat(editForm.cost) || 0, sell: parseFloat(editForm.sell),
       emoji: editForm.emoji || "📦", description: editForm.description || null,
       images, image_url: images[0] || null,
     }).eq("id", id);
@@ -2064,7 +2070,6 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     onCatalogChanged && onCatalogChanged();
   };
 
-  // Keep the cart across a page refresh — nothing is lost if the seller reloads mid-checkout.
   useEffect(() => { writeLocal(`ef_cart_${sellerEmail}`, cart); }, [cart, sellerEmail]);
 
   const addToCart = (product, qty) => {
@@ -2073,7 +2078,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
       if (existing) return prev.map((c) => (c.id === product.id ? { ...c, qty: c.qty + qty } : c));
       return [...prev, { id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, qty }];
     });
-    notify && notify("Added to cart.");
+    notify && notify(`${qty > 1 ? qty + "x " : ""}Added to cart.`);
   };
   const updateCartQty = (id, qty) => setCart((prev) => prev.map((c) => (c.id === id ? { ...c, qty } : c)).filter((c) => c.qty > 0));
   const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id));
@@ -2092,8 +2097,6 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     setCheckoutFrom("cart");
     setView("checkout");
   };
-  // Lets the seller charge this particular customer more than the catalog price —
-  // the gap between what they charge and the catalog price becomes extra profit.
   const updateCheckoutItemPrice = (id, sell) => {
     setCheckoutItems((prev) => prev.map((it) => (it.id === id ? { ...it, sell: Math.max(0, sell) } : it)));
   };
@@ -2192,6 +2195,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.map((p, i) => {
           const color = catColor(p.category);
+          const qty = getQty(p.id);
           if (isAdmin && editingId === p.id) {
             return (
               <div
@@ -2205,7 +2209,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                     {(editForm.images || []).map((url, idx) => (
                       <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid #E5E7EB" }}>
                         <img src={url} alt="" className="w-full h-full object-cover" />
-                        <button onClick={() => removeEditImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center text-white text-[10px]" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
+                        <button onClick={() => removeEditImage(idx)} title="Remove" className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center text-white text-[10px]" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
                       </div>
                     ))}
                     {(editForm.images || []).length < 4 && (
@@ -2217,14 +2221,12 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                   </div>
                   <p className="text-[11px] text-gray-400">{(editForm.images || []).length}/4 pictures</p>
                   <div className="flex items-center gap-2">
-                    <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} title="Fallback emoji (shown until a picture is uploaded)" className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
+                    <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} title="Fallback emoji" className="w-14 rounded-lg px-2 py-1.5 text-lg text-center" style={{ border: "1px solid #E5E7EB" }} />
                     <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="flex-1 rounded-lg px-2 py-1.5 text-sm font-semibold" style={{ border: "1px solid #E5E7EB" }} />
                   </div>
                   <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} placeholder="Category" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} placeholder="Cost" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                    <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                  </div>
+                  {/* SELL PRICE ONLY — cost is admin-internal, not shown here */}
+                  <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell price (AED)" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                   <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => saveEdit(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
@@ -2267,11 +2269,28 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
               <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
               <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{p.category}</span>
               <div className="mt-2 text-lg font-bold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
-              <div className="mt-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => addToCart(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
+
+              {/* ── Quantity counter ── */}
+              <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <span className="text-xs text-gray-400 font-medium">Qty</span>
+                <div className="flex items-center rounded-full" style={{ border: "1px solid #E5E7EB" }}>
+                  <button
+                    onClick={() => setQty(p.id, qty - 1)}
+                    className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
+                  >−</button>
+                  <span className="w-6 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
+                  <button
+                    onClick={() => setQty(p.id, qty + 1)}
+                    className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
+                  >+</button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => addToCart(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
                   🛒 Add to Cart
                 </button>
-                <button onClick={() => buyNow(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                <button onClick={() => buyNow(p, qty)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
                   Buy Now
                 </button>
               </div>
@@ -2283,7 +2302,6 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     </div>
   );
 }
-
 function CategoriesTab({ catalog, listings, onAdd }) {
   const [openCat, setOpenCat] = useState(null);
   const categories = Array.from(new Set(catalog.map((p) => p.category || "General")));
