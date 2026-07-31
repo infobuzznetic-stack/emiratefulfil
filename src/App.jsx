@@ -1775,14 +1775,29 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     return <CheckoutForm items={checkoutItems} onBack={() => setView(checkoutFrom)} onSubmit={placeOrder} onUpdateItemPrice={updateCheckoutItemPrice} />;
   }
 
+  const CATEGORY_COLORS = {
+    Electronics: "#3B82F6",
+    Home: "#F8B400",
+    Accessories: "#8B5CF6",
+    Beauty: "#EC4899",
+  };
+  const catColor = (cat) => CATEGORY_COLORS[cat] || "#00C896";
+
   return (
     <div>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
-          <p className="text-sm text-gray-500 mt-1">Click a product to view it, or add it to cart / buy it now for a customer.</p>
+      <div
+        className="rounded-2xl p-6 text-white relative overflow-hidden flex items-start justify-between gap-4 flex-wrap"
+        style={{ background: "linear-gradient(135deg,#0B1F3A,#0F2E52 55%,#00997a)" }}
+      >
+        <div
+          className="absolute -left-8 -bottom-12 w-44 h-44 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(0,200,150,0.3), transparent 70%)" }}
+        />
+        <div className="relative">
+          <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
+          <p className="text-sm text-white/70 mt-1">Click a product to view it, or add it to cart / buy it now for a customer.</p>
         </div>
-        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>
+        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full transition-transform duration-200 hover:scale-105" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff" }}>
           🛒 Cart
           {cartCount > 0 && (
             <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896" }}>{cartCount}</span>
@@ -1790,28 +1805,43 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
         </button>
       </div>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {catalog.map((p, i) => (
-          <div
-            key={p.id}
-            onClick={() => openProduct(p)}
-            className="rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl cursor-pointer"
-            style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.35s ease-out ${i * 40}ms both` }}
-          >
-            <div className="text-4xl transition-transform duration-300 hover:scale-110 inline-block">{p.emoji}</div>
-            <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
-            <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
-            <div className="mt-2 text-lg font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
-            <div className="mt-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => addToCart(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
-                🛒 Add to Cart
-              </button>
-              <button onClick={() => buyNow(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
-                Buy Now
-              </button>
+        {catalog.map((p, i) => {
+          const color = catColor(p.category);
+          return (
+            <div
+              key={p.id}
+              onClick={() => openProduct(p)}
+              className="group relative rounded-2xl p-5 bg-white transition-all duration-300 ease-out hover:-translate-y-1.5 cursor-pointer overflow-hidden"
+              style={{
+                border: "1px solid #E5E7EB",
+                animation: `dashTabIn 0.35s ease-out ${i * 40}ms both`,
+                boxShadow: "0 0 0 rgba(0,0,0,0)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 16px 32px ${color}22`)}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 0 0 rgba(0,0,0,0)")}
+            >
+              <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                style={{ background: `${color}18` }}
+              >
+                {p.emoji}
+              </div>
+              <div className="mt-3 font-semibold text-sm" style={{ color: "#111827" }}>{p.name}</div>
+              <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{p.category}</span>
+              <div className="mt-2 text-lg font-bold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
+              <div className="mt-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => addToCart(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}>
+                  🛒 Add to Cart
+                </button>
+                <button onClick={() => buyNow(p, 1)} className="flex-1 text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                  Buy Now
+                </button>
+              </div>
+              <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1.5 text-gray-500 hover:text-gray-800">View product →</button>
             </div>
-            <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1.5 text-gray-500 hover:text-gray-800">View product →</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
