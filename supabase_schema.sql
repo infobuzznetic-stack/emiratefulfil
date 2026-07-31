@@ -4,8 +4,6 @@ import {
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
-  User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -63,19 +61,6 @@ async function uploadProductImage(file) {
   if (!file.type.startsWith("image/")) return { url: null, error: "Please choose an image file." };
   const ext = file.name.split(".").pop() || "jpg";
   const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error: upErr } = await supabase.storage.from("public-assets").upload(path, file, { upsert: true, cacheControl: "3600" });
-  if (upErr) return { url: null, error: "Could not upload the picture." };
-  const { data } = supabase.storage.from("public-assets").getPublicUrl(path);
-  return { url: data?.publicUrl || null, error: null };
-}
-
-// Same "upload to Supabase Storage" pattern as the logo/product pictures,
-// used for photos attached to ticket messages (seller or Customer Support).
-async function uploadTicketImage(file) {
-  if (!file) return { url: null, error: "No file" };
-  if (!file.type.startsWith("image/")) return { url: null, error: "Please choose an image file." };
-  const ext = file.name.split(".").pop() || "jpg";
-  const path = `tickets/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error: upErr } = await supabase.storage.from("public-assets").upload(path, file, { upsert: true, cacheControl: "3600" });
   if (upErr) return { url: null, error: "Could not upload the picture." };
   const { data } = supabase.storage.from("public-assets").getPublicUrl(path);
@@ -814,50 +799,6 @@ async function fetchOrders(email) {
     createdAt: o.created_at,
   }));
 }
-async function fetchTickets(email) {
-  const { data, error } = await supabase.from("tickets").select("*").eq("seller_email", email).order("created_at", { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data.map((t) => ({ id: t.id, sellerEmail: t.seller_email, sellerName: t.seller_name, subject: t.subject, status: t.status || "open", createdAt: t.created_at }));
-}
-async function fetchAllTickets() {
-  const { data, error } = await supabase.from("tickets").select("*").order("created_at", { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data.map((t) => ({ id: t.id, sellerEmail: t.seller_email, sellerName: t.seller_name, subject: t.subject, status: t.status || "open", createdAt: t.created_at }));
-}
-async function fetchTicketMessages(ticketId) {
-  const { data, error } = await supabase.from("ticket_messages").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: true });
-  if (error) { console.error(error); return []; }
-  return data.map((m) => ({ id: m.id, ticketId: m.ticket_id, sender: m.sender, senderName: m.sender_name, body: m.body, imageUrl: m.image_url, createdAt: m.created_at }));
-}
-
-/* ============================================================
-   SELLER INVOICES (Admin-generated tax invoice per seller)
-   Admin picks specific orders for one seller, edits the fee/VAT/COD/RTC
-   figures per row, and saves a snapshot to seller_invoices — the seller
-   then sees it read-only under their own Invoices tab.
-============================================================ */
-const INVOICE_VAT_RATE = 5; // %
-
-function genInvoiceNumber() {
-  return "INV" + Date.now().toString().slice(-9);
-}
-
-// Orders belonging to one seller that haven't been pulled into an invoice yet.
-async function fetchUninvoicedOrders(email) {
-  const { data, error } = await supabase.from("orders").select("*").eq("seller_email", email).is("invoiced_at", null).order("created_at", { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data.map((o) => ({
-    id: o.id, productName: o.product_name, qty: Number(o.qty),
-    sellPrice: Number(o.sell_price), deliveryCharge: o.delivery_charge != null ? Number(o.delivery_charge) : 0,
-    status: o.status, createdAt: o.created_at,
-  }));
-}
-
-async function fetchSellerInvoices(email) {
-  const { data, error } = await supabase.from("seller_invoices").select("*").eq("seller_email", email).order("created_at", { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data;
-}
 
 /* ============================================================
    TOAST
@@ -1193,17 +1134,6 @@ function Dashboard({ session, onLogout, notify }) {
     });
     if (error) { notify("Could not save order."); return null; }
     setOrders([newOrder, ...orders]);
-
-    // Every order pulls straight from stock, so once enough orders land the
-    // product flips to Out of Stock on its own — Admin never has to zero it
-    // out by hand.
-    const product = catalog.find((p) => p.id === newOrder.productId);
-    if (product) {
-      const newStock = Math.max(0, (Number(product.stock) || 0) - Number(newOrder.qty || 0));
-      const { error: stockError } = await supabase.from("products").update({ stock: newStock }).eq("id", newOrder.productId);
-      if (!stockError) setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
-    }
-
     notify("Order added — tracking as Pending.");
     return newOrder;
   };
@@ -1245,9 +1175,8 @@ function Dashboard({ session, onLogout, notify }) {
     { id: "products", label: "Products", icon: Package },
     { id: "orders", label: "Orders", icon: Truck },
     { id: "invoices", label: "Invoices", icon: Receipt },
-    { id: "settings", label: "Seller Details", icon: Sparkles },
+    { id: "settings", label: "Settings", icon: Sparkles },
     { id: "support", label: "Customer Support", icon: LifeBuoy },
-    { id: "tickets", label: "Tickets", icon: MessageCircle },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
   ];
 
@@ -1260,8 +1189,8 @@ function Dashboard({ session, onLogout, notify }) {
       <aside className="hidden md:flex flex-col w-64 px-5 py-6 min-h-screen relative z-10" style={{ background: "#0B1F3A" }}>
         <div className="flex items-center gap-2.5 px-2">
           <Logo />
-          <span className="font-extrabold text-white text-xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Emirate<span style={{ background: "linear-gradient(90deg,#00C896,#7FE8C9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Fulfil</span>
+          <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
           </span>
         </div>
         <div className="mt-8 space-y-1">
@@ -1284,9 +1213,9 @@ function Dashboard({ session, onLogout, notify }) {
           ))}
         </div>
         <div className="mt-auto pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-          <div className="text-white text-base font-semibold">{session.name}</div>
-          <div className="text-white/40 text-sm">{session.company || "Seller account"}</div>
-          <button onClick={onLogout} className="mt-3 text-white/60 text-sm font-semibold hover:text-white">Log out</button>
+          <div className="text-white text-sm font-semibold">{session.name}</div>
+          <div className="text-white/40 text-xs">{session.company || "Seller account"}</div>
+          <button onClick={onLogout} className="mt-3 text-white/60 text-xs font-semibold hover:text-white">Log out</button>
         </div>
       </aside>
 
@@ -1345,27 +1274,20 @@ function Dashboard({ session, onLogout, notify }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {/* Settings, Support, Tickets, and Admin aren't country-specific, so they stay open regardless of the region switch.
+          {/* Settings, Support, and Admin aren't country-specific, so they stay open regardless of the region switch.
               Every other tab is UAE-only for now — switching to KSA/Qatar shows Coming Soon everywhere. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "support" && tab !== "tickets" && tab !== "admin" && region !== "UAE" && (
+          {tab !== "overview" && tab !== "settings" && tab !== "support" && tab !== "admin" && region !== "UAE" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "support" || tab === "tickets" || region === "UAE") && (
+          {(tab === "settings" || tab === "support" || region === "UAE") && (
             <>
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} onCatalogChanged={reload} />}
               {tab === "orders" && (
-                isAdmin
-                  ? <AdminOrdersPanel notify={notify} />
-                  : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
+                <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
               )}
-              {tab === "invoices" && <InvoicesTab session={session} />}
-              {tab === "settings" && <SettingsTab session={session} notify={notify} />}
+              {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
+              {tab === "settings" && <SettingsTab session={session} />}
               {tab === "support" && <SupportTab session={session} />}
-              {tab === "tickets" && (
-                isAdmin
-                  ? <AdminTicketsPanel notify={notify} />
-                  : <TicketsTab session={session} notify={notify} />
-              )}
             </>
           )}
           {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
@@ -1834,6 +1756,27 @@ function specsForProduct(product) {
   return base;
 }
 
+function reviewsForProduct(product) {
+  const seed = seededFrom(product.id || product.name);
+  const names = ["Amina K.", "Rashid M.", "Sara A.", "Yousef H.", "Fatima R."];
+  const bodies = [
+    "Arrived fast and exactly as described. Packaging was solid, no damage at all.",
+    "Good quality for the price. Would order again for sure.",
+    "Works well, seller was responsive when I had a question about delivery.",
+    "Nice product overall — matches the photos and description closely.",
+    "Delivery was quicker than expected, everything felt well made.",
+  ];
+  const count = 3 + (seed % 3); // 3–5 reviews
+  const avg = 4.2 + ((seed % 8) / 10 - 0.3); // roughly 3.9–4.6
+  const list = Array.from({ length: count }).map((_, i) => ({
+    name: names[(seed + i) % names.length],
+    body: bodies[(seed + i * 3) % bodies.length],
+    rating: 4 + ((seed + i) % 2),
+    daysAgo: 3 + ((seed + i * 7) % 40),
+  }));
+  return { avg: Math.min(5, Math.round(avg * 10) / 10), count, list };
+}
+
 function daysAgoFromDate(iso) {
   if (!iso) return 0;
   const diff = Date.now() - new Date(iso).getTime();
@@ -1875,14 +1818,15 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
     { icon: CreditCard, label: "Cash on Delivery" },
   ];
   const specs = specsForProduct(product);
-  // Reviews are real only — no more auto-generated sample reviews. Until a
-  // product has an actual review (added by Admin), the tab just shows "no
-  // reviews yet" instead of made-up names/ratings.
-  const reviewList = Array.isArray(dbReviews)
+  const sampleReviews = reviewsForProduct(product);
+  const hasRealReviews = Array.isArray(dbReviews) && dbReviews.length > 0;
+  const reviewList = hasRealReviews
     ? dbReviews.map((r) => ({ name: r.name, body: r.body, rating: r.rating, daysAgo: daysAgoFromDate(r.createdAt) }))
-    : [];
-  const count = reviewList.length;
-  const avg = count > 0 ? Math.round((reviewList.reduce((s, r) => s + r.rating, 0) / count) * 10) / 10 : 0;
+    : sampleReviews.list;
+  const count = hasRealReviews ? dbReviews.length : sampleReviews.count;
+  const avg = hasRealReviews
+    ? Math.round((dbReviews.reduce((s, r) => s + r.rating, 0) / dbReviews.length) * 10) / 10
+    : sampleReviews.avg;
   const inStock = (product.stock ?? 0) > 0;
   const related = (catalog || []).filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
   const relatedFallback = related.length > 0 ? related : (catalog || []).filter((p) => p.id !== product.id).slice(0, 4);
@@ -1894,43 +1838,28 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
   ];
 
   return (
-    <div style={{ animation: "dashTabIn 0.3s ease-out both", position: "relative" }}>
-      {/* Soft color wash behind the whole page so it doesn't sit flat on white */}
-      <div className="pointer-events-none absolute -top-10 -left-16 w-[380px] h-[380px] rounded-full opacity-[0.08] blur-3xl" style={{ background: "#00C896" }} />
-      <div className="pointer-events-none absolute top-24 -right-20 w-[340px] h-[340px] rounded-full opacity-[0.07] blur-3xl" style={{ background: "#F8B400" }} />
-
+    <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
       {/* Breadcrumb */}
-      <div className="relative flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
         <button onClick={onBack} className="hover:text-gray-700 font-medium">Products</button>
         <ChevronRight className="w-3.5 h-3.5" />
         <span className="font-semibold" style={{ color: "#0B1F3A" }}>{product.name}</span>
       </div>
 
-      <button onClick={onBack} className="relative text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
+      <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
         <ChevronDown className="w-4 h-4 rotate-90" /> Back to products
       </button>
 
-      <div className="relative mt-5 grid lg:grid-cols-10 gap-6">
+      <div className="mt-5 grid lg:grid-cols-10 gap-6">
         {/* Image column with badge + mini gallery */}
         <div className="lg:col-span-4">
-          <div
-            className="relative rounded-3xl p-4"
-            style={{ background: "linear-gradient(145deg,#0B1F3A 0%,#0F2E52 45%,#0B7A5E 130%)" }}
-          >
-            <div
-              className="pointer-events-none absolute inset-0 rounded-3xl opacity-[0.08]"
-              style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "16px 16px" }}
-            />
-            <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896" }} />
-            <div className="pointer-events-none absolute -bottom-10 -left-10 w-40 h-40 rounded-full opacity-25 blur-3xl" style={{ background: "#F8B400" }} />
-            <div className="relative rounded-2xl bg-white flex items-center justify-center overflow-hidden" style={{ minHeight: 360, boxShadow: "0 20px 45px rgba(0,0,0,0.25)" }}>
-              <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)", boxShadow: "0 6px 16px rgba(248,180,0,0.4)" }}>Best Seller</span>
-              {galleryImages.length > 0 ? (
-                <img src={galleryImages[activeImg] || galleryImages[0]} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
-              ) : (
-                <span style={{ fontSize: 150 }}>{product.emoji}</span>
-              )}
-            </div>
+          <div className="relative rounded-3xl bg-white flex items-center justify-center overflow-hidden" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
+            <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Best Seller</span>
+            {galleryImages.length > 0 ? (
+              <img src={galleryImages[activeImg] || galleryImages[0]} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
+            ) : (
+              <span style={{ fontSize: 150 }}>{product.emoji}</span>
+            )}
           </div>
           {galleryImages.length > 0 && (
             <div className="mt-3 grid grid-cols-4 gap-3">
@@ -1938,52 +1867,14 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
                 <button
                   key={i}
                   onClick={() => setActiveImg(i)}
-                  className="rounded-xl bg-white flex items-center justify-center py-4 overflow-hidden transition-all duration-200"
-                  style={{ border: i === activeImg ? "2px solid #00C896" : "1px solid #E5E7EB", opacity: i === activeImg ? 1 : 0.55, boxShadow: i === activeImg ? "0 6px 16px rgba(0,200,150,0.25)" : "none" }}
+                  className="rounded-xl bg-white flex items-center justify-center py-4 overflow-hidden"
+                  style={{ border: i === activeImg ? "2px solid #00C896" : "1px solid #E5E7EB", opacity: i === activeImg ? 1 : 0.55 }}
                 >
                   <img src={url} alt={`${product.name} ${i + 1}`} className="w-full h-10 object-cover" />
                 </button>
               ))}
             </div>
           )}
-
-          <div
-            className="mt-4 rounded-2xl p-5 relative overflow-hidden"
-            style={{ background: "linear-gradient(160deg, rgba(0,200,150,0.07), rgba(248,180,0,0.05))", border: "1px solid rgba(0,200,150,0.25)", boxShadow: "0 10px 30px rgba(11,31,58,0.06)" }}
-          >
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-gray-500">Quantity</label>
-              <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
-                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
-                <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
-                <button onClick={() => setQty((q) => Math.min((product.stock ?? 0) || 1, q + 1))} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
-              </div>
-            </div>
-            <div className="mt-2 text-sm text-gray-500">
-              Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
-              <span className="ml-1 text-xs text-gray-400">(incl. AED {DELIVERY_CHARGE} delivery)</span>
-            </div>
-
-            <div className="mt-5">
-              <button
-                disabled={!inStock}
-                onClick={() => onBuyNow(qty)}
-                className="w-full text-lg font-extrabold py-5 rounded-2xl text-white transition-transform duration-200 hover:scale-[1.015] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-                style={{ background: inStock ? "linear-gradient(135deg,#00C896,#00a67e)" : "#D1D5DB", boxShadow: inStock ? "0 14px 34px rgba(0,200,150,0.45)" : "none" }}
-              >
-                <Zap className="w-5 h-5" />
-                {inStock ? "Buy Now" : "Out of Stock"}
-              </button>
-              <button
-                disabled={!inStock}
-                onClick={() => onAddToCart(qty)}
-                className="mt-2.5 w-full text-sm font-semibold py-3 rounded-xl bg-white transition-transform duration-200 hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-                style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
-              >
-                🛒 Add to Cart
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="lg:col-span-3">
@@ -1993,21 +1884,14 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
           <h1 className="mt-2 text-2xl md:text-3xl font-extrabold leading-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
 
           <div className="mt-2 flex items-center gap-2">
-            {count > 0 ? (
-              <>
-                <StarRow rating={avg} />
-                <span className="text-xs font-semibold text-gray-600">{avg.toFixed(1)}</span>
-                <span className="text-xs text-gray-400">({count} reviews)</span>
-              </>
-            ) : (
-              <span className="text-xs text-gray-400">No reviews yet</span>
-            )}
+            <StarRow rating={avg} />
+            <span className="text-xs font-semibold text-gray-600">{avg.toFixed(1)}</span>
+            <span className="text-xs text-gray-400">({count} reviews)</span>
           </div>
 
-          <div className="mt-3 flex items-baseline gap-2 flex-wrap">
+          <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</span>
             <span className="text-sm text-gray-300 line-through" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {Math.round(product.sell * 1.35)}</span>
-            <span className="text-xs font-bold px-2 py-1 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Save 26%</span>
             <span
               className="text-xs font-semibold px-2.5 py-1 rounded-full"
               style={inStock ? { background: "rgba(0,200,150,0.12)", color: "#00a67e" } : { background: "rgba(239,68,68,0.1)", color: "#EF4444" }}
@@ -2029,15 +1913,46 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
 
           {/* Trust badges */}
           <div className="mt-5 grid grid-cols-2 gap-2">
-            {trustBadges.map((b, i) => {
-              const badgeColor = ["#00C896", "#F8B400", "#3B82F6", "#8B5CF6"][i % 4];
-              return (
-                <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: `${badgeColor}0D`, border: `1px solid ${badgeColor}30` }}>
-                  <b.icon className="w-4 h-4 flex-shrink-0" style={{ color: badgeColor }} />
-                  <span className="text-xs font-medium" style={{ color: "#0B1F3A" }}>{b.label}</span>
-                </div>
-              );
-            })}
+            {trustBadges.map((b, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+                <b.icon className="w-4 h-4 flex-shrink-0" style={{ color: "#00a67e" }} />
+                <span className="text-xs font-medium text-gray-600">{b.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-2xl p-5" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-semibold text-gray-500">Quantity</label>
+              <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
+                <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
+                <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
+              </div>
+            </div>
+            <div className="mt-2 text-sm text-gray-500">
+              Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
+              <span className="ml-1 text-xs text-gray-400">(incl. AED {DELIVERY_CHARGE} delivery)</span>
+            </div>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-3">
+              <button
+                disabled={!inStock}
+                onClick={() => onAddToCart(qty)}
+                className="flex-1 text-sm font-semibold py-3.5 rounded-full bg-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
+              >
+                🛒 Add to Cart
+              </button>
+              <button
+                disabled={!inStock}
+                onClick={() => onBuyNow(qty)}
+                className="flex-1 text-sm font-semibold py-3.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 24px rgba(0,200,150,0.35)" }}
+              >
+                {inStock ? "Buy Now" : "Out of Stock"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2058,59 +1973,6 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Gulf-wide coverage strip */}
-            <div className="mt-4 pt-4" style={{ borderTop: "1px solid #F3F4F6" }}>
-              <div className="flex items-center gap-2 mb-2.5">
-                <Globe2 className="w-3.5 h-3.5" style={{ color: "#00a67e" }} />
-                <span className="text-[11px] font-bold uppercase tracking-wide text-gray-400">We deliver across the Gulf</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {["UAE", "KSA", "Qatar", "Oman", "Bahrain", "Kuwait"].map((country) => {
-                  const isLive = country === "UAE";
-                  return (
-                    <span
-                      key={country}
-                      title={isLive ? "Available now" : "Coming soon"}
-                      className="text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1"
-                      style={isLive ? { background: "rgba(0,200,150,0.12)", color: "#00a67e", border: "1px solid rgba(0,200,150,0.3)" } : { background: "#F3F4F6", color: "#9CA3AF" }}
-                    >
-                      {isLive && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00C896" }} />}
-                      {country}
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="mt-1.5 text-[10px] text-gray-400">UAE is live now · other countries coming soon</div>
-            </div>
-
-            {/* WhatsApp quick-help card */}
-            <div className="mt-4 rounded-xl p-3.5 relative overflow-hidden" style={{ background: "rgba(37,211,102,0.06)", border: "1px solid rgba(37,211,102,0.25)" }}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,211,102,0.15)" }}>
-                  <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>Need help deciding?</div>
-                  <div className="text-xs text-gray-500">Usually replies within a few minutes</div>
-                </div>
-              </div>
-              <a
-                href="https://wa.me/971568328274"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 flex items-center justify-center gap-2 w-full text-xs font-semibold py-2.5 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
-                style={{ background: "#25D366" }}
-              >
-                Chat on WhatsApp
-              </a>
-            </div>
-
-            {/* Trust seal */}
-            <div className="mt-4 flex items-center justify-center gap-2 text-gray-400">
-              <ShieldCheck className="w-3.5 h-3.5" style={{ color: "#00a67e" }} />
-              <span className="text-[11px] font-medium">Verified seller · Secure Cash on Delivery</span>
             </div>
           </div>
         </div>
@@ -2167,40 +2029,34 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
 
           {tab === "reviews" && (
             <div className="max-w-2xl">
-              {count === 0 ? (
-                <div className="text-sm text-gray-400 py-6">No reviews yet — be the first to order and review this product.</div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-4 pb-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                    <div className="text-4xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>{avg.toFixed(1)}</div>
-                    <div>
-                      <StarRow rating={avg} size="w-4 h-4" />
-                      <div className="text-xs text-gray-400 mt-1">Based on {count} verified orders</div>
+              <div className="flex items-center gap-4 pb-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <div className="text-4xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>{avg.toFixed(1)}</div>
+                <div>
+                  <StarRow rating={avg} size="w-4 h-4" />
+                  <div className="text-xs text-gray-400 mt-1">Based on {count} verified orders</div>
+                </div>
+              </div>
+              <div className="mt-4 space-y-4">
+                {reviewList.map((r, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      style={{ background: `linear-gradient(135deg,#0B1F3A,#00a67e)` }}
+                    >
+                      {r.name.charAt(0)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold" style={{ color: "#111827" }}>{r.name}</span>
+                        <span className="text-xs text-gray-300">·</span>
+                        <span className="text-xs text-gray-400">{r.daysAgo}d ago</span>
+                      </div>
+                      <StarRow rating={r.rating} />
+                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">{r.body}</p>
                     </div>
                   </div>
-                  <div className="mt-4 space-y-4">
-                    {reviewList.map((r, i) => (
-                      <div key={i} className="flex gap-3">
-                        <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                          style={{ background: `linear-gradient(135deg,#0B1F3A,#00a67e)` }}
-                        >
-                          {r.name.charAt(0)}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold" style={{ color: "#111827" }}>{r.name}</span>
-                            <span className="text-xs text-gray-300">·</span>
-                            <span className="text-xs text-gray-400">{r.daysAgo}d ago</span>
-                          </div>
-                          <StarRow rating={r.rating} />
-                          <p className="text-xs text-gray-600 mt-1 leading-relaxed">{r.body}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -2551,28 +2407,20 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     <div>
       <div
         className="rounded-2xl p-6 text-white relative overflow-hidden flex items-start justify-between gap-4 flex-wrap"
-        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}
+        style={{ background: "linear-gradient(135deg,#0B1F3A,#0F2E52 55%,#00997a)" }}
       >
         <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
-        />
-        <div
-          className="absolute -left-8 -bottom-12 w-52 h-52 rounded-full opacity-70 blur-3xl"
-          style={{ background: "rgba(0,200,150,0.3)", animation: "blobMove 9s ease-in-out infinite" }}
-        />
-        <div
-          className="absolute -top-14 right-16 w-40 h-40 rounded-full opacity-40 blur-3xl"
-          style={{ background: "rgba(248,180,0,0.35)", animation: "blobMove 11s ease-in-out infinite reverse" }}
+          className="absolute -left-8 -bottom-12 w-44 h-44 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(0,200,150,0.3), transparent 70%)" }}
         />
         <div className="relative">
           <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
           <p className="text-sm text-white/70 mt-1">Click a product to view it, or add it to cart / buy it now for a customer.</p>
         </div>
-        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full transition-all duration-300 hover:scale-105 active:scale-95" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", backdropFilter: "blur(6px)" }}>
+        <button onClick={() => setView("cart")} className="relative flex-shrink-0 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-full transition-transform duration-200 hover:scale-105" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff" }}>
           🛒 Cart
           {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896", animation: "livePulse 2s infinite" }}>{cartCount}</span>
+            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "#00C896" }}>{cartCount}</span>
           )}
         </button>
       </div>
@@ -2629,37 +2477,25 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             <div
               key={p.id}
               onClick={() => openProduct(p)}
-              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1.5 cursor-pointer overflow-hidden flex flex-col"
+              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1 cursor-pointer overflow-hidden flex flex-col"
               style={{
                 border: "1px solid #E5E7EB",
                 animation: `dashTabIn 0.35s ease-out ${i * 40}ms both`,
                 boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 24px 40px -14px ${color}45`)}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 20px 32px -12px ${color}33`)}
               onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 2px rgba(16,24,40,0.04)")}
             >
-              {/* Gradient accent bar, same touch used across the dashboard's cards */}
-              <div className="absolute top-0 left-0 right-0 h-[3px] z-10" style={{ background: `linear-gradient(90deg, ${color}, ${color}00)` }} />
-
               {/* ── Image ── */}
               <div className="relative w-full aspect-square flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(160deg, ${color}14, ${color}05)` }}>
-                <div className="transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full">
+                <div className="transition-transform duration-500 ease-out group-hover:scale-105 flex items-center justify-center w-full h-full">
                   <ProductThumb product={p} size={56} className="w-full h-full" />
                 </div>
-                {/* Diagonal shine sweep on hover */}
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                  style={{
-                    background: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)",
-                    backgroundSize: "220% 220%",
-                    animation: "shimmer 1.6s ease-in-out",
-                  }}
-                />
                 <span
-                  className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm shadow-sm"
+                  className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm"
                   style={inStock ? { background: "rgba(255,255,255,0.92)", color: "#00a67e" } : { background: "rgba(255,255,255,0.92)", color: "#EF4444" }}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444", animation: inStock ? "livePulse 2s infinite" : "none" }} />
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444" }} />
                   {inStock ? "In Stock" : "Out of Stock"}
                 </span>
                 {isAdmin && (
@@ -2676,12 +2512,9 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 
               {/* ── Content ── */}
               <div className="p-4 flex flex-col flex-1">
-                <span className="inline-block w-fit text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color, background: color + "16" }}>{p.category}</span>
-                <div className="mt-2 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
-                <div
-                  className="mt-2 text-xl font-extrabold"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", background: `linear-gradient(90deg, #0B1F3A, ${color})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
-                >
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{p.category}</span>
+                <div className="mt-1 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
+                <div className="mt-2 text-xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>
                   AED {Number(p.sell).toLocaleString()}
                 </div>
 
@@ -2695,7 +2528,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                     >−</button>
                     <span className="w-6 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
                     <button
-                      onClick={() => setQty(p.id, Math.min((p.stock ?? 0) || 1, qty + 1))}
+                      onClick={() => setQty(p.id, qty + 1)}
                       className="w-7 h-7 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors"
                     >+</button>
                   </div>
@@ -2720,727 +2553,57 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     </div>
   );
 }
-function InvoicesTab({ session }) {
+function InvoicesTab({ orders, session, unpaidInvoice, paidInvoice }) {
+  // Cancelled orders were never billed, so they're excluded from every invoice total below.
+  // Amount billed = product price + the flat delivery charge (delivery isn't seller profit, but it is part of what's invoiced).
+  const billable = orders.filter((o) => o.status !== "cancelled");
+  const totalBilled = billable.reduce((s, o) => s + o.sellPrice * o.qty + (o.deliveryCharge || 0), 0);
   return (
     <div>
-      <div
-        className="rounded-2xl p-6 text-white relative overflow-hidden mb-6"
-        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}
-      >
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
-        />
-        <div
-          className="absolute -top-14 -right-10 w-56 h-56 rounded-full opacity-30 blur-3xl"
-          style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }}
-        />
-        <div
-          className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl"
-          style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }}
-        />
-        <div className="relative flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
-            <Receipt className="w-7 h-7" style={{ color: "#00e0aa" }} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
-            <p className="text-sm text-white/70 mt-1">Tax invoices Admin has created for you show up here.</p>
-          </div>
-        </div>
+      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoices</h1>
+      <p className="text-sm text-gray-500 mt-1">An invoice is generated automatically for every order you log. Admin reviews and approves each one before it counts as Paid.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <StatCard label="Total invoices" value={orders.length} color="#0B1F3A" icon={Receipt} />
+        <StatCard label="Total billed" value={totalBilled} prefix="AED " color="#0B1F3A" icon={ShieldCheck} />
+        <StatCard label="Unpaid invoice" value={unpaidInvoice} prefix="AED " color="#F8B400" icon={Receipt} />
+        <StatCard label="Paid invoice" value={paidInvoice} prefix="AED " color="#00C896" icon={CheckCircle2} />
       </div>
-      <SellerInvoicesPanel email={session.email} showEmptyState />
-    </div>
-  );
-}
-
-// Full branded tax invoice document — shared by Admin (preview/print + mark
-// paid) and Seller (read-only view + print). Rendered as a fixed overlay so
-// it can be opened from anywhere without disturbing the page underneath.
-function InvoiceDocument({ invoice, isAdmin, onClose, onMarkStatus }) {
-  const items = Array.isArray(invoice.items) ? invoice.items : [];
-  return (
-    <div className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto py-8 px-3" style={{ background: "rgba(11,31,58,0.6)" }}>
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .invoice-print-area, .invoice-print-area * { visibility: visible; }
-          .invoice-print-area { position: absolute; top: 0; left: 0; width: 100%; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
-      <div className="w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl">
-        <div className="no-print flex flex-wrap items-center justify-between gap-2 px-5 py-3" style={{ borderBottom: "1px solid #E5E7EB" }}>
-          <span className="text-sm font-semibold" style={{ color: "#0B1F3A" }}>Invoice {invoice.invoice_number}</span>
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <button
-                onClick={() => onMarkStatus(invoice.status === "paid" ? "unpaid" : "paid")}
-                className="text-xs font-semibold px-3 py-1.5 rounded-full text-white"
-                style={{ background: invoice.status === "paid" ? "#6B7280" : "#00C896" }}
-              >
-                {invoice.status === "paid" ? "Mark unpaid" : "Mark paid"}
-              </button>
-            )}
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>
-              <Printer className="w-3.5 h-3.5" /> Print / Save PDF
-            </button>
-            <button onClick={onClose} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Close</button>
-          </div>
-        </div>
-
-        <div className="invoice-print-area p-8" style={{ fontFamily: "Inter, sans-serif" }}>
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2">
-              <Logo box="w-10 h-10" icon="w-5 h-5" />
-              <span className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-start justify-between gap-4 mt-6 text-sm">
-            <div>
-              <div className="text-xs text-gray-400">Store Name</div>
-              <div className="font-bold" style={{ color: "#0B1F3A" }}>{invoice.store_name || "—"}</div>
-              <div className="text-xs text-gray-400 mt-2">Seller Email</div>
-              <div className="text-gray-700">{invoice.seller_email}</div>
-            </div>
-            <div className="text-right">
-              <div className="font-bold" style={{ color: "#0B1F3A" }}>Tax Invoice</div>
-              {invoice.trn_no && <div className="text-xs text-gray-500">TRN No. {invoice.trn_no}</div>}
-              <div className="text-xs text-gray-500 mt-2">Invoice No. {invoice.invoice_number}</div>
-              <div className="text-xs text-gray-500">Dated: {invoice.invoice_date}</div>
-              {invoice.payment_date && <div className="text-xs text-gray-500">Payment Date: {invoice.payment_date}</div>}
-            </div>
-          </div>
-
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-[11px]">
-              <thead>
-                <tr className="text-left" style={{ borderBottom: "2px solid #0B1F3A" }}>
-                  <th className="px-2 py-2">Order Date</th>
-                  <th className="px-2 py-2">Order ID</th>
-                  <th className="px-2 py-2">Product</th>
-                  <th className="px-2 py-2 text-right">Qty</th>
-                  <th className="px-2 py-2 text-right">Sale Price/Unit</th>
-                  <th className="px-2 py-2 text-right">Product Value (A)</th>
-                  <th className="px-2 py-2 text-right">Service Fee (B)</th>
-                  <th className="px-2 py-2 text-right">Value Excl. VAT (A+B)</th>
-                  <th className="px-2 py-2 text-right">VAT {invoice.vat_rate ?? INVOICE_VAT_RATE}%</th>
-                  <th className="px-2 py-2 text-right">Value Incl. VAT</th>
-                  <th className="px-2 py-2 text-right">COD</th>
-                  <th className="px-2 py-2 text-right">RTC Deduction</th>
-                  <th className="px-2 py-2 text-right">Payable</th>
-                  <th className="px-2 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it, i) => (
-                  <tr key={it.orderId || i} style={{ borderBottom: "1px solid #F3F4F6" }}>
-                    <td className="px-2 py-2 whitespace-nowrap">{it.orderDate || "—"}</td>
-                    <td className="px-2 py-2 whitespace-nowrap">{it.orderId}</td>
-                    <td className="px-2 py-2">{it.productName}</td>
-                    <td className="px-2 py-2 text-right">{it.qty}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.salePrice).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.productValue).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.serviceFee).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.exclVat).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.vatAmount).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.inclVat).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.cod).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{Number(it.rtcDeduction).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right font-semibold">{Number(it.payable).toFixed(2)}</td>
-                    <td className="px-2 py-2 capitalize">{it.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="font-bold" style={{ borderTop: "2px solid #0B1F3A" }}>
-                  <td className="px-2 py-2" colSpan={7}>Totals</td>
-                  <td className="px-2 py-2 text-right">{Number(invoice.subtotal_excl_vat).toFixed(2)}</td>
-                  <td className="px-2 py-2 text-right">{Number(invoice.vat_total).toFixed(2)}</td>
-                  <td className="px-2 py-2 text-right">{Number(invoice.subtotal_incl_vat).toFixed(2)}</td>
-                  <td className="px-2 py-2 text-right">{Number(invoice.cod_total).toFixed(2)}</td>
-                  <td className="px-2 py-2 text-right">{Number(invoice.rtc_deductions_total).toFixed(2)}</td>
-                  <td className="px-2 py-2 text-right">{Number(invoice.payable_total ?? invoice.net_payable).toFixed(2)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <div className="flex flex-wrap items-start justify-between gap-4 mt-6">
-            <div className="text-sm">
-              <div className="font-bold" style={{ color: "#0B1F3A" }}>Bank Details</div>
-              <div className="text-xs text-gray-600 mt-1">A/C Title: {invoice.account_title || "—"}</div>
-              <div className="text-xs text-gray-600">A/C No: {invoice.account_number || "—"}</div>
-              <div className="text-xs text-gray-600">Bank Name: {invoice.bank_name || "—"}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-400">Net Payable (AED)</div>
-              <div className="text-2xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{Number(invoice.net_payable).toFixed(2)}</div>
-              <div className="mt-2">
-                <span
-                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                  style={invoice.status === "paid" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}
-                >
-                  {invoice.status === "paid" ? "Paid" : "Unpaid"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {invoice.company_address && <div className="text-xs text-gray-400 mt-6">{invoice.company_address}</div>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Admin-only: build a new invoice for one seller (pick orders with checkboxes,
-// edit fee/COD/RTC per row) and browse that seller's past invoices.
-function SellerInvoiceManager({ seller, notify, onClose }) {
-  const [view, setView] = useState("create"); // create | history
-  const [uninvoiced, setUninvoiced] = useState([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);
-  const [selected, setSelected] = useState({});
-  const [rowEdits, setRowEdits] = useState({});
-  const [vatRate, setVatRate] = useState(INVOICE_VAT_RATE);
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [paymentDate, setPaymentDate] = useState("");
-  const [trnNo, setTrnNo] = useState("");
-  const [companyAddress, setCompanyAddress] = useState("");
-  const [bankOverride, setBankOverride] = useState({
-    bank_name: seller.bank_name || "", account_title: seller.account_title || "", account_number: seller.account_number || "",
-  });
-  const [saving, setSaving] = useState(false);
-
-  const [history, setHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [openInvoice, setOpenInvoice] = useState(null);
-
-  const loadOrders = async () => { setLoadingOrders(true); setUninvoiced(await fetchUninvoicedOrders(seller.email)); setLoadingOrders(false); };
-  const loadHistory = async () => { setHistoryLoading(true); setHistory(await fetchSellerInvoices(seller.email)); setHistoryLoading(false); };
-  useEffect(() => { loadOrders(); loadHistory(); }, []); // eslint-disable-line
-
-  const toggleSelect = (o) => {
-    setSelected((s) => {
-      const next = { ...s };
-      if (next[o.id]) {
-        delete next[o.id];
-      } else {
-        next[o.id] = true;
-        setRowEdits((r) => (r[o.id] ? r : {
-          ...r,
-          [o.id]: {
-            serviceFee: 0,
-            cod: o.status === "delivered" ? (o.sellPrice * o.qty + (o.deliveryCharge || 0)) : 0,
-            rtcDeduction: (o.status === "returned" || o.status === "cancelled") ? -5 : 0,
-          },
-        }));
-      }
-      return next;
-    });
-  };
-  const editRow = (id, field, value) => setRowEdits((r) => ({ ...r, [id]: { ...r[id], [field]: value } }));
-
-  const selectedOrders = uninvoiced.filter((o) => selected[o.id]);
-  const computedItems = selectedOrders.map((o) => {
-    const edit = rowEdits[o.id] || { serviceFee: 0, cod: 0, rtcDeduction: 0 };
-    const serviceFee = Number(edit.serviceFee) || 0;
-    const cod = Number(edit.cod) || 0;
-    const rtcDeduction = Number(edit.rtcDeduction) || 0;
-    const productValue = o.sellPrice * o.qty;
-    const exclVat = productValue + serviceFee;
-    const vatAmount = exclVat * (Number(vatRate) / 100);
-    const inclVat = exclVat + vatAmount;
-    const payable = cod + rtcDeduction;
-    return {
-      orderId: o.id, orderDate: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : "",
-      productName: o.productName, qty: o.qty, salePrice: o.sellPrice, productValue, serviceFee,
-      exclVat, vatAmount, inclVat, cod, rtcDeduction, payable, status: o.status,
-    };
-  });
-  const totals = computedItems.reduce((t, it) => ({
-    excl: t.excl + it.exclVat, vat: t.vat + it.vatAmount, incl: t.incl + it.inclVat,
-    cod: t.cod + it.cod, rtc: t.rtc + it.rtcDeduction, payable: t.payable + it.payable,
-  }), { excl: 0, vat: 0, incl: 0, cod: 0, rtc: 0, payable: 0 });
-
-  const saveInvoice = async () => {
-    if (!computedItems.length) { notify("Select at least one order for this invoice."); return; }
-    setSaving(true);
-    const invoice_number = genInvoiceNumber();
-    const payload = {
-      invoice_number, seller_email: seller.email, store_name: seller.store_name || seller.company || "",
-      trn_no: trnNo || null, invoice_date: invoiceDate, payment_date: paymentDate || null, vat_rate: Number(vatRate) || INVOICE_VAT_RATE,
-      items: computedItems, subtotal_excl_vat: totals.excl, vat_total: totals.vat, subtotal_incl_vat: totals.incl,
-      cod_total: totals.cod, rtc_deductions_total: totals.rtc, payable_total: totals.payable, net_payable: totals.payable,
-      bank_name: bankOverride.bank_name || null, account_title: bankOverride.account_title || null, account_number: bankOverride.account_number || null,
-      company_address: companyAddress || null, status: "unpaid",
-    };
-    const { error } = await supabase.from("seller_invoices").insert(payload);
-    if (error) { console.error(error); notify("Could not create invoice."); setSaving(false); return; }
-    await supabase.from("orders").update({ invoiced_at: new Date().toISOString() }).in("id", selectedOrders.map((o) => o.id));
-    setSaving(false);
-    notify("Invoice created — visible in the seller's Invoices tab now.");
-    setSelected({});
-    setRowEdits({});
-    loadOrders();
-    loadHistory();
-    setView("history");
-  };
-
-  const markStatus = async (invoice, status) => {
-    await supabase.from("seller_invoices").update({ status }).eq("id", invoice.id);
-    setHistory((h) => h.map((x) => (x.id === invoice.id ? { ...x, status } : x)));
-    setOpenInvoice((cur) => (cur && cur.id === invoice.id ? { ...cur, status } : cur));
-    notify(status === "paid" ? "Invoice marked paid." : "Invoice marked unpaid.");
-  };
-
-  return (
-    <>
-      <div className="fixed inset-0 z-[85] flex items-start justify-center overflow-y-auto py-8 px-3" style={{ background: "rgba(11,31,58,0.55)" }}>
-        <div className="w-full max-w-5xl bg-white rounded-2xl overflow-hidden shadow-2xl">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4" style={{ borderBottom: "1px solid #E5E7EB" }}>
-            <div>
-              <div className="text-base font-extrabold" style={{ color: "#0B1F3A" }}>{seller.name || seller.email}</div>
-              <div className="text-xs text-gray-400">{seller.email}</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setView("create")} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={view === "create" ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>Create invoice</button>
-              <button onClick={() => setView("history")} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={view === "history" ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>History ({history.length})</button>
-              <button onClick={onClose} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Close</button>
-            </div>
-          </div>
-
-          <div className="p-6 max-h-[75vh] overflow-y-auto">
-            {view === "create" ? (
-              <>
-                <div className="grid sm:grid-cols-4 gap-3">
-                  <div><label className="text-xs text-gray-500">Invoice date</label><input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-                  <div><label className="text-xs text-gray-500">Payment date</label><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-                  <div><label className="text-xs text-gray-500">TRN No.</label><input value={trnNo} onChange={(e) => setTrnNo(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-                  <div><label className="text-xs text-gray-500">VAT %</label><input type="number" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-                </div>
-                <div className="grid sm:grid-cols-3 gap-3 mt-3">
-                  <div><label className="text-xs text-gray-500">Bank name</label><input value={bankOverride.bank_name} onChange={(e) => setBankOverride({ ...bankOverride, bank_name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-                  <div><label className="text-xs text-gray-500">Account title</label><input value={bankOverride.account_title} onChange={(e) => setBankOverride({ ...bankOverride, account_title: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-                  <div><label className="text-xs text-gray-500">Account / IBAN</label><input value={bankOverride.account_number} onChange={(e) => setBankOverride({ ...bankOverride, account_number: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-                </div>
-                <div className="mt-3"><label className="text-xs text-gray-500">Company address (printed on invoice)</label><input value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-
-                <div className="mt-5">
-                  <div className="text-sm font-bold" style={{ color: "#0B1F3A" }}>Select orders ({uninvoiced.length} not yet invoiced)</div>
-                  {loadingOrders ? (
-                    <div className="text-sm text-gray-400 py-6 text-center">Loading orders…</div>
-                  ) : uninvoiced.length === 0 ? (
-                    <div className="text-sm text-gray-400 py-6 text-center">No un-invoiced orders for this seller.</div>
-                  ) : (
-                    <div className="mt-2 overflow-x-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="text-left text-gray-400" style={{ background: "#F8FAFC" }}>
-                            <th className="px-3 py-2"></th>
-                            <th className="px-3 py-2">Order</th>
-                            <th className="px-3 py-2">Product</th>
-                            <th className="px-3 py-2">Qty</th>
-                            <th className="px-3 py-2">Sale/Unit</th>
-                            <th className="px-3 py-2">Status</th>
-                            <th className="px-3 py-2">Service Fee</th>
-                            <th className="px-3 py-2">COD</th>
-                            <th className="px-3 py-2">RTC Deduction</th>
-                            <th className="px-3 py-2">Payable</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {uninvoiced.map((o) => {
-                            const isSel = !!selected[o.id];
-                            const edit = rowEdits[o.id] || { serviceFee: 0, cod: 0, rtcDeduction: 0 };
-                            const payable = (Number(edit.cod) || 0) + (Number(edit.rtcDeduction) || 0);
-                            return (
-                              <tr key={o.id} style={{ borderTop: "1px solid #F3F4F6" }}>
-                                <td className="px-3 py-2"><input type="checkbox" checked={isSel} onChange={() => toggleSelect(o)} /></td>
-                                <td className="px-3 py-2 text-gray-500">{o.id}</td>
-                                <td className="px-3 py-2">{o.productName}</td>
-                                <td className="px-3 py-2">{o.qty}</td>
-                                <td className="px-3 py-2">{o.sellPrice}</td>
-                                <td className="px-3 py-2 capitalize">{o.status}</td>
-                                <td className="px-3 py-2"><input type="number" disabled={!isSel} value={edit.serviceFee} onChange={(e) => editRow(o.id, "serviceFee", e.target.value)} className="w-20 rounded px-2 py-1" style={{ border: "1px solid #E5E7EB" }} /></td>
-                                <td className="px-3 py-2"><input type="number" disabled={!isSel} value={edit.cod} onChange={(e) => editRow(o.id, "cod", e.target.value)} className="w-20 rounded px-2 py-1" style={{ border: "1px solid #E5E7EB" }} /></td>
-                                <td className="px-3 py-2"><input type="number" disabled={!isSel} value={edit.rtcDeduction} onChange={(e) => editRow(o.id, "rtcDeduction", e.target.value)} className="w-20 rounded px-2 py-1" style={{ border: "1px solid #E5E7EB" }} /></td>
-                                <td className="px-3 py-2 font-semibold">{isSel ? payable.toFixed(2) : "—"}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {computedItems.length > 0 && (
-                  <div className="mt-4 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-                    <div className="text-xs text-gray-500">
-                      {computedItems.length} order{computedItems.length === 1 ? "" : "s"} selected · VAT {vatRate}% · Excl {totals.excl.toFixed(2)} · VAT {totals.vat.toFixed(2)} · Incl {totals.incl.toFixed(2)}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-gray-400">Net payable</div>
-                      <div className="text-lg font-extrabold" style={{ color: "#00C896" }}>AED {totals.payable.toFixed(2)}</div>
-                    </div>
-                    <button onClick={saveInvoice} disabled={saving} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white" style={{ background: "#0B1F3A", opacity: saving ? 0.6 : 1 }}>
-                      {saving ? "Creating…" : "Create invoice"}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div>
-                {historyLoading ? (
-                  <div className="text-sm text-gray-400 py-8 text-center">Loading invoices…</div>
-                ) : history.length === 0 ? (
-                  <div className="text-sm text-gray-400 py-8 text-center">No invoices created for this seller yet.</div>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs text-gray-400" style={{ background: "#F8FAFC" }}>
-                          <th className="px-4 py-2">Invoice #</th>
-                          <th className="px-4 py-2">Date</th>
-                          <th className="px-4 py-2">Net Payable</th>
-                          <th className="px-4 py-2">Status</th>
-                          <th className="px-4 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {history.map((inv) => (
-                          <tr key={inv.id} style={{ borderTop: "1px solid #F3F4F6" }}>
-                            <td className="px-4 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{inv.invoice_number}</td>
-                            <td className="px-4 py-2 text-gray-500">{inv.invoice_date}</td>
-                            <td className="px-4 py-2 font-semibold">AED {Number(inv.net_payable).toFixed(2)}</td>
-                            <td className="px-4 py-2">
-                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={inv.status === "paid" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}>
-                                {inv.status === "paid" ? "Paid" : "Unpaid"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2">
-                              <button onClick={() => setOpenInvoice(inv)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}><Eye className="w-3.5 h-3.5" /> View</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      {openInvoice && (
-        <InvoiceDocument invoice={openInvoice} isAdmin onClose={() => setOpenInvoice(null)} onMarkStatus={(status) => markStatus(openInvoice, status)} />
-      )}
-    </>
-  );
-}
-
-// Seller-facing, read-only: statements Admin has created for this seller —
-// shown at the top of the seller's own Invoices tab, above the per-order list.
-function SellerInvoicesPanel({ email, showEmptyState = false }) {
-  const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [openInvoice, setOpenInvoice] = useState(null);
-
-  useEffect(() => {
-    (async () => { setLoading(true); setInvoices(await fetchSellerInvoices(email)); setLoading(false); })();
-  }, [email]);
-
-  if (loading) {
-    return showEmptyState ? (
-      <div className="rounded-2xl bg-white text-sm text-gray-400 py-14 text-center" style={{ border: "1px solid #E5E7EB" }}>Loading invoices…</div>
-    ) : null;
-  }
-  if (invoices.length === 0) {
-    if (!showEmptyState) return null;
-    return (
-      <div className="flex flex-col items-center justify-center py-14 text-center rounded-2xl bg-white" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.06)" }}>
-          <Receipt className="w-7 h-7" style={{ color: "#9CA3AF" }} />
-        </div>
-        <div className="text-sm text-gray-400">No invoices yet — Admin will create one for you here once it's ready.</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-6">
-      <h2 className="text-base font-extrabold mb-2 flex items-center gap-2" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-        <FileText className="w-4 h-4" /> Statements from Admin
-      </h2>
-      <div className="rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
-              <th className="px-4 py-3">Invoice #</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Net Payable</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} style={{ borderBottom: "1px solid #FAFAFA" }}>
-                <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{inv.invoice_number}</td>
-                <td className="px-4 py-3 text-gray-500">{inv.invoice_date}</td>
-                <td className="px-4 py-3 font-semibold">AED {Number(inv.net_payable).toFixed(2)}</td>
-                <td className="px-4 py-3">
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={inv.status === "paid" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}>
-                    {inv.status === "paid" ? "Paid" : "Unpaid"}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <button onClick={() => setOpenInvoice(inv)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}><Eye className="w-3.5 h-3.5" /> View</button>
-                </td>
+      <div className="mt-6 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+        {orders.length === 0 ? (
+          <div className="text-sm text-gray-400 py-10 text-center">No invoices yet — they appear here once you log an order.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <th className="px-4 py-3">Invoice #</th>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Buyer</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Order status</th>
+                <th className="px-4 py-3">Payment</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {openInvoice && <InvoiceDocument invoice={openInvoice} isAdmin={false} onClose={() => setOpenInvoice(null)} onMarkStatus={() => {}} />}
-    </div>
-  );
-}
-
-function AdminOrdersPanel({ notify }) {
-  const [allOrders, setAllOrders] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  const [trackingDrafts, setTrackingDrafts] = useState({});
-  // Seller bank details, keyed by email — pulled from profiles so the payout
-  // account each seller filled in (and can update from Seller Details) shows
-  // right here next to their orders, no need to jump to the Sellers table.
-  const [sellerBankInfo, setSellerBankInfo] = useState({});
-
-  const loadAllOrders = async () => {
-    setOrdersLoading(true);
-    const [{ data, error }, { data: profiles }] = await Promise.all([
-      supabase.from("orders").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("email, bank_name, account_title, account_number, iban"),
-    ]);
-    if (!error) setAllOrders(data || []);
-    const bankMap = {};
-    (profiles || []).forEach((p) => { if (p.email) bankMap[p.email] = p; });
-    setSellerBankInfo(bankMap);
-    setOrdersLoading(false);
-  };
-  useEffect(() => { loadAllOrders(); }, []); // eslint-disable-line
-
-  const setAdminOrderStatus = async (id, status) => {
-    await supabase.from("orders").update({ status }).eq("id", id);
-    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
-  };
-  const setAdminPaymentStatus = async (id, payment_status) => {
-    await supabase.from("orders").update({ payment_status }).eq("id", id);
-    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, payment_status } : o)));
-    notify && notify(payment_status === "paid" ? "Invoice approved as paid." : "Invoice marked unpaid.");
-  };
-  const saveTracking = async (id) => {
-    const value = trackingDrafts[id] ?? "";
-    await supabase.from("orders").update({ tracking_number: value }).eq("id", id);
-    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, tracking_number: value } : o)));
-    notify && notify("Tracking number saved.");
-  };
-
-  // Group every order by seller, in the order each seller's most recent order appeared —
-  // so the busiest / most-recent seller naturally floats to the top.
-  const sellerGroups = [];
-  const seenSellers = new Map();
-  for (const o of allOrders) {
-    const key = o.seller_email || "Unknown seller";
-    if (!seenSellers.has(key)) {
-      seenSellers.set(key, sellerGroups.length);
-      sellerGroups.push({ seller: key, orders: [] });
-    }
-    sellerGroups[seenSellers.get(key)].orders.push(o);
-  }
-  const SELLER_COLORS = ["#00C896", "#3B82F6", "#F8B400", "#8B5CF6", "#EC4899", "#0B7A5E"];
-
-  return (
-    <div>
-      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
-        />
-        <div className="absolute -top-14 -right-10 w-56 h-56 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
-        <div className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
-        <div className="relative flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
-            <Truck className="w-7 h-7" style={{ color: "#00e0aa" }} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Orders — all sellers</h1>
-            <p className="text-sm text-white/70 mt-1">Every order any seller logs lands here immediately for you to fulfill and update.</p>
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes adminOrdersFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes adminOrderRowFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes sellerGroupFadeIn { from { opacity: 0; transform: translateY(18px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .admin-orders-panel { animation: adminOrdersFadeIn 0.5s cubic-bezier(.2,.7,.2,1) both; }
-        .admin-order-row { opacity: 0; animation: adminOrderRowFadeIn 0.4s cubic-bezier(.2,.7,.2,1) forwards; }
-        .seller-group { opacity: 0; animation: sellerGroupFadeIn 0.5s cubic-bezier(.2,.7,.2,1) forwards; }
-      `}</style>
-
-      {!ordersLoading && allOrders.length > 0 && (
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-gray-500">Update status, approve payments, and save tracking numbers below.</div>
-          <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(0,200,150,0.12)", color: "#00a67e" }}>
-            {allOrders.length} order{allOrders.length === 1 ? "" : "s"} · {sellerGroups.length} seller{sellerGroups.length === 1 ? "" : "s"}
-          </span>
-        </div>
-      )}
-
-      {ordersLoading ? (
-        <div className="rounded-2xl bg-white text-sm text-gray-400 py-10 text-center" style={{ border: "1px solid #E5E7EB" }}>Loading orders…</div>
-      ) : allOrders.length === 0 ? (
-        <div className="rounded-2xl bg-white text-sm text-gray-400 py-10 text-center" style={{ border: "1px solid #E5E7EB" }}>No customer orders yet.</div>
-      ) : (
-        <div className="space-y-6">
-          {sellerGroups.map((group, gi) => {
-            const color = SELLER_COLORS[gi % SELLER_COLORS.length];
-            return (
-              <div
-                key={group.seller}
-                className="seller-group admin-orders-panel rounded-2xl bg-white overflow-hidden"
-                style={{ border: "1px solid #E5E7EB", animationDelay: `${gi * 90}ms`, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
-              >
-                {/* Seller header — colored, one per seller, sits above their own orders */}
-                <div
-                  className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 transition-all duration-300"
-                  style={{ background: `linear-gradient(90deg, ${color}1A, ${color}05)`, borderBottom: `1px solid ${color}30` }}
+            </thead>
+            <tbody>
+              {orders.map((o, i) => (
+                <tr
+                  key={o.id}
+                  className="transition-colors duration-200 hover:bg-gray-50"
+                  style={{ borderBottom: "1px solid #FAFAFA", animation: `dashTabIn 0.3s ease-out ${i * 30}ms both` }}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-extrabold"
-                      style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 6px 14px ${color}40`, fontFamily: "'Space Grotesk', sans-serif" }}
-                    >
-                      {(group.seller[0] || "?").toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-bold text-sm truncate" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{group.seller}</div>
-                      {(() => {
-                        const bank = sellerBankInfo[group.seller];
-                        if (!bank || (!bank.bank_name && !bank.account_number && !bank.iban)) return null;
-                        return (
-                          <div
-                            className="flex items-center gap-1 text-[11px] text-gray-500 truncate mt-0.5"
-                            title={`Account title: ${bank.account_title || "—"}  ·  IBAN: ${bank.iban || "—"}`}
-                          >
-                            <Landmark className="w-3 h-3 flex-shrink-0" style={{ color }} />
-                            <span className="truncate">{bank.bank_name || "—"} · {bank.account_number || "—"}</span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: color + "22", color }}>
-                    {group.orders.length} order{group.orders.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                        <th className="px-4 py-3">Order</th>
-                        <th className="px-4 py-3">Product</th>
-                        <th className="px-4 py-3">Customer</th>
-                        <th className="px-4 py-3">Email / Phone</th>
-                        <th className="px-4 py-3">Address / Emirate</th>
-                        <th className="px-4 py-3">Amount</th>
-                        <th className="px-4 py-3">Profit</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Payment</th>
-                        <th className="px-4 py-3">Tracking #</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.orders.map((o, i) => (
-                        <tr key={o.id} className="admin-order-row transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA", animationDelay: `${gi * 90 + Math.min(i, 20) * 35}ms` }}>
-                          <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
-                          <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
-                          <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
-                          <td className="px-4 py-3 text-gray-500 text-xs">
-                            <div>{o.customer_email || "—"}</div>
-                            <div className="text-gray-400">{o.customer_phone || ""}</div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
-                            <div className="text-gray-700 font-medium">{o.city || "—"}</div>
-                            <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
-                          </td>
-                          <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
-                          <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>
-                            AED {(o.status === "cancelled" || o.status === "returned") ? 0 : (Number(o.sell_price) - Number(o.list_price != null ? o.list_price : o.sell_price)) * o.qty}
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={o.status}
-                              onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
-                              className="text-xs rounded-full px-2 py-1 font-semibold border-0"
-                              style={
-                                o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
-                                o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
-                                o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
-                                o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
-                                { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
-                              }
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="shipped">Shipped</option>
-                              <option value="delivered">Delivered</option>
-                              <option value="cancelled">Cancelled</option>
-                              <option value="returned">Returned</option>
-                            </select>
-                          </td>
-                          <td className="px-4 py-3">
-                            {o.status === "cancelled" ? (
-                              <span className="text-xs text-gray-300">—</span>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <PaymentPill status={o.payment_status} />
-                                {o.payment_status === "paid" ? (
-                                  <button onClick={() => setAdminPaymentStatus(o.id, "unpaid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Undo</button>
-                                ) : (
-                                  <button onClick={() => setAdminPaymentStatus(o.id, "paid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-white" style={{ background: "#00C896" }}>Approve</button>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                defaultValue={o.tracking_number || ""}
-                                onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
-                                placeholder="e.g. AWB123456"
-                                className="w-28 rounded-lg px-2 py-1.5 text-xs"
-                                style={{ border: "1px solid #E5E7EB" }}
-                              />
-                              <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>INV-{o.id}</td>
+                  <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
+                  <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {(o.status === "cancelled" || o.status === "returned") ? "AED 0" : `AED ${o.sellPrice * o.qty + (o.deliveryCharge || 0)}`}
+                  </td>
+                  <td className="px-4 py-3"><StatusPill status={o.status} /></td>
+                  <td className="px-4 py-3">{o.status === "cancelled" ? <span className="text-xs text-gray-300">—</span> : <PaymentPill status={o.paymentStatus} />}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
@@ -3533,229 +2696,25 @@ function WalletTab({ confirmedProfit, pending, notify }) {
   );
 }
 
-function DetailRow({ icon: Icon, label, value, color, delay = 0 }) {
+function SettingsTab({ session }) {
   return (
-    <div
-      className="flex items-start gap-3 py-3 transition-all duration-300"
-      style={{ borderBottom: "1px solid #F3F4F6", animation: `dashTabIn 0.4s ease-out both`, animationDelay: `${delay}ms` }}
-    >
-      <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
-        style={{ background: color + "1A" }}
-      >
-        <Icon className="w-4 h-4" style={{ color }} />
-      </div>
-      <div className="min-w-0">
-        <div className="text-xs text-gray-500">{label}</div>
-        <div className="mt-0.5 text-sm font-semibold truncate" style={{ color: value === "—" ? "#C0C5CE" : "#111827" }}>{value}</div>
-      </div>
-    </div>
-  );
-}
-
-function DetailSection({ title, icon: Icon, color, rows, delay = 0 }) {
-  return (
-    <div
-      className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-0.5"
-      style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)", animation: "dashTabIn 0.45s ease-out both", animationDelay: `${delay}ms` }}
-    >
-      <div className="flex items-center gap-2.5 mb-1">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 6px 14px ${color}40` }}>
-          <Icon className="w-4 h-4 text-white" />
-        </div>
-        <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</div>
-      </div>
-      <div>
-        {rows.map((r, i) => (
-          <DetailRow key={r.label} icon={r.icon} label={r.label} value={r.value} color={color} delay={i * 60} />
+    <div>
+      <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Settings</h1>
+      <p className="text-sm text-gray-500 mt-1">Your account details.</p>
+      <div className="mt-6 rounded-2xl p-6 bg-white max-w-lg space-y-4" style={{ border: "1px solid #E5E7EB" }}>
+        {[
+          ["Full name", session.name], ["Email", session.email], ["Store name", session.storeName || session.company || "—"],
+          ["Country", session.country || "—"], ["Mobile", session.phone || "—"], ["WhatsApp", session.whatsapp || "—"],
+          ["Monthly avg. orders", session.monthlyOrders || "—"], ["Bank name", session.bankName || "—"],
+          ["Account title", session.accountTitle || "—"], ["Account number", session.accountNumber || "—"], ["IBAN", session.iban || "—"],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <label className="text-xs text-gray-500">{label}</label>
+            <div className="mt-1 text-sm font-semibold" style={{ color: "#111827" }}>{value}</div>
+          </div>
         ))}
+        <p className="text-xs text-gray-400 pt-2" style={{ borderTop: "1px solid #F3F4F6" }}>Editing profile fields isn't wired up yet in this prototype — say the word and I'll add it next.</p>
       </div>
-    </div>
-  );
-}
-
-function SettingsTab({ session, notify }) {
-  const initials = (session.name || session.email || "?")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0])
-    .join("")
-    .toUpperCase();
-
-  const personal = [
-    { icon: User, label: "Full name", value: session.name || "—" },
-    { icon: Mail, label: "Email", value: session.email || "—" },
-    { icon: Phone, label: "Mobile", value: session.phone || "—" },
-    { icon: MessageCircle, label: "WhatsApp", value: session.whatsapp || "—" },
-  ];
-  const store = [
-    { icon: Store, label: "Store name", value: session.storeName || session.company || "—" },
-    { icon: Globe2, label: "Country", value: session.country || "—" },
-    { icon: TrendingUp, label: "Monthly avg. orders", value: session.monthlyOrders || "—" },
-  ];
-
-  // Bank details are editable — everything else on this page still isn't.
-  // savedBank reflects what's actually in Supabase; bankForm is the draft
-  // being edited. Saving writes to profiles by email, so Admin's Orders and
-  // Sellers views (which read from the same table) pick up the change too.
-  const [editingBank, setEditingBank] = useState(false);
-  const [savingBank, setSavingBank] = useState(false);
-  const [savedBank, setSavedBank] = useState({
-    bankName: session.bankName || "", accountTitle: session.accountTitle || "",
-    accountNumber: session.accountNumber || "", iban: session.iban || "",
-  });
-  const [bankForm, setBankForm] = useState(savedBank);
-
-  const startEditBank = () => { setBankForm(savedBank); setEditingBank(true); };
-  const cancelEditBank = () => { setEditingBank(false); setBankForm(savedBank); };
-  const updateBankField = (k) => (e) => setBankForm((f) => ({ ...f, [k]: e.target.value }));
-
-  const saveBank = async () => {
-    if (!bankForm.bankName || !bankForm.accountTitle || !bankForm.accountNumber || !bankForm.iban) {
-      notify && notify("Please fill in all bank details.");
-      return;
-    }
-    setSavingBank(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        bank_name: bankForm.bankName, account_title: bankForm.accountTitle,
-        account_number: bankForm.accountNumber, iban: bankForm.iban,
-      })
-      .eq("email", session.email);
-    setSavingBank(false);
-    if (error) { notify && notify("Could not save bank details."); return; }
-    setSavedBank(bankForm);
-    setEditingBank(false);
-    notify && notify("Bank details updated.");
-  };
-
-  const banking = [
-    { icon: Landmark, label: "Bank name", value: savedBank.bankName || "—" },
-    { icon: User, label: "Account title", value: savedBank.accountTitle || "—" },
-    { icon: Hash, label: "Account number", value: savedBank.accountNumber || "—" },
-    { icon: Hash, label: "IBAN", value: savedBank.iban || "—" },
-  ];
-
-  return (
-    <div>
-      {/* Profile header banner, matching the dashboard's visual language */}
-      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
-        />
-        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
-        <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
-
-        <div className="relative flex items-center gap-5">
-          <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-extrabold text-white"
-            style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 10px 24px rgba(0,200,150,0.4)", fontFamily: "'Space Grotesk', sans-serif" }}
-          >
-            {initials}
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {session.name || "Seller"}
-              </h1>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(0,200,150,0.18)", color: "#7FE8C9" }}>
-                <BadgeCheck className="w-3 h-3" /> Verified Seller
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-white/60">{session.storeName || session.company || "Your store"} · {session.country || "UAE"}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-5">
-        <DetailSection title="Personal information" icon={User} color="#3B82F6" rows={personal} delay={0} />
-        <DetailSection title="Store information" icon={Store} color="#F8B400" rows={store} delay={80} />
-        <div className="lg:col-span-2">
-          {!editingBank ? (
-            <div
-              className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-0.5"
-              style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)", animation: "dashTabIn 0.45s ease-out both", animationDelay: "160ms" }}
-            >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#8B5CF6,#8B5CF6CC)", boxShadow: "0 6px 14px #8B5CF640" }}>
-                    <Landmark className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Banking information</div>
-                </div>
-                <button
-                  onClick={startEditBank}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-full transition-transform hover:scale-105"
-                  style={{ background: "rgba(139,92,246,0.12)", color: "#8B5CF6" }}
-                >
-                  Edit
-                </button>
-              </div>
-              <div>
-                {banking.map((r, i) => (
-                  <DetailRow key={r.label} icon={r.icon} label={r.label} value={r.value} color="#8B5CF6" delay={i * 60} />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div
-              className="rounded-2xl p-6 bg-white"
-              style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
-            >
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#8B5CF6,#8B5CF6CC)", boxShadow: "0 6px 14px #8B5CF640" }}>
-                  <Landmark className="w-4 h-4 text-white" />
-                </div>
-                <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Edit banking information</div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <LightField label="Bank name" value={bankForm.bankName} onChange={updateBankField("bankName")} />
-                <LightField label="Account title" value={bankForm.accountTitle} onChange={updateBankField("accountTitle")} />
-                <LightField label="Account number" value={bankForm.accountNumber} onChange={updateBankField("accountNumber")} />
-                <LightField label="IBAN" value={bankForm.iban} onChange={updateBankField("iban")} />
-              </div>
-              <div className="flex items-center gap-2 mt-5">
-                <button
-                  onClick={saveBank}
-                  disabled={savingBank}
-                  className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
-                  style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: savingBank ? 0.6 : 1 }}
-                >
-                  {savingBank ? "Saving…" : "Save changes"}
-                </button>
-                <button
-                  onClick={cancelEditBank}
-                  disabled={savingBank}
-                  className="text-sm font-semibold px-5 py-2.5 rounded-full"
-                  style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <p className="text-xs text-gray-400 mt-5 px-1">Personal and store details aren't editable yet — only banking information can be updated for now.</p>
-    </div>
-  );
-}
-
-// Light-background input used on the Seller Details page (unlike Field,
-// which is styled for the dark Auth page).
-function LightField({ label, type = "text", value, onChange, placeholder }) {
-  return (
-    <div>
-      <label className="text-xs text-gray-500">{label}</label>
-      <input
-        type={type} value={value} onChange={onChange} placeholder={placeholder}
-        className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none"
-        style={{ background: "#F8FAFC", border: "1px solid #E5E7EB", color: "#111827" }}
-      />
     </div>
   );
 }
@@ -3785,8 +2744,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [sellers, setSellers] = useState([]);
   const [sellersLoading, setSellersLoading] = useState(true);
   const [sellerSearch, setSellerSearch] = useState("");
-  // Which seller's invoice-builder modal is open (create + history) — null when closed.
-  const [invoiceManagerSeller, setInvoiceManagerSeller] = useState(null);
 
   // Site logo: pick a picture from your computer, it's uploaded to Supabase
   // Storage and saved as the shared logo everyone sees (navbar, footer,
@@ -3844,6 +2801,27 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       approval_status === "deactivated" ? "Seller deactivated — they can no longer log in." :
       "Seller status updated."
     );
+  };
+
+  const setAdminOrderStatus = async (id, status) => {
+    await supabase.from("orders").update({ status }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
+  };
+
+  // Only Admin can approve an invoice as Paid — this is what moves it out of
+  // the seller's "Unpaid invoice" box and into "Paid invoice".
+  const setAdminPaymentStatus = async (id, payment_status) => {
+    await supabase.from("orders").update({ payment_status }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, payment_status } : o)));
+    notify(payment_status === "paid" ? "Invoice approved as paid." : "Invoice marked unpaid.");
+  };
+
+  const [trackingDrafts, setTrackingDrafts] = useState({});
+  const saveTracking = async (id) => {
+    const value = trackingDrafts[id] ?? "";
+    await supabase.from("orders").update({ tracking_number: value }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, tracking_number: value } : o)));
+    notify("Tracking number saved.");
   };
 
   const addProduct = async (e) => {
@@ -3987,8 +2965,115 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <StatCard label="Customer orders (all sellers)" value={allOrders.length} color="#F8B400" />
       </div>
 
-      {/* Full order management for every seller now lives under the "Orders"
-          tab in the sidebar (shown there for Admin logins) — see AdminOrdersPanel. */}
+      {/* Every order every seller has logged — moved to the top of Admin so
+          it's the first thing you see, with a fade/slide-in entrance and a
+          staggered row animation each time the list loads or refreshes. */}
+      <style>{`
+        @keyframes adminOrdersFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes adminOrderRowFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .admin-orders-panel { animation: adminOrdersFadeIn 0.5s cubic-bezier(.2,.7,.2,1) both; }
+        .admin-order-row { opacity: 0; animation: adminOrderRowFadeIn 0.4s cubic-bezier(.2,.7,.2,1) forwards; }
+      `}</style>
+      <div className="admin-orders-panel mt-6 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="px-5 pt-5 pb-1 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer orders — all sellers</div>
+            <p className="text-xs text-gray-400 mt-1">Every order any seller logs lands here immediately for you to fulfill and update.</p>
+          </div>
+          {!ordersLoading && allOrders.length > 0 && (
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(0,200,150,0.12)", color: "#00a67e" }}>
+              {allOrders.length} order{allOrders.length === 1 ? "" : "s"} · {new Set(allOrders.map((o) => o.seller_email)).size} seller{new Set(allOrders.map((o) => o.seller_email)).size === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        {ordersLoading ? (
+          <div className="text-sm text-gray-400 py-10 text-center">Loading orders…</div>
+        ) : allOrders.length === 0 ? (
+          <div className="text-sm text-gray-400 py-10 text-center">No customer orders yet.</div>
+        ) : (
+          <table className="w-full text-sm mt-3">
+            <thead>
+              <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <th className="px-4 py-3">Order</th>
+                <th className="px-4 py-3">Seller</th>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Email / Phone</th>
+                <th className="px-4 py-3">Address / Emirate</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Payment</th>
+                <th className="px-4 py-3">Tracking #</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allOrders.map((o, i) => (
+                <tr key={o.id} className="admin-order-row transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA", animationDelay: `${Math.min(i, 20) * 35}ms` }}>
+                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
+                  <td className="px-4 py-3 text-gray-500">{o.seller_email}</td>
+                  <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
+                  <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    <div>{o.customer_email || "—"}</div>
+                    <div className="text-gray-400">{o.customer_phone || ""}</div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
+                    <div className="text-gray-700 font-medium">{o.city || "—"}</div>
+                    <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
+                  </td>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={o.status}
+                      onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
+                      className="text-xs rounded-full px-2 py-1 font-semibold border-0"
+                      style={
+                        o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
+                        o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
+                        o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
+                        o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
+                        { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
+                      }
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="returned">Returned</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    {o.status === "cancelled" ? (
+                      <span className="text-xs text-gray-300">—</span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <PaymentPill status={o.payment_status} />
+                        {o.payment_status === "paid" ? (
+                          <button onClick={() => setAdminPaymentStatus(o.id, "unpaid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Undo</button>
+                        ) : (
+                          <button onClick={() => setAdminPaymentStatus(o.id, "paid")} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-white" style={{ background: "#00C896" }}>Approve</button>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        defaultValue={o.tracking_number || ""}
+                        onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
+                        placeholder="e.g. AWB123456"
+                        className="w-28 rounded-lg px-2 py-1.5 text-xs"
+                        style={{ border: "1px solid #E5E7EB" }}
+                      />
+                      <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* Site logo: upload a picture from your computer to replace the default icon everywhere */}
       <div className="mt-6 rounded-2xl bg-white p-5" style={{ border: "1px solid #E5E7EB" }}>
@@ -4049,7 +3134,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <th className="px-4 py-3">Signed up</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Approval</th>
-                  <th className="px-4 py-3">Invoices</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "#F3F4F6" }}>
@@ -4107,15 +3191,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => setInvoiceManagerSeller(s)}
-                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full"
-                        style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}
-                      >
-                        <FileText className="w-3.5 h-3.5" /> Invoices
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -4123,10 +3198,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           </div>
         )}
       </div>
-
-      {invoiceManagerSeller && (
-        <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
-      )}
 
       <form onSubmit={addProduct} className="mt-8 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
         <div className="sm:col-span-2"><label className="text-xs text-gray-500">Product name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
@@ -4279,29 +3350,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   );
 }
 
-function SupportChannelCard({ icon, iconBg, title, subtitle, action, delay = 0 }) {
-  return (
-    <div
-      className="rounded-2xl p-6 bg-white transition-all duration-500 hover:-translate-y-1 hover:shadow-lg"
-      style={{ border: "1px solid #E5E7EB", animation: "dashTabIn 0.45s ease-out both", animationDelay: `${delay}ms` }}
-    >
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</div>
-          <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>
-        </div>
-      </div>
-      {action}
-    </div>
-  );
-}
-
 function SupportTab({ session }) {
-  const email = "info.buzznetic@gmail.com";
-  const address = "99 Al Waha St - Al Qouz Third - Al Quoz - Dubai - United Arab Emirates";
   return (
     <div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
@@ -4309,8 +3358,7 @@ function SupportTab({ session }) {
           className="absolute inset-0 opacity-[0.07]"
           style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         />
-        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
-        <div className="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896" }} />
         <div className="relative flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
             <LifeBuoy className="w-7 h-7" style={{ color: "#00e0aa" }} />
@@ -4322,587 +3370,25 @@ function SupportTab({ session }) {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <SupportChannelCard
-          delay={0}
-          iconBg="rgba(37,211,102,0.12)"
-          icon={<svg viewBox="0 0 24 24" className="w-6 h-6" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>}
-          title="WhatsApp support"
-          subtitle="+971 56 832 8274 · replies within minutes"
-          action={
-            <a
-              href="https://wa.me/971568328274"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
-              style={{ background: "#25D366" }}
-            >
-              Chat on WhatsApp
-            </a>
-          }
-        />
-
-        <SupportChannelCard
-          delay={90}
-          iconBg="rgba(59,130,246,0.12)"
-          icon={<Mail className="w-6 h-6" style={{ color: "#3B82F6" }} />}
-          title="Email support"
-          subtitle="We reply within one business day."
-          action={
-            <a
-              href={`mailto:${email}`}
-              className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
-              style={{ background: "#3B82F6" }}
-            >
-              {email}
-            </a>
-          }
-        />
-
-        <SupportChannelCard
-          delay={180}
-          iconBg="rgba(248,180,0,0.15)"
-          icon={<MapPin className="w-6 h-6" style={{ color: "#F8B400" }} />}
-          title="Our office"
-          subtitle="Dubai, United Arab Emirates"
-          action={
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 flex items-center justify-center gap-2 w-full text-xs sm:text-sm font-semibold py-3 rounded-full text-white text-center transition-transform duration-200 hover:scale-[1.02] active:scale-95 leading-snug px-2"
-              style={{ background: "#F8B400" }}
-            >
-              {address}
-            </a>
-          }
-        />
-      </div>
-    </div>
-  );
-}
-
-function TicketStatusPill({ status }) {
-  const resolved = status === "resolved";
-  return (
-    <span
-      className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
-      style={resolved ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}
-    >
-      {resolved ? "Resolved" : "Open"}
-    </span>
-  );
-}
-
-// Shared chat-thread UI used by both the seller's ticket view and the
-// admin's ticket panel — bubbles align right for whoever is currently
-// looking at the thread, left for the other side.
-function TicketThread({ messages, loading, viewerRole }) {
-  if (loading) return <div className="text-xs text-gray-400 text-center py-6">Loading conversation…</div>;
-  if (!messages || messages.length === 0) return <div className="text-xs text-gray-400 text-center py-6">No messages yet.</div>;
-  return (
-    <div className="space-y-3">
-      {messages.map((m) => {
-        const mine = m.sender === viewerRole;
-        return (
-          <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-            <div
-              className="max-w-[80%] rounded-2xl px-4 py-2.5"
-              style={
-                mine
-                  ? { background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#fff", borderBottomRightRadius: 4 }
-                  : { background: "#F8FAFC", border: "1px solid #E5E7EB", color: "#111827", borderBottomLeftRadius: 4 }
-              }
-            >
-              <div className={`text-[10px] font-semibold mb-0.5 ${mine ? "text-white/70" : "text-gray-400"}`}>
-                {m.sender === "admin" ? "Customer Support" : m.senderName || "Seller"}
-              </div>
-              {m.imageUrl && (
-                <img
-                  src={m.imageUrl}
-                  alt="Attachment"
-                  className="rounded-xl max-w-full mb-1.5"
-                  style={{ maxHeight: 240, cursor: "pointer" }}
-                  onClick={() => window.open(m.imageUrl, "_blank")}
-                />
-              )}
-              {m.body && <div className="text-sm leading-relaxed whitespace-pre-wrap">{m.body}</div>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TicketsTab({ session, notify }) {
-  const [tickets, setTickets] = useState([]);
-  const [ticketsLoading, setTicketsLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState(null);
-  const [messages, setMessages] = useState({});
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [reply, setReply] = useState("");
-  const [sending, setSending] = useState(false);
-  const [showNewForm, setShowNewForm] = useState(false);
-  const [newSubject, setNewSubject] = useState("");
-  const [newBody, setNewBody] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const loadTickets = async () => {
-    setTicketsLoading(true);
-    setTickets(await fetchTickets(session.email));
-    setTicketsLoading(false);
-  };
-  useEffect(() => { loadTickets(); }, []); // eslint-disable-line
-
-  const openTicket = async (id) => {
-    setSelectedId(id);
-    if (!messages[id]) {
-      setMessagesLoading(true);
-      const list = await fetchTicketMessages(id);
-      setMessages((prev) => ({ ...prev, [id]: list }));
-      setMessagesLoading(false);
-    }
-  };
-
-  const createTicket = async () => {
-    if (!newSubject.trim() || !newBody.trim()) { notify && notify("Add a subject and a message."); return; }
-    setCreating(true);
-    const id = "TCK" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10);
-    const { error } = await supabase.from("tickets").insert({
-      id, seller_email: session.email, seller_name: session.name || session.email, subject: newSubject.trim(), status: "open",
-    });
-    if (error) { setCreating(false); notify && notify("Could not create ticket."); return; }
-    const { error: msgError } = await supabase.from("ticket_messages").insert({
-      ticket_id: id, sender: "seller", sender_name: session.name || session.email, body: newBody.trim(),
-    });
-    setCreating(false);
-    if (msgError) { notify && notify("Ticket created, but the message failed to send."); }
-    const newTicket = { id, sellerEmail: session.email, sellerName: session.name || session.email, subject: newSubject.trim(), status: "open", createdAt: new Date().toISOString() };
-    setTickets((prev) => [newTicket, ...prev]);
-    setMessages((prev) => ({ ...prev, [id]: [{ id: "local-" + id, ticketId: id, sender: "seller", senderName: session.name || session.email, body: newBody.trim(), createdAt: new Date().toISOString() }] }));
-    setNewSubject(""); setNewBody(""); setShowNewForm(false);
-    setSelectedId(id);
-    notify && notify("Ticket created — Customer Support will reply here.");
-  };
-
-  const sendReply = async () => {
-    if (!reply.trim() || !selectedId) return;
-    setSending(true);
-    const { error } = await supabase.from("ticket_messages").insert({
-      ticket_id: selectedId, sender: "seller", sender_name: session.name || session.email, body: reply.trim(),
-    });
-    // A seller replying to a resolved ticket reopens it, so it lands back in Admin's open queue.
-    const ticket = tickets.find((t) => t.id === selectedId);
-    if (!error && ticket?.status === "resolved") {
-      await supabase.from("tickets").update({ status: "open" }).eq("id", selectedId);
-      setTickets((prev) => prev.map((t) => (t.id === selectedId ? { ...t, status: "open" } : t)));
-    }
-    setSending(false);
-    if (error) { notify && notify("Could not send message."); return; }
-    setMessages((prev) => ({
-      ...prev,
-      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "seller", senderName: session.name || session.email, body: reply.trim(), createdAt: new Date().toISOString() }],
-    }));
-    setReply("");
-  };
-
-  const sendImage = async (file) => {
-    if (!file || !selectedId) return;
-    setUploadingImage(true);
-    const { url, error: upErr } = await uploadTicketImage(file);
-    if (upErr) { setUploadingImage(false); notify && notify(upErr); return; }
-    const { error } = await supabase.from("ticket_messages").insert({
-      ticket_id: selectedId, sender: "seller", sender_name: session.name || session.email, body: "", image_url: url,
-    });
-    // A seller replying to a resolved ticket reopens it, so it lands back in Customer Support's open queue.
-    const ticket = tickets.find((t) => t.id === selectedId);
-    if (!error && ticket?.status === "resolved") {
-      await supabase.from("tickets").update({ status: "open" }).eq("id", selectedId);
-      setTickets((prev) => prev.map((t) => (t.id === selectedId ? { ...t, status: "open" } : t)));
-    }
-    setUploadingImage(false);
-    if (error) { notify && notify("Could not send the picture."); return; }
-    setMessages((prev) => ({
-      ...prev,
-      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "seller", senderName: session.name || session.email, body: "", imageUrl: url, createdAt: new Date().toISOString() }],
-    }));
-  };
-
-  const selectedTicket = tickets.find((t) => t.id === selectedId);
-
-  return (
-    <div>
-      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
-        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
-        <div className="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
-        <div className="relative flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
-              <span className="absolute inset-0 rounded-2xl" style={{ boxShadow: "0 0 0 1px rgba(0,224,170,0.35)" }} />
-              <MessageCircle className="w-7 h-7" style={{ color: "#00e0aa" }} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tickets</h1>
-              <p className="text-sm text-white/60 mt-1">Raise an issue and chat with Customer Support directly until it's resolved.</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowNewForm((v) => !v)}
-            className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95"
-            style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 22px rgba(0,200,150,0.35)" }}
-          >
-            {showNewForm ? "Cancel" : "+ New ticket"}
-          </button>
-        </div>
-      </div>
-
-      {showNewForm && (
-        <div className="relative overflow-hidden rounded-2xl bg-white p-5 mb-6 animate-[dashTabIn_0.35s_ease-out]" style={{ border: "1px solid #E5E7EB", boxShadow: "0 12px 30px rgba(11,31,58,0.06)" }}>
-          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: "linear-gradient(90deg,#00C896,#F8B400)" }} />
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
-              <Sparkles className="w-[18px] h-[18px]" style={{ color: "#00a67e" }} />
-            </div>
-            <div className="font-bold text-sm" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Raise a new ticket</div>
-          </div>
-          <div className="space-y-3.5">
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Subject</label>
-              <input
-                value={newSubject}
-                onChange={(e) => setNewSubject(e.target.value)}
-                placeholder="e.g. Payout for order ORD123456 is late"
-                className="mt-1.5 w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
-                style={{ border: "1px solid #E5E7EB" }}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Message</label>
-              <textarea
-                value={newBody}
-                onChange={(e) => setNewBody(e.target.value)}
-                rows={4}
-                placeholder="Describe the issue in detail…"
-                className="mt-1.5 w-full rounded-xl px-4 py-2.5 text-sm outline-none resize-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
-                style={{ border: "1px solid #E5E7EB" }}
-              />
-            </div>
-            <button
-              onClick={createTicket}
-              disabled={creating}
-              className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95 disabled:hover:scale-100"
-              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: creating ? 0.6 : 1, boxShadow: "0 8px 20px rgba(0,200,150,0.3)" }}
-            >
-              {creating ? "Submitting…" : "Submit ticket"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="grid lg:grid-cols-5 gap-5">
-        {/* Ticket list */}
-        <div className="lg:col-span-2 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB", boxShadow: "0 12px 30px rgba(11,31,58,0.05)" }}>
-          <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: "1px solid #F3F4F6" }}>
-            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Your tickets</span>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(11,31,58,0.06)", color: "#0B1F3A" }}>{tickets.length}</span>
-          </div>
-          {ticketsLoading ? (
-            <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
-          ) : tickets.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.05)" }}>
-                <MessageCircle className="w-6 h-6" style={{ color: "#9CA3AF" }} />
-              </div>
-              <div className="text-sm text-gray-400">No tickets yet — raise one if you need help.</div>
-            </div>
-          ) : (
-            <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
-              {tickets.map((t) => {
-                const isSelected = selectedId === t.id;
-                const isOpen = t.status !== "resolved";
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => openTicket(t.id)}
-                    className="relative w-full text-left px-5 py-4 flex items-start gap-3 transition-all duration-200 hover:bg-gray-50"
-                    style={isSelected ? { background: "rgba(0,200,150,0.06)" } : {}}
-                  >
-                    {isSelected && <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: "linear-gradient(180deg,#00C896,#00a67e)" }} />}
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ background: isOpen ? "linear-gradient(135deg,#F8B400,#e0a200)" : "linear-gradient(135deg,#00C896,#00a67e)" }}
-                    >
-                      <MessageCircle className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold truncate" style={{ color: "#111827" }}>{t.subject}</span>
-                        <TicketStatusPill status={t.status} />
-                      </div>
-                      <div className="text-[11px] text-gray-400 mt-1">{t.id} · {new Date(t.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Conversation */}
-        <div className="lg:col-span-3 rounded-2xl bg-white overflow-hidden flex flex-col" style={{ border: "1px solid #E5E7EB", minHeight: 360, boxShadow: "0 12px 30px rgba(11,31,58,0.05)" }}>
-          {!selectedTicket ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(0,200,150,0.08)" }}>
-                <MessageCircle className="w-7 h-7" style={{ color: "#00a67e" }} />
-              </div>
-              <div className="text-sm text-gray-400">Select a ticket to see the conversation.</div>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-3 px-5 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#0B1F3A,#0F2E52)" }}>
-                    <LifeBuoy className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>{selectedTicket.subject}</div>
-                    <div className="text-[11px] text-gray-400">{selectedTicket.id}</div>
-                  </div>
-                </div>
-                <TicketStatusPill status={selectedTicket.status} />
-              </div>
-              <div className="flex-1 p-5 overflow-y-auto" style={{ maxHeight: 420, background: "linear-gradient(180deg,#FAFBFC,#ffffff)" }}>
-                <TicketThread messages={messages[selectedId]} loading={messagesLoading} viewerRole="seller" />
-              </div>
-              <div className="p-4 flex items-center gap-2" style={{ borderTop: "1px solid #F3F4F6" }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) sendImage(f); e.target.value = ""; }}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage}
-                  title="Attach a picture"
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
-                  style={{ border: "1px solid #E5E7EB", color: uploadingImage ? "#00a67e" : "#6B7280" }}
-                >
-                  <ImagePlus className={`w-4 h-4 ${uploadingImage ? "animate-pulse" : ""}`} />
-                </button>
-                <input
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
-                  placeholder="Type a reply…"
-                  className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
-                  style={{ border: "1px solid #E5E7EB" }}
-                />
-                <button onClick={sendReply} disabled={sending || !reply.trim()} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 6px 16px rgba(0,200,150,0.3)" }}>
-                  Send
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminTicketsPanel({ notify }) {
-  const [tickets, setTickets] = useState([]);
-  const [ticketsLoading, setTicketsLoading] = useState(true);
-  const [filter, setFilter] = useState("open"); // all | open | resolved
-  const [selectedId, setSelectedId] = useState(null);
-  const [messages, setMessages] = useState({});
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [reply, setReply] = useState("");
-  const [sending, setSending] = useState(false);
-  const [resolving, setResolving] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const loadTickets = async () => {
-    setTicketsLoading(true);
-    setTickets(await fetchAllTickets());
-    setTicketsLoading(false);
-  };
-  useEffect(() => { loadTickets(); }, []); // eslint-disable-line
-
-  const openTicket = async (id) => {
-    setSelectedId(id);
-    if (!messages[id]) {
-      setMessagesLoading(true);
-      const list = await fetchTicketMessages(id);
-      setMessages((prev) => ({ ...prev, [id]: list }));
-      setMessagesLoading(false);
-    }
-  };
-
-  const sendReply = async () => {
-    if (!reply.trim() || !selectedId) return;
-    setSending(true);
-    const { error } = await supabase.from("ticket_messages").insert({
-      ticket_id: selectedId, sender: "admin", sender_name: "Customer Support", body: reply.trim(),
-    });
-    setSending(false);
-    if (error) { notify && notify("Could not send message."); return; }
-    setMessages((prev) => ({
-      ...prev,
-      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Customer Support", body: reply.trim(), createdAt: new Date().toISOString() }],
-    }));
-    setReply("");
-  };
-
-  const sendImage = async (file) => {
-    if (!file || !selectedId) return;
-    setUploadingImage(true);
-    const { url, error: upErr } = await uploadTicketImage(file);
-    if (upErr) { setUploadingImage(false); notify && notify(upErr); return; }
-    const { error } = await supabase.from("ticket_messages").insert({
-      ticket_id: selectedId, sender: "admin", sender_name: "Customer Support", body: "", image_url: url,
-    });
-    setUploadingImage(false);
-    if (error) { notify && notify("Could not send the picture."); return; }
-    setMessages((prev) => ({
-      ...prev,
-      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Customer Support", body: "", imageUrl: url, createdAt: new Date().toISOString() }],
-    }));
-  };
-
-  const toggleResolve = async (id, currentStatus) => {
-    const nextStatus = currentStatus === "resolved" ? "open" : "resolved";
-    setResolving(true);
-    const { error } = await supabase.from("tickets").update({ status: nextStatus }).eq("id", id);
-    setResolving(false);
-    if (error) { notify && notify("Could not update ticket status."); return; }
-    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
-    notify && notify(nextStatus === "resolved" ? "Ticket marked resolved." : "Ticket reopened.");
-  };
-
-  const selectedTicket = tickets.find((t) => t.id === selectedId);
-  const filteredTickets = tickets.filter((t) => (filter === "all" ? true : t.status === filter));
-  const openCount = tickets.filter((t) => t.status !== "resolved").length;
-
-  return (
-    <div>
-      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
-        <div className="absolute -top-14 -right-10 w-56 h-56 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
-        <div className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
-        <div className="relative flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
-            <MessageCircle className="w-7 h-7" style={{ color: "#00e0aa" }} />
+      <div className="rounded-2xl p-6 bg-white max-w-md" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,211,102,0.12)" }}>
+            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tickets — all sellers</h1>
-            <p className="text-sm text-white/70 mt-1">{openCount} open ticket{openCount === 1 ? "" : "s"} waiting on a reply.</p>
+            <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>WhatsApp support</div>
+            <div className="text-xs text-gray-400 mt-0.5">Usually replies within a few minutes.</div>
           </div>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 mb-4">
-        {[{ id: "open", label: "Open" }, { id: "resolved", label: "Resolved" }, { id: "all", label: "All" }].map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className="text-xs font-semibold px-3.5 py-2 rounded-full transition-colors"
-            style={filter === f.id ? { background: "#0B1F3A", color: "#fff" } : { background: "#F3F4F6", color: "#6B7280" }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid lg:grid-cols-5 gap-5">
-        {/* Ticket list */}
-        <div className="lg:col-span-2 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
-          {ticketsLoading ? (
-            <div className="p-6 text-center text-sm text-gray-400">Loading tickets…</div>
-          ) : filteredTickets.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-400">No tickets here.</div>
-          ) : (
-            <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
-              {filteredTickets.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => openTicket(t.id)}
-                  className="w-full text-left px-5 py-3.5 transition-colors hover:bg-gray-50"
-                  style={selectedId === t.id ? { background: "rgba(0,200,150,0.06)" } : {}}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold truncate" style={{ color: "#111827" }}>{t.subject}</span>
-                    <TicketStatusPill status={t.status} />
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-1 truncate">{t.sellerName || t.sellerEmail} · {t.sellerEmail}</div>
-                  <div className="text-[11px] text-gray-300 mt-0.5">{t.id} · {new Date(t.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Conversation */}
-        <div className="lg:col-span-3 rounded-2xl bg-white overflow-hidden flex flex-col" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
-          {!selectedTicket ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">Select a ticket to see the conversation.</div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-2 px-5 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <div className="min-w-0">
-                  <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>{selectedTicket.subject}</div>
-                  <div className="text-[11px] text-gray-400 truncate">{selectedTicket.sellerName || selectedTicket.sellerEmail} · {selectedTicket.sellerEmail}</div>
-                </div>
-                <button
-                  onClick={() => toggleResolve(selectedTicket.id, selectedTicket.status)}
-                  disabled={resolving}
-                  className="text-xs font-semibold px-3.5 py-2 rounded-full flex-shrink-0"
-                  style={selectedTicket.status === "resolved" ? { border: "1px solid #E5E7EB", color: "#6B7280" } : { background: "#00C896", color: "#fff" }}
-                >
-                  {selectedTicket.status === "resolved" ? "Reopen" : "Mark resolved"}
-                </button>
-              </div>
-              <div className="flex-1 p-5 overflow-y-auto" style={{ maxHeight: 420 }}>
-                <TicketThread messages={messages[selectedId]} loading={messagesLoading} viewerRole="admin" />
-              </div>
-              <div className="p-4 flex items-center gap-2" style={{ borderTop: "1px solid #F3F4F6" }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) sendImage(f); e.target.value = ""; }}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage}
-                  title="Attach a picture"
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40"
-                  style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}
-                >
-                  <ImagePlus className="w-4 h-4" />
-                </button>
-                <input
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
-                  placeholder="Reply as Customer Support…"
-                  className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
-                  style={{ border: "1px solid #E5E7EB" }}
-                />
-                <button onClick={sendReply} disabled={sending || !reply.trim()} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105 disabled:opacity-40" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
-                  Send
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        <a
+          href="https://wa.me/971568328274"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+          style={{ background: "#25D366" }}
+        >
+          Chat on WhatsApp · +971 56 832 8274
+        </a>
       </div>
     </div>
   );
