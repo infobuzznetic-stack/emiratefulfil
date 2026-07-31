@@ -1230,11 +1230,47 @@ function writeLocal(key, value) {
 }
 
 /* ============================================================
+   URL ROUTING — keeps the address bar in sync with the current
+   page/tab (e.g. /dashboard/products) instead of always staying
+   on "/", so refreshing or sharing a link lands on the right page.
+============================================================ */
+const DASHBOARD_TABS = ["overview", "products", "orders", "invoices", "settings", "support", "tickets", "admin"];
+
+function pathToRoute(pathname) {
+  const parts = pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+  if (parts.length === 0) return { view: "home", tab: null };
+  if (parts[0] === "signup") return { view: "signup", tab: null };
+  if (parts[0] === "login") return { view: "login", tab: null };
+  if (parts[0] === "forgot-password") return { view: "forgot", tab: null };
+  if (parts[0] === "reset-password") return { view: "reset-password", tab: null };
+  if (parts[0] === "dashboard") {
+    const tab = DASHBOARD_TABS.includes(parts[1]) ? parts[1] : null;
+    return { view: "dashboard", tab };
+  }
+  return { view: "home", tab: null };
+}
+
+function routeToPath(view, tab) {
+  if (view === "signup") return "/signup";
+  if (view === "login") return "/login";
+  if (view === "forgot") return "/forgot-password";
+  if (view === "reset-password") return "/reset-password";
+  if (view === "dashboard") return tab ? `/dashboard/${tab}` : "/dashboard";
+  return "/";
+}
+
+/* ============================================================
    SELLER DASHBOARD
 ============================================================ */
-function Dashboard({ session, onLogout, notify }) {
+function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   const isAdmin = ADMIN_EMAILS.includes(session.email);
-  const [tab, setTab] = useState(() => readLocal("ef_tab", "overview"));
+  // Initial tab comes from the URL (e.g. landing on /dashboard/products)
+  // when present, otherwise falls back to whatever tab was last used.
+  const [tab, setTabRaw] = useState(() => initialTab || readLocal("ef_tab", "overview"));
+  const setTab = (t) => { setTabRaw(t); onTabChange && onTabChange(t); };
+  // Let the parent know the actual starting tab right after mount, so the
+  // address bar reflects it even when it came from localStorage rather than the URL.
+  useEffect(() => { onTabChange && onTabChange(tab); }, []); // eslint-disable-line
   const [region, setRegion] = useState("UAE"); // UAE | KSA — which country's dashboard is showing
   const [catalog, setCatalog] = useState([]);
   const [listings, setListings] = useState([]);
@@ -5034,7 +5070,12 @@ function FloatingWhatsApp() {
 
 export default function EmirateFulfilApp() {
   useGoogleFonts();
-  const [view, setView] = useState("home"); // home | signup | login | forgot | reset-password | dashboard
+  const initialRoute = pathToRoute(window.location.pathname);
+  const [view, setView] = useState(initialRoute.view); // home | signup | login | forgot | reset-password | dashboard
+  const [dashboardTab, setDashboardTab] = useState(initialRoute.tab); // synced with /dashboard/<tab> in the URL
+  const [dashRemountKey, setDashRemountKey] = useState(0); // bumped on browser back/forward so Dashboard re-reads the URL's tab
+  const isFirstRoute = useRef(true);
+  const fromPopstate = useRef(false);
   const [session, setSession] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -5044,6 +5085,31 @@ export default function EmirateFulfilApp() {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), msg.length > 60 ? 5000 : 2600);
   };
+
+  // Keep the address bar in sync with view/tab. Skips the very first render
+  // (the URL already matches on initial load) and skips right after a
+  // browser back/forward navigation (that already changed the URL — pushing
+  // again would break the back button).
+  useEffect(() => {
+    if (isFirstRoute.current) { isFirstRoute.current = false; return; }
+    if (fromPopstate.current) { fromPopstate.current = false; return; }
+    const path = routeToPath(view, dashboardTab);
+    if (path !== window.location.pathname) window.history.pushState(null, "", path);
+  }, [view, dashboardTab]);
+
+  // Handle the browser's Back/Forward buttons — re-read the URL and update
+  // our state to match, remounting the Dashboard so it picks up the tab.
+  useEffect(() => {
+    const onPopState = () => {
+      const route = pathToRoute(window.location.pathname);
+      fromPopstate.current = true;
+      setView(route.view);
+      setDashboardTab(route.tab);
+      setDashRemountKey((k) => k + 1);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   // Load the custom logo (if the admin has uploaded one) so it shows up
   // everywhere immediately — no login required, works on the public homepage.
@@ -5097,12 +5163,15 @@ export default function EmirateFulfilApp() {
             });
             setView("dashboard");
           }
+        } else if (view === "dashboard") {
+          // URL pointed straight at /dashboard but there's no session — bounce to login instead of a blank page.
+          setView("login");
         }
       } finally {
         setCheckingAuth(false);
       }
     });
-  }, []);
+  }, []); // eslint-disable-line
 
   // Backup for the same recovery case — if the link is opened while the
   // page is already loaded (rare, but possible), this listener catches the
@@ -5129,7 +5198,9 @@ export default function EmirateFulfilApp() {
       {view === "reset-password" && (
         <ResetPasswordPage notify={notify} onDone={() => { supabase.auth.signOut(); setView("login"); }} />
       )}
-      {view === "dashboard" && session && <Dashboard session={session} onLogout={handleLogout} notify={notify} />}
+      {view === "dashboard" && session && (
+        <Dashboard key={dashRemountKey} session={session} onLogout={handleLogout} notify={notify} initialTab={dashboardTab} onTabChange={setDashboardTab} />
+      )}
       <FloatingWhatsApp />
     </LogoContext.Provider>
   );
