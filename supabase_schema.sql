@@ -201,3 +201,30 @@ create policy "public-assets uploadable by signed in users" on storage.objects
 drop policy if exists "public-assets updatable by signed in users" on storage.objects;
 create policy "public-assets updatable by signed in users" on storage.objects
   for update using (bucket_id = 'public-assets' and auth.role() = 'authenticated');
+
+-- 6. Product reviews — Admin can add/edit/delete reviews shown on each
+--    product's storefront page (Reviews tab). Until a product has at least
+--    one real review here, the storefront falls back to sample reviews so
+--    pages don't look empty.
+create table if not exists reviews (
+  id bigint generated always as identity primary key,
+  product_id text not null references products(id) on delete cascade,
+  name text not null,
+  rating int not null default 5 check (rating between 1 and 5),
+  body text not null,
+  created_at timestamptz default now()
+);
+alter table reviews enable row level security;
+
+drop policy if exists "reviews readable by anyone signed in" on reviews;
+create policy "reviews readable by anyone signed in" on reviews
+  for select using (auth.role() = 'authenticated');
+drop policy if exists "reviews writable by anyone signed in" on reviews;
+create policy "reviews writable by anyone signed in" on reviews
+  for insert with check (auth.role() = 'authenticated');
+drop policy if exists "reviews updatable by anyone signed in" on reviews;
+create policy "reviews updatable by anyone signed in" on reviews
+  for update using (auth.role() = 'authenticated');
+drop policy if exists "reviews deletable by anyone signed in" on reviews;
+create policy "reviews deletable by anyone signed in" on reviews
+  for delete using (auth.role() = 'authenticated');
