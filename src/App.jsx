@@ -800,6 +800,21 @@ async function fetchOrders(email) {
     createdAt: o.created_at,
   }));
 }
+async function fetchTickets(email) {
+  const { data, error } = await supabase.from("tickets").select("*").eq("seller_email", email).order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data.map((t) => ({ id: t.id, sellerEmail: t.seller_email, sellerName: t.seller_name, subject: t.subject, status: t.status || "open", createdAt: t.created_at }));
+}
+async function fetchAllTickets() {
+  const { data, error } = await supabase.from("tickets").select("*").order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data.map((t) => ({ id: t.id, sellerEmail: t.seller_email, sellerName: t.seller_name, subject: t.subject, status: t.status || "open", createdAt: t.created_at }));
+}
+async function fetchTicketMessages(ticketId) {
+  const { data, error } = await supabase.from("ticket_messages").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: true });
+  if (error) { console.error(error); return []; }
+  return data.map((m) => ({ id: m.id, ticketId: m.ticket_id, sender: m.sender, senderName: m.sender_name, body: m.body, createdAt: m.created_at }));
+}
 
 /* ============================================================
    TOAST
@@ -1189,6 +1204,7 @@ function Dashboard({ session, onLogout, notify }) {
     { id: "invoices", label: "Invoices", icon: Receipt },
     { id: "settings", label: "Seller Details", icon: Sparkles },
     { id: "support", label: "Customer Support", icon: LifeBuoy },
+    { id: "tickets", label: "Tickets", icon: MessageCircle },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
   ];
 
@@ -1286,12 +1302,12 @@ function Dashboard({ session, onLogout, notify }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {/* Settings, Support, and Admin aren't country-specific, so they stay open regardless of the region switch.
+          {/* Settings, Support, Tickets, and Admin aren't country-specific, so they stay open regardless of the region switch.
               Every other tab is UAE-only for now — switching to KSA/Qatar shows Coming Soon everywhere. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "support" && tab !== "admin" && region !== "UAE" && (
+          {tab !== "overview" && tab !== "settings" && tab !== "support" && tab !== "tickets" && tab !== "admin" && region !== "UAE" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "support" || region === "UAE") && (
+          {(tab === "settings" || tab === "support" || tab === "tickets" || region === "UAE") && (
             <>
               {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} onCatalogChanged={reload} />}
               {tab === "orders" && (
@@ -1302,6 +1318,11 @@ function Dashboard({ session, onLogout, notify }) {
               {tab === "invoices" && <InvoicesTab orders={orders} session={session} unpaidInvoice={unpaidInvoice} paidInvoice={paidInvoice} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
               {tab === "support" && <SupportTab session={session} />}
+              {tab === "tickets" && (
+                isAdmin
+                  ? <AdminTicketsPanel notify={notify} />
+                  : <TicketsTab session={session} notify={notify} />
+              )}
             </>
           )}
           {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
@@ -3836,6 +3857,395 @@ function SupportTab({ session }) {
             </a>
           }
         />
+      </div>
+    </div>
+  );
+}
+
+function TicketStatusPill({ status }) {
+  const resolved = status === "resolved";
+  return (
+    <span
+      className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
+      style={resolved ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } : { background: "rgba(248,180,0,0.15)", color: "#b07d00" }}
+    >
+      {resolved ? "Resolved" : "Open"}
+    </span>
+  );
+}
+
+// Shared chat-thread UI used by both the seller's ticket view and the
+// admin's ticket panel — bubbles align right for whoever is currently
+// looking at the thread, left for the other side.
+function TicketThread({ messages, loading, viewerRole }) {
+  if (loading) return <div className="text-xs text-gray-400 text-center py-6">Loading conversation…</div>;
+  if (!messages || messages.length === 0) return <div className="text-xs text-gray-400 text-center py-6">No messages yet.</div>;
+  return (
+    <div className="space-y-3">
+      {messages.map((m) => {
+        const mine = m.sender === viewerRole;
+        return (
+          <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+            <div
+              className="max-w-[80%] rounded-2xl px-4 py-2.5"
+              style={
+                mine
+                  ? { background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#fff", borderBottomRightRadius: 4 }
+                  : { background: "#F8FAFC", border: "1px solid #E5E7EB", color: "#111827", borderBottomLeftRadius: 4 }
+              }
+            >
+              <div className={`text-[10px] font-semibold mb-0.5 ${mine ? "text-white/70" : "text-gray-400"}`}>
+                {m.sender === "admin" ? "Admin" : m.senderName || "Seller"}
+              </div>
+              <div className="text-sm leading-relaxed whitespace-pre-wrap">{m.body}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TicketsTab({ session, notify }) {
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
+  const [messages, setMessages] = useState({});
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newSubject, setNewSubject] = useState("");
+  const [newBody, setNewBody] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const loadTickets = async () => {
+    setTicketsLoading(true);
+    setTickets(await fetchTickets(session.email));
+    setTicketsLoading(false);
+  };
+  useEffect(() => { loadTickets(); }, []); // eslint-disable-line
+
+  const openTicket = async (id) => {
+    setSelectedId(id);
+    if (!messages[id]) {
+      setMessagesLoading(true);
+      const list = await fetchTicketMessages(id);
+      setMessages((prev) => ({ ...prev, [id]: list }));
+      setMessagesLoading(false);
+    }
+  };
+
+  const createTicket = async () => {
+    if (!newSubject.trim() || !newBody.trim()) { notify && notify("Add a subject and a message."); return; }
+    setCreating(true);
+    const id = "TCK" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10);
+    const { error } = await supabase.from("tickets").insert({
+      id, seller_email: session.email, seller_name: session.name || session.email, subject: newSubject.trim(), status: "open",
+    });
+    if (error) { setCreating(false); notify && notify("Could not create ticket."); return; }
+    const { error: msgError } = await supabase.from("ticket_messages").insert({
+      ticket_id: id, sender: "seller", sender_name: session.name || session.email, body: newBody.trim(),
+    });
+    setCreating(false);
+    if (msgError) { notify && notify("Ticket created, but the message failed to send."); }
+    const newTicket = { id, sellerEmail: session.email, sellerName: session.name || session.email, subject: newSubject.trim(), status: "open", createdAt: new Date().toISOString() };
+    setTickets((prev) => [newTicket, ...prev]);
+    setMessages((prev) => ({ ...prev, [id]: [{ id: "local-" + id, ticketId: id, sender: "seller", senderName: session.name || session.email, body: newBody.trim(), createdAt: new Date().toISOString() }] }));
+    setNewSubject(""); setNewBody(""); setShowNewForm(false);
+    setSelectedId(id);
+    notify && notify("Ticket created — Admin will reply here.");
+  };
+
+  const sendReply = async () => {
+    if (!reply.trim() || !selectedId) return;
+    setSending(true);
+    const { error } = await supabase.from("ticket_messages").insert({
+      ticket_id: selectedId, sender: "seller", sender_name: session.name || session.email, body: reply.trim(),
+    });
+    // A seller replying to a resolved ticket reopens it, so it lands back in Admin's open queue.
+    const ticket = tickets.find((t) => t.id === selectedId);
+    if (!error && ticket?.status === "resolved") {
+      await supabase.from("tickets").update({ status: "open" }).eq("id", selectedId);
+      setTickets((prev) => prev.map((t) => (t.id === selectedId ? { ...t, status: "open" } : t)));
+    }
+    setSending(false);
+    if (error) { notify && notify("Could not send message."); return; }
+    setMessages((prev) => ({
+      ...prev,
+      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "seller", senderName: session.name || session.email, body: reply.trim(), createdAt: new Date().toISOString() }],
+    }));
+    setReply("");
+  };
+
+  const selectedTicket = tickets.find((t) => t.id === selectedId);
+
+  return (
+    <div>
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full opacity-25 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
+        <div className="relative flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+              <MessageCircle className="w-7 h-7" style={{ color: "#00e0aa" }} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tickets</h1>
+              <p className="text-sm text-white/60 mt-1">Raise an issue and chat with Admin directly until it's resolved.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowNewForm((v) => !v)}
+            className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
+            style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}
+          >
+            {showNewForm ? "Cancel" : "+ New ticket"}
+          </button>
+        </div>
+      </div>
+
+      {showNewForm && (
+        <div className="rounded-2xl bg-white p-5 mb-6" style={{ border: "1px solid #E5E7EB" }}>
+          <div className="font-bold text-sm mb-3" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>New ticket</div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-gray-500">Subject</label>
+              <input value={newSubject} onChange={(e) => setNewSubject(e.target.value)} placeholder="e.g. Payout for order ORD123456 is late" className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none" style={{ border: "1px solid #E5E7EB" }} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Message</label>
+              <textarea value={newBody} onChange={(e) => setNewBody(e.target.value)} rows={4} placeholder="Describe the issue in detail…" className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none resize-none" style={{ border: "1px solid #E5E7EB" }} />
+            </div>
+            <button onClick={createTicket} disabled={creating} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: creating ? 0.6 : 1 }}>
+              {creating ? "Submitting…" : "Submit ticket"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid lg:grid-cols-5 gap-5">
+        {/* Ticket list */}
+        <div className="lg:col-span-2 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+          <div className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+            Your tickets ({tickets.length})
+          </div>
+          {ticketsLoading ? (
+            <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
+          ) : tickets.length === 0 ? (
+            <div className="p-6 text-center text-sm text-gray-400">No tickets yet — raise one if you need help.</div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
+              {tickets.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => openTicket(t.id)}
+                  className="w-full text-left px-5 py-3.5 transition-colors hover:bg-gray-50"
+                  style={selectedId === t.id ? { background: "rgba(0,200,150,0.06)" } : {}}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold truncate" style={{ color: "#111827" }}>{t.subject}</span>
+                    <TicketStatusPill status={t.status} />
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-1">{t.id} · {new Date(t.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Conversation */}
+        <div className="lg:col-span-3 rounded-2xl bg-white overflow-hidden flex flex-col" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
+          {!selectedTicket ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">Select a ticket to see the conversation.</div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 px-5 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>{selectedTicket.subject}</div>
+                  <div className="text-[11px] text-gray-400">{selectedTicket.id}</div>
+                </div>
+                <TicketStatusPill status={selectedTicket.status} />
+              </div>
+              <div className="flex-1 p-5 overflow-y-auto" style={{ maxHeight: 420 }}>
+                <TicketThread messages={messages[selectedId]} loading={messagesLoading} viewerRole="seller" />
+              </div>
+              <div className="p-4 flex items-center gap-2" style={{ borderTop: "1px solid #F3F4F6" }}>
+                <input
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
+                  placeholder="Type a reply…"
+                  className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
+                  style={{ border: "1px solid #E5E7EB" }}
+                />
+                <button onClick={sendReply} disabled={sending || !reply.trim()} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105 disabled:opacity-40" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                  Send
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminTicketsPanel({ notify }) {
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(true);
+  const [filter, setFilter] = useState("open"); // all | open | resolved
+  const [selectedId, setSelectedId] = useState(null);
+  const [messages, setMessages] = useState({});
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [resolving, setResolving] = useState(false);
+
+  const loadTickets = async () => {
+    setTicketsLoading(true);
+    setTickets(await fetchAllTickets());
+    setTicketsLoading(false);
+  };
+  useEffect(() => { loadTickets(); }, []); // eslint-disable-line
+
+  const openTicket = async (id) => {
+    setSelectedId(id);
+    if (!messages[id]) {
+      setMessagesLoading(true);
+      const list = await fetchTicketMessages(id);
+      setMessages((prev) => ({ ...prev, [id]: list }));
+      setMessagesLoading(false);
+    }
+  };
+
+  const sendReply = async () => {
+    if (!reply.trim() || !selectedId) return;
+    setSending(true);
+    const { error } = await supabase.from("ticket_messages").insert({
+      ticket_id: selectedId, sender: "admin", sender_name: "Admin", body: reply.trim(),
+    });
+    setSending(false);
+    if (error) { notify && notify("Could not send message."); return; }
+    setMessages((prev) => ({
+      ...prev,
+      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Admin", body: reply.trim(), createdAt: new Date().toISOString() }],
+    }));
+    setReply("");
+  };
+
+  const toggleResolve = async (id, currentStatus) => {
+    const nextStatus = currentStatus === "resolved" ? "open" : "resolved";
+    setResolving(true);
+    const { error } = await supabase.from("tickets").update({ status: nextStatus }).eq("id", id);
+    setResolving(false);
+    if (error) { notify && notify("Could not update ticket status."); return; }
+    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
+    notify && notify(nextStatus === "resolved" ? "Ticket marked resolved." : "Ticket reopened.");
+  };
+
+  const selectedTicket = tickets.find((t) => t.id === selectedId);
+  const filteredTickets = tickets.filter((t) => (filter === "all" ? true : t.status === filter));
+  const openCount = tickets.filter((t) => t.status !== "resolved").length;
+
+  return (
+    <div>
+      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-6" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
+        <div className="absolute -top-14 -right-10 w-56 h-56 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        <div className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
+            <MessageCircle className="w-7 h-7" style={{ color: "#00e0aa" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tickets — all sellers</h1>
+            <p className="text-sm text-white/70 mt-1">{openCount} open ticket{openCount === 1 ? "" : "s"} waiting on a reply.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        {[{ id: "open", label: "Open" }, { id: "resolved", label: "Resolved" }, { id: "all", label: "All" }].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            className="text-xs font-semibold px-3.5 py-2 rounded-full transition-colors"
+            style={filter === f.id ? { background: "#0B1F3A", color: "#fff" } : { background: "#F3F4F6", color: "#6B7280" }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-5 gap-5">
+        {/* Ticket list */}
+        <div className="lg:col-span-2 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+          {ticketsLoading ? (
+            <div className="p-6 text-center text-sm text-gray-400">Loading tickets…</div>
+          ) : filteredTickets.length === 0 ? (
+            <div className="p-6 text-center text-sm text-gray-400">No tickets here.</div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
+              {filteredTickets.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => openTicket(t.id)}
+                  className="w-full text-left px-5 py-3.5 transition-colors hover:bg-gray-50"
+                  style={selectedId === t.id ? { background: "rgba(0,200,150,0.06)" } : {}}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold truncate" style={{ color: "#111827" }}>{t.subject}</span>
+                    <TicketStatusPill status={t.status} />
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-1 truncate">{t.sellerName || t.sellerEmail} · {t.sellerEmail}</div>
+                  <div className="text-[11px] text-gray-300 mt-0.5">{t.id} · {new Date(t.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Conversation */}
+        <div className="lg:col-span-3 rounded-2xl bg-white overflow-hidden flex flex-col" style={{ border: "1px solid #E5E7EB", minHeight: 360 }}>
+          {!selectedTicket ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">Select a ticket to see the conversation.</div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 px-5 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>{selectedTicket.subject}</div>
+                  <div className="text-[11px] text-gray-400 truncate">{selectedTicket.sellerName || selectedTicket.sellerEmail} · {selectedTicket.sellerEmail}</div>
+                </div>
+                <button
+                  onClick={() => toggleResolve(selectedTicket.id, selectedTicket.status)}
+                  disabled={resolving}
+                  className="text-xs font-semibold px-3.5 py-2 rounded-full flex-shrink-0"
+                  style={selectedTicket.status === "resolved" ? { border: "1px solid #E5E7EB", color: "#6B7280" } : { background: "#00C896", color: "#fff" }}
+                >
+                  {selectedTicket.status === "resolved" ? "Reopen" : "Mark resolved"}
+                </button>
+              </div>
+              <div className="flex-1 p-5 overflow-y-auto" style={{ maxHeight: 420 }}>
+                <TicketThread messages={messages[selectedId]} loading={messagesLoading} viewerRole="admin" />
+              </div>
+              <div className="p-4 flex items-center gap-2" style={{ borderTop: "1px solid #F3F4F6" }}>
+                <input
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
+                  placeholder="Reply as Admin…"
+                  className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
+                  style={{ border: "1px solid #E5E7EB" }}
+                />
+                <button onClick={sendReply} disabled={sending || !reply.trim()} className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105 disabled:opacity-40" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                  Send
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
