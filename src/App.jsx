@@ -1916,6 +1916,44 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
               ))}
             </div>
           )}
+
+          <div
+            className="mt-4 rounded-2xl p-5 relative overflow-hidden"
+            style={{ background: "linear-gradient(160deg, rgba(0,200,150,0.07), rgba(248,180,0,0.05))", border: "1px solid rgba(0,200,150,0.25)", boxShadow: "0 10px 30px rgba(11,31,58,0.06)" }}
+          >
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-semibold text-gray-500">Quantity</label>
+              <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
+                <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
+                <button onClick={() => setQty((q) => Math.min((product.stock ?? 0) || 1, q + 1))} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
+              </div>
+            </div>
+            <div className="mt-2 text-sm text-gray-500">
+              Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
+              <span className="ml-1 text-xs text-gray-400">(incl. AED {DELIVERY_CHARGE} delivery)</span>
+            </div>
+
+            <div className="mt-5">
+              <button
+                disabled={!inStock}
+                onClick={() => onBuyNow(qty)}
+                className="w-full text-lg font-extrabold py-5 rounded-2xl text-white transition-transform duration-200 hover:scale-[1.015] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                style={{ background: inStock ? "linear-gradient(135deg,#00C896,#00a67e)" : "#D1D5DB", boxShadow: inStock ? "0 14px 34px rgba(0,200,150,0.45)" : "none" }}
+              >
+                <Zap className="w-5 h-5" />
+                {inStock ? "Buy Now" : "Out of Stock"}
+              </button>
+              <button
+                disabled={!inStock}
+                onClick={() => onAddToCart(qty)}
+                className="mt-2.5 w-full text-sm font-semibold py-3 rounded-xl bg-white transition-transform duration-200 hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
+              >
+                🛒 Add to Cart
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="lg:col-span-3">
@@ -1971,44 +2009,6 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
               );
             })}
           </div>
-
-          <div
-            className="mt-6 rounded-2xl p-5 relative overflow-hidden"
-            style={{ background: "linear-gradient(160deg, rgba(0,200,150,0.07), rgba(248,180,0,0.05))", border: "1px solid rgba(0,200,150,0.25)", boxShadow: "0 10px 30px rgba(11,31,58,0.06)" }}
-          >
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-gray-500">Quantity</label>
-              <div className="flex items-center rounded-full bg-white" style={{ border: "1px solid #E5E7EB" }}>
-                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 text-sm font-bold text-gray-600">−</button>
-                <span className="w-8 text-center text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{qty}</span>
-                <button onClick={() => setQty((q) => Math.min((product.stock ?? 0) || 1, q + 1))} className="w-9 h-9 text-sm font-bold text-gray-600">+</button>
-              </div>
-            </div>
-            <div className="mt-2 text-sm text-gray-500">
-              Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
-              <span className="ml-1 text-xs text-gray-400">(incl. AED {DELIVERY_CHARGE} delivery)</span>
-            </div>
-
-            <div className="mt-5">
-              <button
-                disabled={!inStock}
-                onClick={() => onBuyNow(qty)}
-                className="w-full text-lg font-extrabold py-5 rounded-2xl text-white transition-transform duration-200 hover:scale-[1.015] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-                style={{ background: inStock ? "linear-gradient(135deg,#00C896,#00a67e)" : "#D1D5DB", boxShadow: inStock ? "0 14px 34px rgba(0,200,150,0.45)" : "none" }}
-              >
-                <Zap className="w-5 h-5" />
-                {inStock ? "Buy Now" : "Out of Stock"}
-              </button>
-              <button
-                disabled={!inStock}
-                onClick={() => onAddToCart(qty)}
-                className="mt-2.5 w-full text-sm font-semibold py-3 rounded-xl bg-white transition-transform duration-200 hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-                style={{ border: "1px solid #0B1F3A", color: "#0B1F3A" }}
-              >
-                🛒 Add to Cart
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Delivery Details sidebar */}
@@ -2037,12 +2037,22 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
                 <span className="text-[11px] font-bold uppercase tracking-wide text-gray-400">We deliver across the Gulf</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {["UAE", "KSA", "Qatar", "Oman", "Bahrain", "Kuwait"].map((country) => (
-                  <span key={country} className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "rgba(11,31,58,0.05)", color: "#0B1F3A" }}>
-                    {country}
-                  </span>
-                ))}
+                {["UAE", "KSA", "Qatar", "Oman", "Bahrain", "Kuwait"].map((country) => {
+                  const isLive = country === "UAE";
+                  return (
+                    <span
+                      key={country}
+                      title={isLive ? "Available now" : "Coming soon"}
+                      className="text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1"
+                      style={isLive ? { background: "rgba(0,200,150,0.12)", color: "#00a67e", border: "1px solid rgba(0,200,150,0.3)" } : { background: "#F3F4F6", color: "#9CA3AF" }}
+                    >
+                      {isLive && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00C896" }} />}
+                      {country}
+                    </span>
+                  );
+                })}
               </div>
+              <div className="mt-1.5 text-[10px] text-gray-400">UAE is live now · other countries coming soon</div>
             </div>
 
             {/* WhatsApp quick-help card */}
