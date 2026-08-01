@@ -809,32 +809,73 @@ function FAQ() {
   ];
   const [open, setOpen] = useState(0);
   return (
-    <section id="faq" className="py-28" style={{ background: "#0B1F3A" }}>
-      <div className="max-w-3xl mx-auto px-6">
+    <section id="faq" className="py-28 relative overflow-hidden" style={{ background: "#0B1F3A" }}>
+      {/* soft glow blobs — same premium treatment as the Hero */}
+      <div className="absolute top-10 -left-32 w-96 h-96 rounded-full opacity-15 blur-3xl pointer-events-none" style={{ background: "#00C896", animation: "blobMove 16s ease-in-out infinite" }} />
+      <div className="absolute bottom-0 -right-32 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "#F8B400", animation: "blobMove 20s ease-in-out infinite reverse" }} />
+
+      <div className="max-w-3xl mx-auto px-6 relative">
         <Reveal>
           <div className="text-center">
-            <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#F8B400" }}>FAQ</span>
-            <h2 className="mt-3 text-4xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Questions, answered.</h2>
+            <span className="inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-3.5 py-1.5 rounded-full" style={{ color: "#F8B400", background: "rgba(248,180,0,0.1)", border: "1px solid rgba(248,180,0,0.25)" }}>FAQ</span>
+            <h2 className="mt-4 text-4xl md:text-5xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Questions, answered.</h2>
+            <p className="mt-3 text-sm text-white/45">Everything you need to know before you get started.</p>
           </div>
         </Reveal>
-        <div className="mt-12 space-y-3">
-          {qs.map((item, i) => (
-            <Reveal key={i} delay={i * 60}>
-              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-                <button
-                  className="w-full flex items-center justify-between px-6 py-5 text-left text-white font-semibold text-sm"
-                  onClick={() => setOpen(open === i ? -1 : i)}
+
+        <div className="mt-14 space-y-4">
+          {qs.map((item, i) => {
+            const isOpen = open === i;
+            return (
+              <Reveal key={i} delay={i * 70}>
+                <div
+                  className="rounded-2xl overflow-hidden transition-all duration-300"
+                  style={{
+                    background: isOpen ? "linear-gradient(160deg,rgba(0,200,150,0.08),rgba(255,255,255,0.03))" : "rgba(255,255,255,0.03)",
+                    border: isOpen ? "1px solid rgba(0,200,150,0.35)" : "1px solid rgba(255,255,255,0.08)",
+                    boxShadow: isOpen ? "0 16px 40px rgba(0,200,150,0.12)" : "none",
+                    backdropFilter: "blur(6px)",
+                  }}
                 >
-                  {item.q}
-                  <ChevronDown className="w-4 h-4 flex-shrink-0 transition-transform" style={{ transform: open === i ? "rotate(180deg)" : "none" }} />
-                </button>
-                <div style={{ maxHeight: open === i ? "160px" : "0px", overflow: "hidden", transition: "max-height 0.35s ease" }}>
-                  <p className="px-6 pb-5 text-sm text-white/55 leading-relaxed">{item.a}</p>
+                  <button
+                    className="w-full flex items-center gap-4 px-6 py-5 text-left group"
+                    onClick={() => setOpen(isOpen ? -1 : i)}
+                  >
+                    <span
+                      className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors duration-300"
+                      style={isOpen ? { background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#04140f" } : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="flex-1 text-white font-semibold text-sm md:text-[15px]">{item.q}</span>
+                    <ChevronDown
+                      className="w-4.5 h-4.5 flex-shrink-0 transition-transform duration-300"
+                      style={{ color: isOpen ? "#00C896" : "rgba(255,255,255,0.35)", transform: isOpen ? "rotate(180deg)" : "none" }}
+                    />
+                  </button>
+                  <div style={{ maxHeight: isOpen ? "200px" : "0px", overflow: "hidden", transition: "max-height 0.4s ease" }}>
+                    <p className="pl-[4.5rem] pr-6 pb-5 text-sm text-white/55 leading-relaxed">{item.a}</p>
+                  </div>
                 </div>
-              </div>
-            </Reveal>
-          ))}
+              </Reveal>
+            );
+          })}
         </div>
+
+        <Reveal delay={280}>
+          <div className="mt-12 text-center">
+            <p className="text-sm text-white/45">Still have questions?</p>
+            <a
+              href="https://wa.me/971568328274"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-full transition-transform hover:scale-105"
+              style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#04140f", boxShadow: "0 12px 32px rgba(0,200,150,0.35)" }}
+            >
+              <MessageCircle className="w-4 h-4" /> Chat with us on WhatsApp
+            </a>
+          </div>
+        </Reveal>
       </div>
     </section>
   );
