@@ -1518,6 +1518,48 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   // Remember which sidebar tab the seller was on, so refreshing the page doesn't bounce them back to Dashboard.
   useEffect(() => { writeLocal("ef_tab", tab); }, [tab]);
 
+  // Language switcher — only English is available today, so the dropdown
+  // just opens and shows that (with more languages coming soon), rather
+  // than doing nothing when clicked.
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef(null);
+
+  // Notification bell — tracks order status changes (shipped / delivered /
+  // returned) for this seller. Persisted per-seller in localStorage so the
+  // list and read/unread state survive a refresh.
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+  const [notifications, setNotifications] = useState(() => readLocal(`ef_notifs_${session.email}`, []));
+  useEffect(() => { writeLocal(`ef_notifs_${session.email}`, notifications); }, [notifications, session.email]);
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const ordersRef = useRef(orders);
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
+
+  // Close either dropdown when clicking outside of it.
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (langRef.current && !langRef.current.contains(e.target)) setLangOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const STATUS_NOTIF_TEXT = {
+    shipped: (id) => `Order #${id} has been shipped.`,
+    delivered: (id) => `Order #${id} has been delivered.`,
+    returned: (id) => `Order #${id} was returned.`,
+  };
+  const pushNotification = (orderId, status) => {
+    const text = STATUS_NOTIF_TEXT[status];
+    if (!text) return;
+    setNotifications((prev) => [
+      { id: `${orderId}-${status}-${Date.now()}`, orderId, status, message: text(orderId), createdAt: new Date().toISOString(), read: false },
+      ...prev,
+    ].slice(0, 30));
+  };
+  const markNotificationsRead = () => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
   const reload = async () => {
     setCatalog(await fetchCatalog());
     setListings(await fetchListings(session.email));
@@ -1528,6 +1570,31 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     }
   };
   useEffect(() => { reload(); }, []); // eslint-disable-line
+
+  // Live-updates: when Admin changes an order's status (ship / deliver /
+  // return it), reflect the new status here right away and drop a
+  // notification in the bell for this seller.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`orders-status-${session.email}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders", filter: `seller_email=eq.${session.email}` },
+        (payload) => {
+          const newRow = payload.new;
+          if (!newRow) return;
+          const prevOrder = ordersRef.current.find((o) => o.id === newRow.id);
+          const prevStatus = prevOrder?.status;
+          const nextStatus = newRow.status;
+          setOrders((prev) => prev.map((o) => (o.id === newRow.id ? { ...o, status: nextStatus } : o)));
+          if (nextStatus && nextStatus !== prevStatus && STATUS_NOTIF_TEXT[nextStatus]) {
+            pushNotification(newRow.id, nextStatus);
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session.email]); // eslint-disable-line
 
   const addListing = async (id) => {
     if (listings.includes(id)) { notify("Already in your listings."); return; }
@@ -1777,13 +1844,73 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         {/* Top bar — language selector, notifications, and account profile.
             Desktop only; the mobile top bar (logo + menu button) covers small screens. */}
         <div className="hidden md:flex items-center justify-end gap-4 mb-6">
-          <button className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full bg-white" style={{ border: "1px solid #E5E7EB", color: "#111827" }}>
-            <Globe2 className="w-4 h-4" style={{ color: "#0B1F3A" }} /> English <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-          </button>
-          <button className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB" }}>
-            <Bell className="w-4.5 h-4.5" style={{ color: "#0B1F3A" }} />
-            <span className="absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "#00C896" }}>3</span>
-          </button>
+          <div className="relative" ref={langRef}>
+            <button
+              onClick={() => { setLangOpen((v) => !v); setNotifOpen(false); }}
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full bg-white"
+              style={{ border: "1px solid #E5E7EB", color: "#111827" }}
+            >
+              <Globe2 className="w-4 h-4" style={{ color: "#0B1F3A" }} /> English <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+            {langOpen && (
+              <div className="absolute right-0 top-12 w-56 rounded-2xl bg-white shadow-xl z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+                <button
+                  onClick={() => setLangOpen(false)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-left"
+                  style={{ color: "#0B1F3A", background: "rgba(0,200,150,0.08)" }}
+                >
+                  English
+                  <CheckCircle2 className="w-4 h-4" style={{ color: "#00C896" }} />
+                </button>
+                <div className="px-4 py-3 text-xs text-gray-400 flex items-center justify-between border-t" style={{ borderColor: "#F1F1F1" }}>
+                  <span>العربية (Arabic)</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#F3F4F6", color: "#9CA3AF" }}>Soon</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => {
+                setNotifOpen((v) => {
+                  const next = !v;
+                  if (next) markNotificationsRead();
+                  return next;
+                });
+                setLangOpen(false);
+              }}
+              className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center"
+              style={{ border: "1px solid #E5E7EB" }}
+            >
+              <Bell className="w-4.5 h-4.5" style={{ color: "#0B1F3A" }} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "#00C896" }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+            {notifOpen && (
+              <div className="absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-2xl bg-white shadow-xl z-50" style={{ border: "1px solid #E5E7EB" }}>
+                <div className="px-4 py-3 text-sm font-bold border-b" style={{ color: "#111827", borderColor: "#F1F1F1" }}>Notifications</div>
+                {notifications.length === 0 ? (
+                  <div className="px-4 py-8 text-sm text-gray-400 text-center">No notifications yet.<br />You'll see updates here when an order ships, is delivered, or is returned.</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div key={n.id} className="px-4 py-3 text-sm border-b flex items-start gap-2" style={{ borderColor: "#F1F1F1" }}>
+                      <span
+                        className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                        style={{ background: n.status === "delivered" ? "#00C896" : n.status === "returned" ? "#EF4444" : "#F8B400" }}
+                      />
+                      <div>
+                        <div className="font-medium" style={{ color: "#111827" }}>{n.message}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{new Date(n.createdAt).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <div className="w-px h-8" style={{ background: "#E5E7EB" }} />
           <button className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)" }}>
