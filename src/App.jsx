@@ -1535,11 +1535,16 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   const ordersRef = useRef(orders);
   useEffect(() => { ordersRef.current = orders; }, [orders]);
 
-  // Close either dropdown when clicking outside of it.
+  // Profile menu — Customer Support / Tickets / Seller Details.
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
+  // Close any open dropdown when clicking outside of it.
   useEffect(() => {
     const onClickOutside = (e) => {
       if (langRef.current && !langRef.current.contains(e.target)) setLangOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
     };
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -1920,16 +1925,40 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             )}
           </div>
           <div className="w-px h-8" style={{ background: "#E5E7EB" }} />
-          <button className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)" }}>
-              {(session.name || session.email || "?").trim()[0]?.toUpperCase()}
-            </div>
-            <div className="text-left">
-              <div className="text-sm font-bold" style={{ color: "#111827" }}>{session.name || session.email}</div>
-              <div className="text-xs" style={{ color: "#6B7280" }}>Business Account</div>
-            </div>
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          </button>
+          <div className="relative" ref={profileRef}>
+            <button
+              onClick={() => { setProfileOpen((v) => !v); setLangOpen(false); setNotifOpen(false); }}
+              className="flex items-center gap-3"
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)" }}>
+                {(session.name || session.email || "?").trim()[0]?.toUpperCase()}
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold" style={{ color: "#111827" }}>{session.name || session.email}</div>
+                <div className="text-xs" style={{ color: "#6B7280" }}>Business Account</div>
+              </div>
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 top-14 w-60 rounded-2xl bg-white shadow-xl z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+                {[
+                  { icon: LifeBuoy, label: "Customer Support", tab: "support" },
+                  { icon: FileText, label: "Tickets", tab: "tickets" },
+                  { icon: User, label: "Seller Details", tab: "settings" },
+                ].map((item) => (
+                  <button
+                    key={item.tab}
+                    onClick={() => { setTab(item.tab); setProfileOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-left transition-colors duration-150 hover:bg-gray-50"
+                    style={{ color: "#111827" }}
+                  >
+                    <item.icon className="w-4 h-4" style={{ color: "#0B1F3A" }} />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           </div>
         </div>
 
