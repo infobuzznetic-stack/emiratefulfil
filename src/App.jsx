@@ -2005,21 +2005,6 @@ function OverviewTab({
   return (
     <div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        {/* Real warehouse + fleet photo, faded in from the right so the banner text
-            stays readable — gives the greeting card a grounded, "this is real"
-            feel instead of only illustration. Hidden on small screens. */}
-        {region === "UAE" && (
-          <div className="hidden md:block absolute inset-y-0 right-0 w-[60%] pointer-events-none">
-            <img
-              src="/images/fleet-warehouse.png"
-              alt="EmirateFulfil warehouse and delivery fleet"
-              className="w-full h-full object-cover"
-              style={{ opacity: 0.55 }}
-            />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(90deg,#0B1F3A 0%,rgba(11,31,58,0.55) 35%,rgba(11,31,58,0) 75%)" }} />
-          </div>
-        )}
-
         {/* subtle dot-grid texture */}
         <div
           className="absolute inset-0 opacity-[0.07]"
