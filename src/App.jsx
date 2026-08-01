@@ -1011,7 +1011,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [] }));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [], isPremium: !!p.is_premium }));
 }
 // Which sellers Admin has marked as "Premium" — just a list of emails, stored
 // as JSON in app_settings (same chunked mechanism as the homepage content).
@@ -1640,10 +1640,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   // A product Admin has assigned to specific sellers only shows up for
   // those sellers (and for Admin, who manages everything). A product with
   // no assignment (assignedSellerEmails is empty) stays visible to everyone,
-  // exactly like before.
+  // exactly like before. On top of that, a product Admin has marked
+  // "Premium" only shows up for sellers Admin has separately marked as
+  // Premium (isPremiumSeller) — everyone else never sees it in their catalog.
   const visibleCatalog = isAdmin
     ? catalog
-    : catalog.filter((p) => !(p.assignedSellerEmails || []).length || p.assignedSellerEmails.includes(session.email));
+    : catalog
+        .filter((p) => !(p.assignedSellerEmails || []).length || p.assignedSellerEmails.includes(session.email))
+        .filter((p) => !p.isPremium || isPremiumSeller);
 
   // Live-updates: when Admin changes an order's status (ship / deliver /
   // return it), reflect the new status here right away and drop a
@@ -3439,6 +3443,14 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: inStock ? "#00C896" : "#EF4444", animation: inStock ? "livePulse 2s infinite" : "none" }} />
                   {inStock ? "In Stock" : "Out of Stock"}
                 </span>
+                {p.isPremium && (
+                  <span
+                    className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full shadow-sm"
+                    style={{ background: "#F8B400", color: "#04140f" }}
+                  >
+                    <Sparkles className="w-3 h-3" /> Premium
+                  </span>
+                )}
                 {isAdmin && (
                   <button
                     onClick={(e) => { e.stopPropagation(); startEdit(p); }}
@@ -4538,7 +4550,7 @@ function LightField({ label, type = "text", value, onChange, placeholder }) {
 }
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [] });
+  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false });
   const toggleFormSeller = (email) => setForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const [formImageUploading, setFormImageUploading] = useState(false);
   const uploadFormImages = async (e) => {
@@ -4660,10 +4672,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       description: form.description || null, images, image_url: images[0] || null,
       stock: Math.max(0, parseInt(form.stock, 10) || 0),
       assigned_seller_emails: form.assignedSellers,
+      is_premium: form.isPremium,
     });
     if (error) { notify("Could not add product."); return; }
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [] });
-    notify(form.assignedSellers.length ? `Product added — only visible to ${form.assignedSellers.length} seller(s).` : "Product added to catalog.");
+    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false });
+    notify(form.isPremium ? "Premium product added — only visible to Premium sellers." : (form.assignedSellers.length ? `Product added — only visible to ${form.assignedSellers.length} seller(s).` : "Product added to catalog."));
     onCatalogChanged();
   };
 
@@ -4681,7 +4694,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const startEdit = (p) => {
     setEditingId(p.id);
     const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0, assignedSellers: p.assignedSellerEmails || [] });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0, assignedSellers: p.assignedSellerEmails || [], isPremium: !!p.isPremium });
   };
   const toggleEditSeller = (email) => setEditForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
@@ -4721,6 +4734,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       images, image_url: images[0] || null,
       stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
       assigned_seller_emails: editForm.assignedSellers || [],
+      is_premium: !!editForm.isPremium,
     }).eq("id", id);
     if (error) { console.error("Product save failed:", error); notify(`Could not save: ${error.message || "unknown error"}`); return; }
     notify("Product updated.");
@@ -5232,6 +5246,13 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           </div>
           <p className="mt-1 text-[11px] text-gray-400">{form.assignedSellers.length === 0 ? "This product will be visible to every seller." : `Only visible to ${form.assignedSellers.length} selected seller(s).`}</p>
         </div>
+        <div className="sm:col-span-6">
+          <label className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer w-fit" style={form.isPremium ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+            <input type="checkbox" className="hidden" checked={form.isPremium} onChange={() => setForm((f) => ({ ...f, isPremium: !f.isPremium }))} />
+            <Sparkles className="w-3.5 h-3.5" /> Premium product
+          </label>
+          <p className="mt-1 text-[11px] text-gray-400">{form.isPremium ? "Only shown to sellers marked Premium (see the Sellers table below)." : "Not marked Premium — visible to all sellers per the setting above."}</p>
+        </div>
         <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
       </form>
@@ -5290,6 +5311,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     ))}
                   </div>
                 </div>
+                <label className="text-[11px] font-semibold flex items-center gap-1 px-2.5 py-1 rounded-full cursor-pointer w-fit" style={editForm.isPremium ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                  <input type="checkbox" className="hidden" checked={editForm.isPremium} onChange={() => setEditForm((f) => ({ ...f, isPremium: !f.isPremium }))} />
+                  <Sparkles className="w-3 h-3" /> Premium product
+                </label>
                 <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => saveEdit(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
@@ -5310,6 +5335,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                 <div className="mt-1 text-[11px] font-semibold truncate" style={{ color: (p.assignedSellerEmails || []).length ? "#F8B400" : "#9CA3AF" }} title={(p.assignedSellerEmails || []).join(", ")}>
                   {(p.assignedSellerEmails || []).length ? `🔒 ${p.assignedSellerEmails.length} seller(s): ${p.assignedSellerEmails.join(", ")}` : "🌐 All sellers"}
                 </div>
+                {p.isPremium && (
+                  <div className="mt-1 text-[11px] font-semibold flex items-center gap-1" style={{ color: "#F8B400" }}>
+                    <Sparkles className="w-3 h-3" /> Premium — Premium sellers only
+                  </div>
+                )}
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => startEdit(p)} className="flex-1 text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
                   <button onClick={() => deleteProduct(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Remove</button>
