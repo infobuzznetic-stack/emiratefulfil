@@ -4670,6 +4670,35 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     }));
     notify(`Pulled details from ${data.sourceHost || importSource} — check them below, add Cost + Category, then save.`);
   };
+  // Prefill from the "EmirateFulfil Product Importer" browser extension —
+  // it scrapes a product page (Temu, and later Noon/Amazon) right in the
+  // seller's own browser (so no bot-block like the server-side link-fetch
+  // above), then opens this Admin page with the scraped data attached as
+  // ?import=<base64 JSON>. We pick that up here, prefill the same form the
+  // link-fetch uses, then strip the param so a refresh doesn't reapply it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("import");
+    if (!raw) return;
+    try {
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(raw)))));
+      setForm((f) => ({
+        ...f,
+        name: decoded.title || f.name,
+        description: decoded.description || f.description,
+        sell: decoded.price != null ? String(decoded.price) : f.sell,
+        images: (decoded.images || []).slice(0, 4),
+        sourceUrl: decoded.url || f.sourceUrl,
+      }));
+      notify(`Pulled details from ${decoded.sourceHost || "the extension"} — check them below, add Cost + Category, then save.`);
+    } catch {
+      // malformed/old import param — ignore quietly
+    } finally {
+      params.delete("import");
+      const clean = window.location.pathname + (params.toString() ? `?${params}` : "");
+      window.history.replaceState(null, "", clean);
+    }
+  }, []); // eslint-disable-line
   const toggleFormSeller = (email) => setForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const [formImageUploading, setFormImageUploading] = useState(false);
   const uploadFormImages = async (e) => {
