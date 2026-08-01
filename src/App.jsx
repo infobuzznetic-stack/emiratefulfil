@@ -2416,7 +2416,7 @@ function OverviewTab({
   return (
     <div>
       <div
-        className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7"
+        className="relative overflow-hidden rounded-3xl px-4 py-6 sm:px-7 sm:py-8 mb-7"
         style={
           isPremiumSeller
             ? { background: "linear-gradient(120deg,#1a1405 0%,#3a2a0b 45%,#7a5a0a 90%,#F8B400 145%)", border: "1px solid rgba(248,180,0,0.45)", boxShadow: "0 0 0 1px rgba(248,180,0,0.12), 0 20px 50px -20px rgba(248,180,0,0.35)" }
@@ -2436,10 +2436,10 @@ function OverviewTab({
         )}
         {isPremiumSeller && (
           <span
-            className="absolute top-5 right-6 flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full z-10"
+            className="absolute top-3 right-3 sm:top-5 sm:right-6 flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full z-10 whitespace-nowrap"
             style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b", boxShadow: "0 6px 16px rgba(248,180,0,0.5)", animation: "goldPulseRing 2.4s infinite" }}
           >
-            <Crown className="w-3.5 h-3.5" style={{ animation: "sparkleTwinkle 2s ease-in-out infinite" }} /> Premium Seller
+            <Crown className="w-3 h-3 sm:w-3.5 sm:h-3.5" style={{ animation: "sparkleTwinkle 2s ease-in-out infinite" }} /> Premium Seller
           </span>
         )}
         <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: isPremiumSeller ? "#F8B400" : "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
