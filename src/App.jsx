@@ -5406,20 +5406,26 @@ export default function EmirateFulfilApp() {
   if (checkingAuth) return <SplashLoader />;
 
   return (
-    <LogoContext.Provider value={{ logoUrl, setLogoUrl }}>
-      <Toast message={toastMsg} />
-      {view === "home" && <HomePage session={session} onNav={setView} onLogout={handleLogout} />}
-      {(view === "signup" || view === "login" || view === "forgot") && (
-        <AuthPage mode={view} onAuthed={handleAuthed} onSwitch={setView} notify={notify} />
-      )}
-      {view === "reset-password" && (
-        <ResetPasswordPage notify={notify} onDone={() => { supabase.auth.signOut(); setView("login"); }} />
-      )}
-      {view === "dashboard" && session && (
-        <Dashboard key={dashRemountKey} session={session} onLogout={handleLogout} notify={notify} initialTab={dashboardTab} onTabChange={setDashboardTab} />
-      )}
-      <FloatingWhatsApp />
-    </LogoContext.Provider>
+    <div style={{ maxWidth: "none", width: "100%", margin: 0, padding: 0, textAlign: "left", overflowX: "hidden" }}>
+      <style>{`
+        html, body { margin: 0; padding: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
+        #root { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; text-align: left !important; overflow-x: hidden !important; }
+      `}</style>
+      <LogoContext.Provider value={{ logoUrl, setLogoUrl }}>
+        <Toast message={toastMsg} />
+        {view === "home" && <HomePage session={session} onNav={setView} onLogout={handleLogout} />}
+        {(view === "signup" || view === "login" || view === "forgot") && (
+          <AuthPage mode={view} onAuthed={handleAuthed} onSwitch={setView} notify={notify} />
+        )}
+        {view === "reset-password" && (
+          <ResetPasswordPage notify={notify} onDone={() => { supabase.auth.signOut(); setView("login"); }} />
+        )}
+        {view === "dashboard" && session && (
+          <Dashboard key={dashRemountKey} session={session} onLogout={handleLogout} notify={notify} initialTab={dashboardTab} onTabChange={setDashboardTab} />
+        )}
+        <FloatingWhatsApp />
+      </LogoContext.Provider>
+    </div>
   );
 }
 
