@@ -1600,7 +1600,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   const NAV = [
     { id: "overview", label: "Dashboard", icon: Boxes },
     { id: "products", label: "Products", icon: Package },
-    { id: "orders", label: "Orders", icon: Truck },
+    { id: "orders", label: "Orders", icon: Truck, count: orders.length },
     { id: "invoices", label: "Invoices", icon: Receipt },
     { id: "settings", label: "Seller Details", icon: Sparkles },
     { id: "support", label: "Customer Support", icon: LifeBuoy },
@@ -1646,7 +1646,15 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                 className="w-4.5 h-4.5 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110"
                 style={tab === n.id ? { color: "#00C896" } : {}}
               />
-              <span className="transition-transform duration-300 group-hover:translate-x-0.5">{n.label}</span>
+              <span className="flex-1 text-left transition-transform duration-300 group-hover:translate-x-0.5">{n.label}</span>
+              {n.count > 0 && (
+                <span
+                  className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                  style={tab === n.id ? { background: "#00C896", color: "#04140f" } : { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
+                >
+                  {n.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -1717,7 +1725,16 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                 ...(tab === n.id ? { background: "rgba(0,200,150,0.15)", color: "#00C896" } : {}),
               }}
             >
-              <n.icon className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110" /> {n.label}
+              <n.icon className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110" />
+              <span className="flex-1 text-left">{n.label}</span>
+              {n.count > 0 && (
+                <span
+                  className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                  style={tab === n.id ? { background: "#00C896", color: "#04140f" } : { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
+                >
+                  {n.count}
+                </span>
+              )}
             </button>
           ))}
           <button onClick={onLogout} className="w-full text-left px-3 py-2.5 text-sm font-semibold text-red-300 transition-transform duration-300 hover:translate-x-1 active:scale-95">Log out</button>
