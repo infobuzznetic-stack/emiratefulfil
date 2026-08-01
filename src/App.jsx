@@ -1843,7 +1843,15 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
         {/* Top bar — language selector, notifications, and account profile.
             Desktop only; the mobile top bar (logo + menu button) covers small screens. */}
-        <div className="hidden md:flex items-center justify-end gap-4 mb-6">
+        <div className="hidden md:flex items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4" style={{ color: "#0B1F3A" }} />
+            <span className="text-sm font-bold" style={{ color: "#111827" }}>Dubai, UAE</span>
+            <span className="w-1 h-1 rounded-full" style={{ background: "#9CA3AF" }} />
+            <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
+            <span className="text-sm font-medium" style={{ color: "#6B7280" }}>Live Operations</span>
+          </div>
+          <div className="flex items-center gap-4">
           <div className="relative" ref={langRef}>
             <button
               onClick={() => { setLangOpen((v) => !v); setNotifOpen(false); }}
@@ -1922,6 +1930,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             </div>
             <ChevronDown className="w-4 h-4 text-gray-400" />
           </button>
+          </div>
         </div>
 
         <div key={tab + region} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
@@ -2162,13 +2171,6 @@ function OverviewTab({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4 px-1">
-        <MapPin className="w-4 h-4" style={{ color: "#0B1F3A" }} />
-        <span className="text-sm font-bold" style={{ color: "#111827" }}>Dubai, UAE</span>
-        <span className="w-1 h-1 rounded-full" style={{ background: "#9CA3AF" }} />
-        <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
-        <span className="text-sm font-medium" style={{ color: "#6B7280" }}>Live Operations</span>
-      </div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
         {/* subtle dot-grid texture */}
         <div
