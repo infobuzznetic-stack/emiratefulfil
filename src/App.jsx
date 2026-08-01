@@ -363,15 +363,32 @@ function Hero({ onSignup }) {
       </div>
 
       {/* Delivery truck drifting along the bottom of the hero, on a loop */}
-      <div className="hidden md:block absolute left-0 right-0 bottom-6 h-10 overflow-hidden pointer-events-none opacity-25">
+      <div className="hidden md:block absolute left-0 right-0 bottom-6 h-14 overflow-hidden pointer-events-none opacity-40">
         <div style={{ animation: "truckDrive 16s linear infinite" }}>
-          <Truck className="w-9 h-9 text-white" />
+          <svg viewBox="0 0 200 90" className="w-44 h-auto" xmlns="http://www.w3.org/2000/svg">
+            {/* van body */}
+            <path d="M8 60 L8 30 Q8 24 14 24 L120 24 L120 14 Q120 10 124 10 L160 10 Q166 10 170 16 L182 34 Q186 38 186 44 L186 60 Z" fill="#F4F6F9" stroke="#0B1F3A" strokeWidth="1.5" />
+            {/* cab window */}
+            <path d="M126 16 L126 24 L164 24 L156 16 Z" fill="#0B1F3A" opacity="0.55" />
+            {/* brand stripe */}
+            <rect x="8" y="46" width="178" height="10" fill="#00C896" />
+            {/* brand wordmark on the side panel */}
+            <text x="60" y="53.5" fontFamily="'Plus Jakarta Sans', sans-serif" fontWeight="800" fontSize="9" fill="#0B1F3A">EmirateFulfil</text>
+            {/* logo mark */}
+            <circle cx="30" cy="35" r="9" fill="#0B1F3A" />
+            <path d="M26 35 L29 38 L35 31" stroke="#00C896" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            {/* wheels */}
+            <circle cx="40" cy="62" r="9" fill="#1F2937" />
+            <circle cx="40" cy="62" r="3.5" fill="#9CA3AF" />
+            <circle cx="150" cy="62" r="9" fill="#1F2937" />
+            <circle cx="150" cy="62" r="3.5" fill="#9CA3AF" />
+          </svg>
         </div>
       </div>
       <style>{`
         @keyframes truckDrive {
-          from { transform: translateX(-60px); }
-          to { transform: translateX(calc(100vw + 60px)); }
+          from { transform: translateX(-180px); }
+          to { transform: translateX(calc(100vw + 180px)); }
         }
       `}</style>
 
