@@ -5,7 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText,
+  Eye, Printer, FileText, Bell,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1774,6 +1774,29 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
 
       {/* Main */}
       <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
+        {/* Top bar — language selector, notifications, and account profile.
+            Desktop only; the mobile top bar (logo + menu button) covers small screens. */}
+        <div className="hidden md:flex items-center justify-end gap-4 mb-6">
+          <button className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full bg-white" style={{ border: "1px solid #E5E7EB", color: "#111827" }}>
+            <Globe2 className="w-4 h-4" style={{ color: "#0B1F3A" }} /> English <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+          </button>
+          <button className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center" style={{ border: "1px solid #E5E7EB" }}>
+            <Bell className="w-4.5 h-4.5" style={{ color: "#0B1F3A" }} />
+            <span className="absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "#00C896" }}>3</span>
+          </button>
+          <div className="w-px h-8" style={{ background: "#E5E7EB" }} />
+          <button className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)" }}>
+              {(session.name || session.email || "?").trim()[0]?.toUpperCase()}
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-bold" style={{ color: "#111827" }}>{session.name || session.email}</div>
+              <div className="text-xs" style={{ color: "#6B7280" }}>Business Account</div>
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
         <div key={tab + region} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
           {tab === "overview" && (
             <OverviewTab
