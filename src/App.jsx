@@ -1011,38 +1011,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0) }));
-}
-// Premium catalog — a completely separate product list, only visible to
-// sellers Admin has switched to "Premium". Stored as JSON in app_settings
-// (same chunked mechanism as the homepage content) instead of the regular
-// `products` table, so it never mixes with the normal catalog.
-const PREMIUM_PRODUCTS_KEY = "premium_products_content";
-async function fetchPremiumProducts() {
-  const raw = await loadChunkedSetting(PREMIUM_PRODUCTS_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
-async function savePremiumProducts(list) {
-  return saveChunkedSetting(PREMIUM_PRODUCTS_KEY, JSON.stringify(list));
-}
-// Which sellers Admin has switched to Premium — just a list of emails,
-// stored the same way. A seller in this list sees the premium catalog
-// (above) instead of the regular one.
-const PREMIUM_SELLERS_KEY = "premium_sellers_content";
-async function fetchPremiumSellerEmails() {
-  const raw = await loadChunkedSetting(PREMIUM_SELLERS_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
-async function savePremiumSellerEmails(list) {
-  return saveChunkedSetting(PREMIUM_SELLERS_KEY, JSON.stringify(list));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [] }));
 }
 async function fetchListings(email) {
   const { data, error } = await supabase.from("listings").select("product_id").eq("seller_email", email);
@@ -1635,20 +1604,8 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   };
   const markNotificationsRead = () => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 
-  // Premium sellers get a completely separate product catalog (managed by
-  // Admin under Admin → Premium products), instead of the regular one.
-  const [isPremiumSeller, setIsPremiumSeller] = useState(false);
-
   const reload = async () => {
-    const [regularCatalog, premiumSellerEmails] = await Promise.all([fetchCatalog(), fetchPremiumSellerEmails()]);
-    const premium = premiumSellerEmails.includes(session.email);
-    setIsPremiumSeller(premium);
-    if (premium) {
-      const premiumProducts = await fetchPremiumProducts();
-      setCatalog(premiumProducts.filter((p) => !p.sellerEmail || p.sellerEmail === session.email));
-    } else {
-      setCatalog(regularCatalog);
-    }
+    setCatalog(await fetchCatalog());
     setListings(await fetchListings(session.email));
     setOrders(await fetchOrders(session.email));
     if (isAdmin) {
@@ -1657,6 +1614,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     }
   };
   useEffect(() => { reload(); }, []); // eslint-disable-line
+
+  // A product Admin has assigned to specific sellers only shows up for
+  // those sellers (and for Admin, who manages everything). A product with
+  // no assignment (assignedSellerEmails is empty) stays visible to everyone,
+  // exactly like before.
+  const visibleCatalog = isAdmin
+    ? catalog
+    : catalog.filter((p) => !(p.assignedSellerEmails || []).length || p.assignedSellerEmails.includes(session.email));
 
   // Live-updates: when Admin changes an order's status (ship / deliver /
   // return it), reflect the new status here right away and drop a
@@ -1707,23 +1672,12 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
 
     // Every order pulls straight from stock, so once enough orders land the
     // product flips to Out of Stock on its own — Admin never has to zero it
-    // out by hand. Premium-catalog products live in app_settings (not the
-    // `products` table), so their stock is decremented and saved there instead.
+    // out by hand.
     const product = catalog.find((p) => p.id === newOrder.productId);
     if (product) {
       const newStock = Math.max(0, (Number(product.stock) || 0) - Number(newOrder.qty || 0));
-      if (isPremiumSeller) {
-        // catalog here only holds the subset this seller can see (public
-        // premium products + ones assigned to them) — save against the full
-        // premium list so other sellers' assigned products aren't dropped.
-        const fullList = await fetchPremiumProducts();
-        const updatedFullList = fullList.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p));
-        const { error: stockError } = await savePremiumProducts(updatedFullList);
-        if (!stockError) setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
-      } else {
-        const { error: stockError } = await supabase.from("products").update({ stock: newStock }).eq("id", newOrder.productId);
-        if (!stockError) setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
-      }
+      const { error: stockError } = await supabase.from("products").update({ stock: newStock }).eq("id", newOrder.productId);
+      if (!stockError) setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
     }
 
     notify("Order added — tracking as Pending.");
@@ -1948,14 +1902,6 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             <span className="w-1 h-1 rounded-full" style={{ background: "#9CA3AF" }} />
             <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
             <span className="text-sm font-medium" style={{ color: "#6B7280" }}>Live Operations</span>
-            {isPremiumSeller && (
-              <span
-                className="ml-2 flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
-                style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f" }}
-              >
-                <Sparkles className="w-3 h-3" /> Premium Seller
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-4">
           <div className="relative" ref={langRef}>
@@ -2084,7 +2030,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           )}
           {(tab === "settings" || tab === "support" || tab === "tickets" || region === "UAE") && (
             <>
-              {tab === "products" && <CatalogTab catalog={catalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} onCatalogChanged={reload} />}
+              {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} onCatalogChanged={reload} />}
               {tab === "orders" && (
                 isAdmin
                   ? <AdminOrdersPanel notify={notify} />
@@ -4562,7 +4508,8 @@ function LightField({ label, type = "text", value, onChange, placeholder }) {
 }
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "" });
+  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [] });
+  const toggleFormSeller = (email) => setForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const [formImageUploading, setFormImageUploading] = useState(false);
   const uploadFormImages = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -4595,20 +4542,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [sellerSearch, setSellerSearch] = useState("");
   // Which seller's invoice-builder modal is open (create + history) — null when closed.
   const [invoiceManagerSeller, setInvoiceManagerSeller] = useState(null);
-  // Premium sellers — a plain list of emails Admin has switched on. A seller
-  // on this list sees the separate premium catalog instead of the regular one.
-  const [premiumSellerEmails, setPremiumSellerEmails] = useState([]);
-  const [premiumTogglingEmail, setPremiumTogglingEmail] = useState(null);
-  const togglePremiumSeller = async (email) => {
-    setPremiumTogglingEmail(email);
-    const isPremium = premiumSellerEmails.includes(email);
-    const next = isPremium ? premiumSellerEmails.filter((e) => e !== email) : [...premiumSellerEmails, email];
-    const { error } = await savePremiumSellerEmails(next);
-    setPremiumTogglingEmail(null);
-    if (error) { notify("Could not update premium status."); return; }
-    setPremiumSellerEmails(next);
-    notify(isPremium ? "Premium login removed for this seller." : "Premium login enabled — they now see the premium catalog.");
-  };
 
   // Site logo: pick a picture from your computer, it's uploaded to Supabase
   // Storage and saved as the shared logo everyone sees (navbar, footer,
@@ -4656,7 +4589,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   useEffect(() => {
     loadAllOrders();
     loadSellers();
-    fetchPremiumSellerEmails().then(setPremiumSellerEmails);
   }, []); // eslint-disable-line
 
   // Approve a newly-signed-up seller (lets them log in), or deactivate/reactivate
@@ -4682,10 +4614,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       cost: parseFloat(form.cost), sell: parseFloat(form.sell), emoji: form.emoji || "📦",
       description: form.description || null, images, image_url: images[0] || null,
       stock: Math.max(0, parseInt(form.stock, 10) || 0),
+      assigned_seller_emails: form.assignedSellers,
     });
     if (error) { notify("Could not add product."); return; }
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "" });
-    notify("Product added to catalog.");
+    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [] });
+    notify(form.assignedSellers.length ? `Product added — only visible to ${form.assignedSellers.length} seller(s).` : "Product added to catalog.");
     onCatalogChanged();
   };
 
@@ -4703,8 +4636,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const startEdit = (p) => {
     setEditingId(p.id);
     const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0 });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0, assignedSellers: p.assignedSellerEmails || [] });
   };
+  const toggleEditSeller = (email) => setEditForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
   const uploadEditImages = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -4741,6 +4675,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       emoji: editForm.emoji || "📦", description: editForm.description || null,
       images, image_url: images[0] || null,
       stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
+      assigned_seller_emails: editForm.assignedSellers || [],
     }).eq("id", id);
     if (error) { console.error("Product save failed:", error); notify(`Could not save: ${error.message || "unknown error"}`); return; }
     notify("Product updated.");
@@ -5105,7 +5040,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <th className="px-4 py-3">Signed up</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Approval</th>
-                  <th className="px-4 py-3">Premium</th>
                   <th className="px-4 py-3">Invoices</th>
                 </tr>
               </thead>
@@ -5166,21 +5100,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => togglePremiumSeller(s.email)}
-                        disabled={premiumTogglingEmail === s.email}
-                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-60"
-                        style={
-                          premiumSellerEmails.includes(s.email)
-                            ? { background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f" }
-                            : { border: "1px solid #E5E7EB", color: "#6B7280" }
-                        }
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {premiumTogglingEmail === s.email ? "…" : premiumSellerEmails.includes(s.email) ? "Premium ✓" : "Make Premium"}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
                         onClick={() => setInvoiceManagerSeller(s)}
                         className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full"
                         style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}
@@ -5236,6 +5155,22 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           )}
           <span className="text-xs text-gray-400">{(form.images || []).length}/4</span>
         </div>
+        <div className="sm:col-span-6">
+          <label className="text-xs text-gray-500">Visible to</label>
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            <label className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style={form.assignedSellers.length === 0 ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+              <input type="checkbox" className="hidden" checked={form.assignedSellers.length === 0} onChange={() => setForm((f) => ({ ...f, assignedSellers: [] }))} />
+              All sellers
+            </label>
+            {sellers.map((s) => (
+              <label key={s.id} className="text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style={form.assignedSellers.includes(s.email) ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                <input type="checkbox" className="hidden" checked={form.assignedSellers.includes(s.email)} onChange={() => toggleFormSeller(s.email)} />
+                {s.email}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-gray-400">{form.assignedSellers.length === 0 ? "This product will be visible to every seller." : `Only visible to ${form.assignedSellers.length} selected seller(s).`}</p>
+        </div>
         <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
       </form>
@@ -5279,6 +5214,21 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                 </div>
                 <input type="number" min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} placeholder="Stock quantity" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                <div>
+                  <label className="text-[11px] text-gray-400">Visible to</label>
+                  <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                    <label className="text-[11px] font-semibold flex items-center gap-1 px-2.5 py-1 rounded-full cursor-pointer" style={editForm.assignedSellers.length === 0 ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                      <input type="checkbox" className="hidden" checked={editForm.assignedSellers.length === 0} onChange={() => setEditForm((f) => ({ ...f, assignedSellers: [] }))} />
+                      All sellers
+                    </label>
+                    {sellers.map((s) => (
+                      <label key={s.id} className="text-[11px] font-medium flex items-center gap-1 px-2.5 py-1 rounded-full cursor-pointer" style={editForm.assignedSellers.includes(s.email) ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                        <input type="checkbox" className="hidden" checked={editForm.assignedSellers.includes(s.email)} onChange={() => toggleEditSeller(s.email)} />
+                        {s.email}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => saveEdit(p.id)} className="flex-1 text-xs font-semibold py-2 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
@@ -5295,6 +5245,9 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                 <div className="mt-1 text-xs text-gray-500">Cost AED {p.cost} · Sell AED {p.sell}</div>
                 <div className="mt-1 text-xs font-semibold" style={{ color: (p.stock ?? 0) > 0 ? "#00a67e" : "#EF4444" }}>
                   Stock: {p.stock ?? 0} {(p.stock ?? 0) > 0 ? "" : "(Out of Stock)"}
+                </div>
+                <div className="mt-1 text-[11px] font-semibold truncate" style={{ color: (p.assignedSellerEmails || []).length ? "#F8B400" : "#9CA3AF" }} title={(p.assignedSellerEmails || []).join(", ")}>
+                  {(p.assignedSellerEmails || []).length ? `🔒 ${p.assignedSellerEmails.length} seller(s): ${p.assignedSellerEmails.join(", ")}` : "🌐 All sellers"}
                 </div>
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => startEdit(p)} className="flex-1 text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
@@ -5365,199 +5318,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         ))}
       </div>
 
-      <PremiumProductsPanel notify={notify} sellers={sellers} />
-
     </div>
   );
 }
 
-// Premium products — a completely separate catalog from the regular one,
-// only shown to sellers Admin has switched to Premium (see the Sellers
-// table above). Kept intentionally simpler than the regular catalog editor
-// (single image, no reviews) since it's a smaller, curated list.
-function PremiumProductsPanel({ notify, sellers = [] }) {
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "⭐", description: "", image_url: "", stock: "", sellerEmail: "" });
-  const [uploading, setUploading] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState(null);
-  const [editUploading, setEditUploading] = useState(false);
-
-  const load = async () => { setLoading(true); setList(await fetchPremiumProducts()); setLoading(false); };
-  useEffect(() => { load(); }, []); // eslint-disable-line
-
-  const uploadForNewProduct = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setUploading(true);
-    const { url, error } = await uploadProductImage(file);
-    setUploading(false);
-    if (error) { notify(error); return; }
-    if (url) setForm((f) => ({ ...f, image_url: url }));
-  };
-  const uploadForEdit = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setEditUploading(true);
-    const { url, error } = await uploadProductImage(file);
-    setEditUploading(false);
-    if (error) { notify(error); return; }
-    if (url) setEditForm((f) => ({ ...f, image_url: url }));
-  };
-
-  const addPremiumProduct = async (e) => {
-    e.preventDefault();
-    if (!form.name || !form.cost || !form.sell) { notify("Fill in name, cost and sell price."); return; }
-    const newProduct = {
-      id: "prm" + Date.now().toString().slice(-8),
-      name: form.name, category: form.category || "Premium",
-      cost: parseFloat(form.cost), sell: parseFloat(form.sell), emoji: form.emoji || "⭐",
-      description: form.description || "", image_url: form.image_url || null, images: form.image_url ? [form.image_url] : [],
-      stock: Math.max(0, parseInt(form.stock, 10) || 0),
-      sellerEmail: form.sellerEmail || "",
-    };
-    const updated = [newProduct, ...list];
-    const { error } = await savePremiumProducts(updated);
-    if (error) { notify(`Could not add premium product: ${error.message || "unknown error"}`); return; }
-    setList(updated);
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "⭐", description: "", image_url: "", stock: "", sellerEmail: "" });
-    notify(form.sellerEmail ? `Premium product added — only ${form.sellerEmail} will see it.` : "Premium product added.");
-  };
-
-  const startEdit = (p) => { setEditingId(p.id); setEditForm({ ...p }); };
-  const cancelEdit = () => { setEditingId(null); setEditForm(null); };
-  const saveEdit = async (id) => {
-    if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify("Fill in name, cost and sell price."); return; }
-    const updated = list.map((p) => (p.id === id ? {
-      ...p, name: editForm.name, category: editForm.category || "Premium",
-      cost: parseFloat(editForm.cost), sell: parseFloat(editForm.sell), emoji: editForm.emoji || "⭐",
-      description: editForm.description || "", image_url: editForm.image_url || null, images: editForm.image_url ? [editForm.image_url] : [],
-      stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
-      sellerEmail: editForm.sellerEmail || "",
-    } : p));
-    const { error } = await savePremiumProducts(updated);
-    if (error) { notify(`Could not save: ${error.message || "unknown error"}`); return; }
-    setList(updated);
-    cancelEdit();
-    notify("Premium product updated.");
-  };
-  const deletePremiumProduct = async (id) => {
-    const updated = list.filter((p) => p.id !== id);
-    const { error } = await savePremiumProducts(updated);
-    if (error) { notify("Could not delete premium product."); return; }
-    setList(updated);
-    notify("Premium product removed.");
-  };
-
-  return (
-    <div className="mt-10">
-      <div className="flex items-center gap-2 mb-1">
-        <Sparkles className="w-4 h-4" style={{ color: "#F8B400" }} />
-        <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Premium products</h2>
-      </div>
-      <p className="text-xs text-gray-400 mb-4">A separate catalog — only visible to sellers you've switched to Premium in the Sellers table above.</p>
-
-      <form onSubmit={addPremiumProduct} className="rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #F8B400" }}>
-        <div className="sm:col-span-2"><label className="text-xs text-gray-500">Product name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Stock quantity</label><input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div className="sm:col-span-2">
-          <label className="text-xs text-gray-500">Visible to</label>
-          <select value={form.sellerEmail} onChange={(e) => setForm({ ...form, sellerEmail: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }}>
-            <option value="">All Premium sellers</option>
-            {sellers.map((s) => (
-              <option key={s.id} value={s.email}>{s.email}{s.store_name ? ` — ${s.store_name}` : ""}</option>
-            ))}
-          </select>
-        </div>
-        <div className="sm:col-span-6 flex items-center gap-3">
-          <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-            {form.image_url ? <img src={form.image_url} alt="" className="w-full h-full object-cover" /> : <span style={{ fontSize: 26 }}>{form.emoji || "⭐"}</span>}
-          </div>
-          <label className="text-sm font-semibold px-4 py-2 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: uploading ? 0.6 : 1 }}>
-            {uploading ? "Uploading…" : "Upload picture"}
-            <input type="file" accept="image/*" onChange={uploadForNewProduct} disabled={uploading} className="hidden" />
-          </label>
-        </div>
-        <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)" }}>+ Add premium product</button>
-      </form>
-
-      {loading ? (
-        <div className="mt-6 text-center text-sm text-gray-400 py-6">Loading premium products…</div>
-      ) : list.length === 0 ? (
-        <div className="mt-6 text-center text-sm text-gray-400 py-6 rounded-2xl bg-white" style={{ border: "1px dashed #E5E7EB" }}>No premium products yet — add one above.</div>
-      ) : (
-        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {list.map((p) => (
-            <div key={p.id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #F8B400" }}>
-              {editingId === p.id ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-                      {editForm.image_url ? <img src={editForm.image_url} alt="" className="w-full h-full object-cover" /> : <span style={{ fontSize: 20 }}>{editForm.emoji || "⭐"}</span>}
-                    </div>
-                    <label className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: editUploading ? 0.6 : 1 }}>
-                      {editUploading ? "Uploading…" : "Change picture"}
-                      <input type="file" accept="image/*" onChange={uploadForEdit} disabled={editUploading} className="hidden" />
-                    </label>
-                  </div>
-                  <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="w-full rounded-lg px-2 py-1.5 text-sm font-semibold" style={{ border: "1px solid #E5E7EB" }} />
-                  <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} placeholder="Category" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} placeholder="Cost" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                    <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell" className="w-1/2 rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                  </div>
-                  <input type="number" min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} placeholder="Stock" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                  <div>
-                    <label className="text-[11px] text-gray-400">Visible to</label>
-                    <select value={editForm.sellerEmail || ""} onChange={(e) => setEditForm({ ...editForm, sellerEmail: e.target.value })} className="mt-0.5 w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }}>
-                      <option value="">All Premium sellers</option>
-                      {sellers.map((s) => (
-                        <option key={s.id} value={s.email}>{s.email}{s.store_name ? ` — ${s.store_name}` : ""}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <textarea rows={2} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
-                  <div className="flex gap-2">
-                    <button onClick={() => saveEdit(p.id)} className="flex-1 text-xs font-semibold py-1.5 rounded-full text-white" style={{ background: "#00C896" }}>Save</button>
-                    <button onClick={cancelEdit} className="flex-1 text-xs font-semibold py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="w-full h-32 rounded-xl overflow-hidden flex items-center justify-center mb-3" style={{ background: "#F8FAFC" }}>
-                    <ProductThumb product={p} size={40} />
-                  </div>
-                  <div className="font-bold text-sm" style={{ color: "#111827" }}>{p.name}</div>
-                  <div className="text-xs text-gray-400">{p.category}</div>
-                  <div className="flex items-center justify-between mt-2 text-xs">
-                    <span style={{ color: "#6B7280" }}>Cost AED {p.cost} → Sell AED {p.sell}</span>
-                  </div>
-                  <div className="text-xs mt-1" style={{ color: Number(p.stock) > 0 ? "#00a67e" : "#EF4444" }}>
-                    {Number(p.stock) > 0 ? `${p.stock} in stock` : "Out of stock"}
-                  </div>
-                  <div className="mt-1 text-[11px] font-semibold truncate" style={{ color: p.sellerEmail ? "#F8B400" : "#9CA3AF" }} title={p.sellerEmail || ""}>
-                    {p.sellerEmail ? `🔒 Only ${p.sellerEmail}` : "⭐ All Premium sellers"}
-                  </div>
-                  <div className="flex gap-2 mt-3">
-                    <button onClick={() => startEdit(p)} className="flex-1 text-xs font-semibold py-1.5 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
-                    <button onClick={() => deletePremiumProduct(p.id)} className="flex-1 text-xs font-semibold py-1.5 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>Delete</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function SupportChannelCard({ icon, iconBg, title, subtitle, action, delay = 0 }) {
   return (
