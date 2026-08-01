@@ -754,12 +754,31 @@ function Pricing() {
 }
 
 /* ---------------- TESTIMONIALS ---------------- */
+const DEFAULT_TESTIMONIALS = [
+  { name: "Sara Al Mansoori", role: "Founder, Noon Threads", quote: "Dispatch time dropped from three days to same-day. Our Riyadh customers noticed immediately.", rating: 5 },
+  { name: "Hamdan Al Suwaidi", role: "Ops Lead, Gulf Gadgets", quote: "The dashboard replaced four spreadsheets. Stock, orders, and payouts finally live in one place.", rating: 5 },
+  { name: "Fatima Khalil", role: "Seller, Doha Beauty Co.", quote: "Returns used to be a nightmare across borders. Now it's a single click for our customers.", rating: 5 },
+];
+
 function Testimonials() {
-  const items = [
-    { name: "Sara Al Mansoori", role: "Founder, Noon Threads", quote: "Dispatch time dropped from three days to same-day. Our Riyadh customers noticed immediately.", rating: 5 },
-    { name: "Hamdan Al Suwaidi", role: "Ops Lead, Gulf Gadgets", quote: "The dashboard replaced four spreadsheets. Stock, orders, and payouts finally live in one place.", rating: 5 },
-    { name: "Fatima Khalil", role: "Seller, Doha Beauty Co.", quote: "Returns used to be a nightmare across borders. Now it's a single click for our customers.", rating: 5 },
-  ];
+  // Customer reviews are admin-editable (Admin tab → "Customer reviews"),
+  // stored as JSON in app_settings under key "testimonials_content".
+  const [items, setItems] = useState(DEFAULT_TESTIMONIALS);
+  useEffect(() => {
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "testimonials_content")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          try {
+            const parsed = JSON.parse(data.value);
+            if (Array.isArray(parsed) && parsed.length) setItems(parsed);
+          } catch { /* keep defaults if stored value is malformed */ }
+        }
+      });
+  }, []);
   return (
     <section id="testimonials" className="py-28" style={{ background: "#F8FAFC" }}>
       <div className="max-w-7xl mx-auto px-6">
@@ -4498,6 +4517,42 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     notify("Pricing section updated — changes are live on the homepage.");
   };
 
+  // Customer reviews: editable copy of the homepage testimonials, saved as
+  // JSON in app_settings under "testimonials_content".
+  const [testimonialsForm, setTestimonialsForm] = useState(DEFAULT_TESTIMONIALS);
+  const [testimonialsSaving, setTestimonialsSaving] = useState(false);
+  useEffect(() => {
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "testimonials_content")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          try {
+            const parsed = JSON.parse(data.value);
+            if (Array.isArray(parsed) && parsed.length) setTestimonialsForm(parsed);
+          } catch { /* keep defaults if stored value is malformed */ }
+        }
+      });
+  }, []);
+  const updateTestimonial = (idx, field, value) => {
+    setTestimonialsForm((list) => list.map((t, i) => (i === idx ? { ...t, [field]: value } : t)));
+  };
+  const addTestimonial = () => {
+    setTestimonialsForm((list) => [...list, { name: "", role: "", quote: "", rating: 5 }]);
+  };
+  const removeTestimonial = (idx) => {
+    setTestimonialsForm((list) => list.filter((_, i) => i !== idx));
+  };
+  const saveTestimonials = async () => {
+    setTestimonialsSaving(true);
+    const { error } = await supabase.from("app_settings").upsert({ key: "testimonials_content", value: JSON.stringify(testimonialsForm) });
+    setTestimonialsSaving(false);
+    if (error) { notify("Could not save the reviews."); return; }
+    notify("Customer reviews updated — changes are live on the homepage.");
+  };
+
   const sellerOrderCount = (email) => allOrders.filter((o) => o.seller_email === email).length;
   const filteredSellers = sellers.filter((s) => {
     const q = sellerSearch.trim().toLowerCase();
@@ -4615,6 +4670,77 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)", opacity: pricingSaving ? 0.6 : 1 }}
         >
           {pricingSaving ? "Saving…" : "Save pricing section"}
+        </button>
+      </div>
+
+      {/* Customer reviews: edit the testimonial cards shown on the homepage's
+          "Trusted by sellers" section. Saves to Supabase, live instantly. */}
+      <div className="mt-6 rounded-2xl bg-white p-5" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer reviews</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Edit the testimonial cards shown on the homepage's "Trusted by sellers across the Gulf" section.</p>
+          </div>
+          <button
+            onClick={addTestimonial}
+            className="text-xs font-semibold px-3.5 py-2 rounded-full flex-shrink-0"
+            style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}
+          >
+            + Add review
+          </button>
+        </div>
+
+        <div className="mt-5 grid md:grid-cols-3 gap-4">
+          {testimonialsForm.map((t, i) => (
+            <div key={i} className="rounded-xl p-4 space-y-2.5 relative" style={{ border: "1px solid #E5E7EB" }}>
+              <button
+                onClick={() => removeTestimonial(i)}
+                className="absolute top-3 right-3 text-gray-300 hover:text-red-400"
+                title="Remove this review"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Reviewer name</label>
+                <input value={t.name} onChange={(e) => updateTestimonial(i, "name", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Role / company</label>
+                <input value={t.role} onChange={(e) => updateTestimonial(i, "role", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Quote</label>
+                <textarea
+                  value={t.quote}
+                  onChange={(e) => updateTestimonial(i, "quote", e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full text-sm rounded-lg px-3 py-2"
+                  style={{ border: "1px solid #E5E7EB" }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Rating (1–5 stars)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={t.rating}
+                  onChange={(e) => updateTestimonial(i, "rating", Math.max(1, Math.min(5, Number(e.target.value) || 5)))}
+                  className="mt-1 w-full text-sm rounded-lg px-3 py-2"
+                  style={{ border: "1px solid #E5E7EB" }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={saveTestimonials}
+          disabled={testimonialsSaving}
+          className="mt-5 text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
+          style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)", opacity: testimonialsSaving ? 0.6 : 1 }}
+        >
+          {testimonialsSaving ? "Saving…" : "Save reviews"}
         </button>
       </div>
 
