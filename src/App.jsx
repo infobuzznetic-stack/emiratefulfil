@@ -662,9 +662,9 @@ function DashboardPreview() {
 const DEFAULT_PRICING = {
   headline: "Simple pricing, built to scale with you.",
   plans: [
-    { name: "Starter", price: 0, unit: "/mo", desc: "For sellers testing the market", features: ["Up to 50 orders/mo", "1 warehouse zone", "Email support", "Standard shipping rates"], cta: "Start free" },
-    { name: "Growth", price: 349, unit: "/mo", desc: "For sellers scaling across the Gulf", features: ["Up to 2,000 orders/mo", "All 6 GCC markets", "Priority support", "COD management", "API access"], cta: "Start free trial", highlighted: true },
-    { name: "Enterprise", price: null, unit: "", desc: "For high-volume brands & marketplaces", features: ["Unlimited orders", "Dedicated warehouse space", "Dedicated account manager", "Custom integrations"], cta: "Talk to sales" },
+    { name: "Starter", price: 0, unit: "/mo", desc: "For sellers testing the market", features: ["Up to 50 orders/mo", "1 warehouse zone", "Email support", "Standard shipping rates"], cta: "Contact Support To Buy Plans" },
+    { name: "Growth", price: 349, unit: "/mo", desc: "For sellers scaling across the Gulf", features: ["Up to 2,000 orders/mo", "All 6 GCC markets", "Priority support", "COD management", "API access"], cta: "Contact Support To Buy Plans", highlighted: true },
+    { name: "Enterprise", price: null, unit: "", desc: "For high-volume brands & marketplaces", features: ["Unlimited orders", "Dedicated warehouse space", "Dedicated account manager", "Custom integrations"], cta: "Contact Support To Buy Plans" },
   ],
 };
 
@@ -735,12 +735,15 @@ function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <button
-                  className="mt-8 w-full text-sm font-semibold py-3 rounded-full transition-transform hover:scale-[1.02]"
+                <a
+                  href={`https://wa.me/971568328274?text=${encodeURIComponent(`Hi, I'd like to buy the ${p.name} plan on EmirateFulfil.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-8 w-full text-sm font-semibold py-3 rounded-full transition-transform hover:scale-[1.02] flex items-center justify-center"
                   style={p.highlighted ? { background: "linear-gradient(135deg,#00C896,#00a67e)", color: "#04140f" } : { background: "rgba(255,255,255,0.08)", color: "#fff" }}
                 >
                   {p.cta}
-                </button>
+                </a>
               </div>
             </Reveal>
           ))}
