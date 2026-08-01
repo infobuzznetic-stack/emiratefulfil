@@ -2162,6 +2162,13 @@ function OverviewTab({
 
   return (
     <div>
+      <div className="flex items-center gap-2 mb-4 px-1">
+        <MapPin className="w-4 h-4" style={{ color: "#0B1F3A" }} />
+        <span className="text-sm font-bold" style={{ color: "#111827" }}>Dubai, UAE</span>
+        <span className="w-1 h-1 rounded-full" style={{ background: "#9CA3AF" }} />
+        <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
+        <span className="text-sm font-medium" style={{ color: "#6B7280" }}>Live Operations</span>
+      </div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
         {/* subtle dot-grid texture */}
         <div
