@@ -2579,15 +2579,31 @@ function OverviewTab({
   );
 }
 
+// Shared across the Admin and Seller order tables so every status pill/select
+// uses the same colors and human-readable label for a given status value.
+const ORDER_STATUS_STYLES = {
+  pending: { background: "rgba(248,180,0,0.15)", color: "#b07d00" },
+  confirmation_pending: { background: "rgba(234,88,12,0.12)", color: "#c2410c" },
+  confirmed: { background: "rgba(14,165,233,0.12)", color: "#0284c7" },
+  dispatched: { background: "rgba(139,92,246,0.14)", color: "#7c3aed" },
+  shipped: { background: "rgba(59,130,246,0.12)", color: "#3B82F6" },
+  delivered: { background: "rgba(0,200,150,0.15)", color: "#00a67e" },
+  returned: { background: "rgba(239,68,68,0.12)", color: "#EF4444" },
+  cancelled: { background: "rgba(156,163,175,0.18)", color: "#6B7280" },
+};
+const ORDER_STATUS_LABELS = {
+  pending: "Pending",
+  confirmation_pending: "Order confirmation pending",
+  confirmed: "Order confirmed",
+  dispatched: "Order dispatched",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  returned: "Returned",
+  cancelled: "Cancelled",
+};
+
 function StatusPill({ status }) {
-  const styles = {
-    delivered: { background: "rgba(0,200,150,0.15)", color: "#00a67e" },
-    shipped: { background: "rgba(59,130,246,0.12)", color: "#3B82F6" },
-    cancelled: { background: "rgba(156,163,175,0.18)", color: "#6B7280" },
-    returned: { background: "rgba(239,68,68,0.12)", color: "#EF4444" },
-    pending: { background: "rgba(248,180,0,0.15)", color: "#b07d00" },
-  };
-  return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={styles[status] || styles.pending}>{status}</span>;
+  return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={ORDER_STATUS_STYLES[status] || ORDER_STATUS_STYLES.pending}>{ORDER_STATUS_LABELS[status] || status}</span>;
 }
 
 function PaymentPill({ status }) {
@@ -4268,19 +4284,16 @@ function AdminOrdersPanel({ notify }) {
                               value={o.status}
                               onChange={(e) => setAdminOrderStatus(o.id, e.target.value)}
                               className="text-xs rounded-full px-2 py-1 font-semibold border-0"
-                              style={
-                                o.status === "delivered" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
-                                o.status === "shipped" ? { background: "rgba(59,130,246,0.12)", color: "#3B82F6" } :
-                                o.status === "cancelled" ? { background: "rgba(156,163,175,0.18)", color: "#6B7280" } :
-                                o.status === "returned" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
-                                { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
-                              }
+                              style={ORDER_STATUS_STYLES[o.status] || ORDER_STATUS_STYLES.pending}
                             >
                               <option value="pending">Pending</option>
+                              <option value="confirmation_pending">Order confirmation pending</option>
+                              <option value="confirmed">Order confirmed</option>
+                              <option value="dispatched">Order dispatched</option>
                               <option value="shipped">Shipped</option>
                               <option value="delivered">Delivered</option>
-                              <option value="cancelled">Cancelled</option>
                               <option value="returned">Returned</option>
+                              <option value="cancelled">Cancelled</option>
                             </select>
                           </td>
                           <td className="px-4 py-3">
