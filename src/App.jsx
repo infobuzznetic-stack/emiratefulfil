@@ -1011,7 +1011,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [], isPremium: !!p.is_premium }));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [], isPremium: !!p.is_premium, sourceUrl: p.source_url || null }));
 }
 // Which sellers Admin has marked as "Premium" — just a list of emails, stored
 // as JSON in app_settings (same chunked mechanism as the homepage content).
@@ -4551,6 +4551,36 @@ function LightField({ label, type = "text", value, onChange, placeholder }) {
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false });
+  // "Import from link" — Admin pastes a product URL from Temu / Noon / Amazon /
+  // Wavebit / a dropshipping site, we fetch the page server-side (Edge
+  // Function "fetch-product") and pull out title/price/pictures/description
+  // to prefill the form below. Admin still reviews everything (and sets
+  // Cost + Category, which the source page never tells us) before saving.
+  const IMPORT_SOURCES = ["Amazon", "Noon", "Temu", "MyZamil", "Arabia Dropshipping", "Wavebit", "Other"];
+  const [importSource, setImportSource] = useState("Amazon");
+  const [importUrl, setImportUrl] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState("");
+  const fetchProductFromLink = async () => {
+    if (!importUrl.trim()) { setImportError("Paste a product link first."); return; }
+    setImportLoading(true);
+    setImportError("");
+    const { data, error } = await supabase.functions.invoke("fetch-product", { body: { url: importUrl.trim() } });
+    setImportLoading(false);
+    if (error || !data?.ok) {
+      setImportError((data && data.error) || "Could not read that link. Please fill the form in manually.");
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      name: data.title || f.name,
+      description: data.description || f.description,
+      sell: data.price != null ? String(data.price) : f.sell,
+      images: (data.images || []).slice(0, 4),
+      sourceUrl: importUrl.trim(),
+    }));
+    notify(`Pulled details from ${data.sourceHost || importSource} — check them below, add Cost + Category, then save.`);
+  };
   const toggleFormSeller = (email) => setForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const [formImageUploading, setFormImageUploading] = useState(false);
   const uploadFormImages = async (e) => {
@@ -4673,9 +4703,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       stock: Math.max(0, parseInt(form.stock, 10) || 0),
       assigned_seller_emails: form.assignedSellers,
       is_premium: form.isPremium,
+      source_url: form.sourceUrl || null,
     });
     if (error) { notify("Could not add product."); return; }
     setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false });
+    setImportUrl(""); setImportError("");
     notify(form.isPremium ? "Premium product added — only visible to Premium sellers." : (form.assignedSellers.length ? `Product added — only visible to ${form.assignedSellers.length} seller(s).` : "Product added to catalog."));
     onCatalogChanged();
   };
@@ -4694,7 +4726,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const startEdit = (p) => {
     setEditingId(p.id);
     const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0, assignedSellers: p.assignedSellerEmails || [], isPremium: !!p.isPremium });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0, assignedSellers: p.assignedSellerEmails || [], isPremium: !!p.isPremium, sourceUrl: p.sourceUrl || "" });
   };
   const toggleEditSeller = (email) => setEditForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
@@ -4735,6 +4767,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       stock: Math.max(0, parseInt(editForm.stock, 10) || 0),
       assigned_seller_emails: editForm.assignedSellers || [],
       is_premium: !!editForm.isPremium,
+      source_url: editForm.sourceUrl || null,
     }).eq("id", id);
     if (error) { console.error("Product save failed:", error); notify(`Could not save: ${error.message || "unknown error"}`); return; }
     notify("Product updated.");
@@ -5194,7 +5227,34 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
       )}
 
-      <form onSubmit={addProduct} className="mt-8 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
+      <div className="mt-8 rounded-2xl p-6" style={{ border: "1px solid #E5E7EB", background: "linear-gradient(135deg,#0B1F3A08,#00C89608)" }}>
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4" style={{ color: "#F8B400" }} />
+          <h3 className="font-bold text-sm" style={{ color: "#0B1F3A" }}>Import product from a link</h3>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">Paste a product page URL from Temu, Noon, Amazon, MyZamil, Arabia Dropshipping, Wavebit, etc. — we'll try to pull the title, price, pictures and description into the form below for you to review before saving.</p>
+        <div className="mt-3 grid sm:grid-cols-6 gap-3 items-end">
+          <div className="sm:col-span-1">
+            <label className="text-xs text-gray-500">Source</label>
+            <select value={importSource} onChange={(e) => setImportSource(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }}>
+              {IMPORT_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="sm:col-span-4">
+            <label className="text-xs text-gray-500">Product link</label>
+            <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} placeholder="https://…" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} />
+          </div>
+          <div className="sm:col-span-1">
+            <button type="button" onClick={fetchProductFromLink} disabled={importLoading} className="w-full text-sm font-semibold py-2.5 rounded-full text-white disabled:opacity-60" style={{ background: "#0B1F3A" }}>
+              {importLoading ? "Fetching…" : "Fetch"}
+            </button>
+          </div>
+        </div>
+        {importError && <p className="mt-2 text-xs font-medium" style={{ color: "#EF4444" }}>{importError} — no problem, just fill the form below in by hand.</p>}
+        <p className="mt-2 text-[11px] text-gray-400">Some sites (especially Amazon and Temu) block automatic access — if fetching fails, add the details manually in the form below. Either way, always double-check Cost, Category and price before saving.</p>
+      </div>
+
+      <form onSubmit={addProduct} className="mt-6 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
         <div className="sm:col-span-2"><label className="text-xs text-gray-500">Product name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
@@ -5339,6 +5399,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <div className="mt-1 text-[11px] font-semibold flex items-center gap-1" style={{ color: "#F8B400" }}>
                     <Sparkles className="w-3 h-3" /> Premium — Premium sellers only
                   </div>
+                )}
+                {p.sourceUrl && (
+                  <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-1 text-[11px] font-medium truncate block" style={{ color: "#6B7280" }}>
+                    🔗 View original source
+                  </a>
                 )}
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => startEdit(p)} className="flex-1 text-xs font-semibold py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>Edit</button>
