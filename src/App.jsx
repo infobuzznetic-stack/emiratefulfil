@@ -626,6 +626,217 @@ function Pricing() {
   );
 }
 
+/* ---------------- ABOUT / STORY (supplier + delivery partner) ---------------- */
+function AboutStory() {
+  return (
+    <section className="py-28" style={{ background: "#0B1F3A" }}>
+      <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+        <Reveal>
+          <div className="relative rounded-3xl overflow-hidden" style={{ boxShadow: "0 30px 70px rgba(0,0,0,0.35)" }}>
+            <img
+              src="https://images.unsplash.com/photo-1667514045886-e79279ebe179?fm=jpg&q=80&w=1200&auto=format&fit=crop"
+              alt="Delivery partner carrying a package"
+              className="w-full h-[420px] object-cover"
+            />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 40%, rgba(11,31,58,0.85) 100%)" }} />
+            <div className="absolute bottom-6 left-6 right-6 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
+                <Truck className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="text-white font-bold text-sm">We deliver it ourselves</div>
+                <div className="text-white/60 text-xs">Own riders &amp; vans across the UAE</div>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
+        <Reveal delay={120}>
+          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#F8B400" }}>Who we are</span>
+          <h2 className="mt-3 text-4xl md:text-5xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            Not just a platform — your supplier and delivery partner.
+          </h2>
+          <p className="mt-5 text-white/60 leading-relaxed">
+            EmirateFulfil is run by people who source the products, stock them, and personally get them out for delivery — not a faceless middleman. When you sell with us, you're working directly with the team that packs the box and drives it to the customer's door.
+          </p>
+          <div className="mt-8 grid sm:grid-cols-2 gap-4">
+            {[
+              { icon: Boxes, title: "We are the supplier", desc: "Real stock, sourced and quality-checked before it ever reaches your customer." },
+              { icon: Truck, title: "We are the delivery", desc: "Our own riders and vans handle last-mile — no third party in between." },
+              { icon: MapPin, title: "On the ground in the UAE", desc: "Local knowledge of every emirate, every neighborhood, every shortcut." },
+              { icon: ShieldCheck, title: "Accountable end-to-end", desc: "One team responsible from warehouse shelf to doorstep handover." },
+            ].map((f, i) => (
+              <div key={i} className="p-5 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <f.icon className="w-5 h-5" style={{ color: "#00C896" }} />
+                <div className="mt-3 text-white font-semibold text-sm">{f.title}</div>
+                <div className="mt-1 text-white/50 text-xs leading-relaxed">{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- FLEET & WAREHOUSE SHOWCASE ---------------- */
+function BrandedVan() {
+  return (
+    <svg viewBox="0 0 600 340" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="vanSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0F2E52" />
+          <stop offset="100%" stopColor="#081221" />
+        </linearGradient>
+        <linearGradient id="vanBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#e6e9ee" />
+        </linearGradient>
+      </defs>
+      <rect width="600" height="340" fill="url(#vanSky)" />
+      <rect x="0" y="255" width="600" height="6" fill="rgba(255,255,255,0.08)" />
+      <circle cx="90" cy="80" r="46" fill="#F8B400" opacity="0.15" />
+      <circle cx="520" cy="60" r="60" fill="#00C896" opacity="0.12" />
+
+      {/* van body */}
+      <g>
+        <rect x="90" y="140" width="330" height="100" rx="14" fill="url(#vanBody)" />
+        <path d="M420 240 L420 165 Q420 150 435 150 L470 150 Q490 150 500 168 L525 205 Q532 216 532 228 L532 240 Z" fill="url(#vanBody)" />
+        <rect x="90" y="140" width="330" height="24" rx="10" fill="#0B1F3A" />
+        <rect x="440" y="168" width="60" height="34" rx="6" fill="#9fd8ff" opacity="0.85" />
+
+        {/* brand stripe */}
+        <rect x="90" y="196" width="442" height="20" fill="#00C896" />
+        <rect x="90" y="216" width="442" height="6" fill="#F8B400" />
+
+        {/* EmirateFulfil wordmark on the van */}
+        <text x="115" y="182" fontFamily="'Plus Jakarta Sans', sans-serif" fontWeight="800" fontSize="30" fill="#0B1F3A">
+          Emirate<tspan fill="#00a67e">Fulfil</tspan>
+        </text>
+        <text x="117" y="211" fontFamily="Inter, sans-serif" fontWeight="600" fontSize="12" fill="#04140f" letterSpacing="1.5">
+          SUPPLIER · WAREHOUSE · DELIVERY
+        </text>
+
+        {/* windshield line */}
+        <line x1="420" y1="150" x2="420" y2="240" stroke="#0B1F3A" strokeWidth="4" />
+
+        {/* wheels */}
+        <circle cx="175" cy="245" r="28" fill="#12294a" />
+        <circle cx="175" cy="245" r="12" fill="#c9d3de" />
+        <circle cx="470" cy="245" r="28" fill="#12294a" />
+        <circle cx="470" cy="245" r="12" fill="#c9d3de" />
+      </g>
+
+      <rect x="0" y="266" width="600" height="74" fill="#081221" />
+    </svg>
+  );
+}
+
+function Fleet() {
+  const cards = [
+    {
+      title: "Our delivery fleet",
+      desc: "Branded EmirateFulfil vans on the road every day, dispatching orders across all seven emirates.",
+      icon: Truck,
+      graphic: true,
+    },
+    {
+      img: "https://images.unsplash.com/photo-1685483749753-0dab7e144794?fm=jpg&q=80&w=1200&auto=format&fit=crop",
+      title: "Our warehouses",
+      desc: "Stock held, organized, and ready to pick — close to where your customers are.",
+      icon: Warehouse,
+    },
+  ];
+  return (
+    <section className="py-28" style={{ background: "#F8FAFC" }}>
+      <div className="max-w-7xl mx-auto px-6">
+        <Reveal>
+          <div className="max-w-xl">
+            <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#00a67e" }}>Real operations</span>
+            <h2 className="mt-3 text-4xl md:text-5xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              The fleet and warehouses behind every order.
+            </h2>
+          </div>
+        </Reveal>
+
+        <div className="mt-14 grid md:grid-cols-2 gap-6">
+          {cards.map((c, i) => (
+            <Reveal key={i} delay={i * 100}>
+              <div className="group relative rounded-2xl overflow-hidden h-80" style={{ boxShadow: "0 10px 30px rgba(16,24,40,0.08)" }}>
+                {c.graphic ? <BrandedVan /> : (
+                  <img src={c.img} alt={c.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                )}
+                <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 35%, rgba(11,31,58,0.9) 100%)" }} />
+                {!c.graphic && (
+                  <span className="absolute top-4 right-4 text-[11px] font-bold px-3 py-1 rounded-full" style={{ background: "rgba(0,200,150,0.9)", color: "#04140f" }}>
+                    EmirateFulfil
+                  </span>
+                )}
+                <div className="absolute bottom-6 left-6 right-6">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
+                    <c.icon className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-white font-bold text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{c.title}</h3>
+                  <p className="text-white/70 text-sm mt-1">{c.desc}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- UAE DELIVERY COVERAGE ---------------- */
+function CoverageMap() {
+  const emirates = [
+    { name: "Dubai", eta: "Same-day" },
+    { name: "Abu Dhabi", eta: "Same-day" },
+    { name: "Sharjah", eta: "Same-day" },
+    { name: "Ajman", eta: "Next-day" },
+    { name: "Umm Al Quwain", eta: "Next-day" },
+    { name: "Ras Al Khaimah", eta: "Next-day" },
+    { name: "Fujairah", eta: "Next-day" },
+  ];
+  return (
+    <section className="py-28" style={{ background: "#0B1F3A" }}>
+      <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+        <Reveal>
+          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#F8B400" }}>Delivery coverage</span>
+          <h2 className="mt-3 text-4xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            We deliver to every emirate, ourselves.
+          </h2>
+          <p className="mt-4 text-white/60">
+            Whether your customer is in Downtown Dubai or Fujairah's coastline, the same team that packed the order carries it the rest of the way.
+          </p>
+          <div className="mt-8 grid sm:grid-cols-2 gap-3">
+            {emirates.map((e, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <span className="flex items-center gap-2 text-sm text-white font-medium">
+                  <MapPin className="w-4 h-4 flex-shrink-0" style={{ color: "#00C896" }} /> {e.name}
+                </span>
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "rgba(0,200,150,0.15)", color: "#00e0aa" }}>{e.eta}</span>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+
+        <Reveal delay={150}>
+          <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/United_Arab_Emirates_adm_location_map.svg/800px-United_Arab_Emirates_adm_location_map.svg.png"
+              alt="Map of the United Arab Emirates"
+              className="w-full h-auto rounded-xl"
+              style={{ background: "#0F2440" }}
+            />
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------- TESTIMONIALS ---------------- */
 function Testimonials() {
   const items = [
@@ -5297,8 +5508,11 @@ function HomePage({ session, onNav, onLogout }) {
       <Hero onSignup={() => onNav("signup")} />
       <TrustStrip />
       <Features />
+      <AboutStory />
+      <Fleet />
       <OrderFlow />
       <DashboardPreview />
+      <CoverageMap />
       <Pricing />
       <Testimonials />
       <FAQ />
