@@ -263,7 +263,6 @@ function Navbar({ session, onNav, onLogout }) {
             </div>
           </div>
           <a href="#how" className="hover:text-white transition-colors">How it works</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
           <a href="#testimonials" className="hover:text-white transition-colors">Customers</a>
           <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
         </div>
@@ -303,7 +302,6 @@ function Navbar({ session, onNav, onLogout }) {
         <div className="lg:hidden px-6 pb-6 flex flex-col gap-4 text-white/85 text-sm" style={{ background: "#0B1F3A" }}>
           <a href="#services">Services</a>
           <a href="#how">How it works</a>
-          <a href="#pricing">Pricing</a>
           <a href="#testimonials">Customers</a>
           <a href="#faq">FAQ</a>
           {session ? (
@@ -6378,7 +6376,6 @@ function HomePage({ session, onNav, onLogout }) {
       <InAction />
       <OrderFlow />
       <DashboardPreview />
-      <Pricing />
       <Testimonials />
       <FAQ />
       <CTA onSignup={() => onNav("signup")} />
