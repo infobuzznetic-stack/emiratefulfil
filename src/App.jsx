@@ -1013,6 +1013,22 @@ async function fetchCatalog() {
   if (error) { console.error(error); return []; }
   return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [] }));
 }
+// Which sellers Admin has marked as "Premium" — just a list of emails, stored
+// as JSON in app_settings (same chunked mechanism as the homepage content).
+// This is a status/badge Admin controls per seller — separate from which
+// specific sellers a product is assigned to (that lives on the product itself).
+const PREMIUM_SELLERS_KEY = "premium_sellers_content";
+async function fetchPremiumSellerEmails() {
+  const raw = await loadChunkedSetting(PREMIUM_SELLERS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+async function savePremiumSellerEmails(list) {
+  return saveChunkedSetting(PREMIUM_SELLERS_KEY, JSON.stringify(list));
+}
 async function fetchListings(email) {
   const { data, error } = await supabase.from("listings").select("product_id").eq("seller_email", email);
   if (error) { console.error(error); return []; }
@@ -1604,10 +1620,16 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   };
   const markNotificationsRead = () => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 
+  // Whether Admin has marked this seller as "Premium" — just a badge/status,
+  // doesn't change which products they see (that's the per-product "Visible to" list).
+  const [isPremiumSeller, setIsPremiumSeller] = useState(false);
+
   const reload = async () => {
     setCatalog(await fetchCatalog());
     setListings(await fetchListings(session.email));
     setOrders(await fetchOrders(session.email));
+    const premiumEmails = await fetchPremiumSellerEmails();
+    setIsPremiumSeller(premiumEmails.includes(session.email));
     if (isAdmin) {
       const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
       setSellerCount(count || 0);
@@ -1902,6 +1924,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             <span className="w-1 h-1 rounded-full" style={{ background: "#9CA3AF" }} />
             <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
             <span className="text-sm font-medium" style={{ color: "#6B7280" }}>Live Operations</span>
+            {isPremiumSeller && (
+              <span
+                className="ml-2 flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+                style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f" }}
+              >
+                <Sparkles className="w-3 h-3" /> Premium Seller
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-4">
           <div className="relative" ref={langRef}>
@@ -4542,6 +4572,20 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   const [sellerSearch, setSellerSearch] = useState("");
   // Which seller's invoice-builder modal is open (create + history) — null when closed.
   const [invoiceManagerSeller, setInvoiceManagerSeller] = useState(null);
+  // Sellers Admin has marked as "Premium" — a plain badge/status, doesn't
+  // affect which products they see (that's the per-product "Visible to" list).
+  const [premiumSellerEmails, setPremiumSellerEmails] = useState([]);
+  const [premiumTogglingEmail, setPremiumTogglingEmail] = useState(null);
+  const togglePremiumSeller = async (email) => {
+    setPremiumTogglingEmail(email);
+    const isPremium = premiumSellerEmails.includes(email);
+    const next = isPremium ? premiumSellerEmails.filter((e) => e !== email) : [...premiumSellerEmails, email];
+    const { error } = await savePremiumSellerEmails(next);
+    setPremiumTogglingEmail(null);
+    if (error) { notify("Could not update premium status."); return; }
+    setPremiumSellerEmails(next);
+    notify(isPremium ? "Premium badge removed for this seller." : "Seller marked as Premium.");
+  };
 
   // Site logo: pick a picture from your computer, it's uploaded to Supabase
   // Storage and saved as the shared logo everyone sees (navbar, footer,
@@ -4589,6 +4633,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   useEffect(() => {
     loadAllOrders();
     loadSellers();
+    fetchPremiumSellerEmails().then(setPremiumSellerEmails);
   }, []); // eslint-disable-line
 
   // Approve a newly-signed-up seller (lets them log in), or deactivate/reactivate
@@ -5040,6 +5085,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                   <th className="px-4 py-3">Signed up</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Approval</th>
+                  <th className="px-4 py-3">Premium</th>
                   <th className="px-4 py-3">Invoices</th>
                 </tr>
               </thead>
@@ -5097,6 +5143,21 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
                           {s.approval_status === "deactivated" ? "Reactivate" : "Approve"}
                         </button>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => togglePremiumSeller(s.email)}
+                        disabled={premiumTogglingEmail === s.email}
+                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-60"
+                        style={
+                          premiumSellerEmails.includes(s.email)
+                            ? { background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f" }
+                            : { border: "1px solid #E5E7EB", color: "#6B7280" }
+                        }
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {premiumTogglingEmail === s.email ? "…" : premiumSellerEmails.includes(s.email) ? "Premium ✓" : "Make Premium"}
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <button
