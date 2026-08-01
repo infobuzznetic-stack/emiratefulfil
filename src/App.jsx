@@ -1463,7 +1463,24 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             </button>
           ))}
         </div>
-        <div className="relative mt-auto pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+        <div className="relative mt-6 flex-1 min-h-[150px] rounded-2xl overflow-hidden flex flex-col items-center justify-center text-center px-4 py-6" style={{ background: "linear-gradient(160deg, rgba(0,200,150,0.10), rgba(11,31,58,0.35))", border: "1px solid rgba(0,200,150,0.18)" }}>
+          <div className="pointer-events-none absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-30 blur-2xl" style={{ background: "#00C896", animation: "blobMove 8s ease-in-out infinite" }} />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 w-28 h-28 rounded-full opacity-20 blur-2xl" style={{ background: "#F8B400", animation: "blobMove 10s ease-in-out infinite reverse" }} />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.06]"
+            style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "14px 14px" }}
+          />
+          <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)", boxShadow: "0 10px 24px rgba(0,200,150,0.35)" }}>
+            <Globe2 className="w-7 h-7 text-white" />
+          </div>
+          <div className="relative text-white text-sm font-bold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Delivering across the Gulf</div>
+          <p className="relative text-white/50 text-xs mt-1.5 leading-relaxed">UAE · KSA · Qatar · Oman · Bahrain · Kuwait</p>
+          <div className="relative mt-4 flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full" style={{ background: "rgba(0,200,150,0.15)", color: "#00C896" }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
+            UAE is live now
+          </div>
+        </div>
+        <div className="relative mt-6 pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
           <div className="text-white text-base font-semibold">{session.name}</div>
           <div className="text-white/40 text-sm">{session.company || "Seller account"}</div>
           <button onClick={onLogout} className="mt-3 text-white/60 text-sm font-semibold hover:text-white">Log out</button>
