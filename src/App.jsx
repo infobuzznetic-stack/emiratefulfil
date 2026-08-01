@@ -651,21 +651,6 @@ function DashboardPreview() {
                 className="w-full h-auto block"
               />
             </div>
-
-            {/* Real fleet photo — full size, sits right below the dashboard screenshot so
-                the data feels backed by an actual team and fleet, not just numbers. */}
-            <div className="mt-6 rounded-2xl overflow-hidden relative" style={{ boxShadow: "0 20px 45px rgba(11,31,58,0.25)" }}>
-              <img
-                src="/images/fleet-handoff.png"
-                alt="EmirateFulfil delivery handoff"
-                className="w-full h-56 object-cover"
-              />
-              <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 45%, rgba(8,18,33,0.9) 100%)" }} />
-              <div className="absolute bottom-0 left-0 right-0 p-5">
-                <div className="text-xs font-bold" style={{ color: "#F8B400" }}>EVERY ORDER, DELIVERED</div>
-                <div className="mt-1 text-sm text-white/90">Real fleet, real people — behind every number above</div>
-              </div>
-            </div>
           </div>
         </Reveal>
       </div>
