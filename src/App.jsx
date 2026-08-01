@@ -2675,6 +2675,15 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     if (uploaded.length) setEditForm((f) => ({ ...f, images: [...(f.images || []), ...uploaded] }));
   };
   const removeEditImage = (idx) => setEditForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
+  // Drag-and-drop reordering of a product's pictures while editing — drag a
+  // thumbnail onto another to move it to that position in the images array.
+  const reorderEditImages = (fromIdx, toIdx) => setEditForm((f) => {
+    const imgs = [...(f.images || [])];
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= imgs.length || toIdx >= imgs.length) return f;
+    const [moved] = imgs.splice(fromIdx, 1);
+    imgs.splice(toIdx, 0, moved);
+    return { ...f, images: imgs };
+  });
   const saveEdit = async (id) => {
     if (!editForm.name || editForm.sell === "") { notify && notify("Fill in name and sell price."); return; }
     const images = editForm.images || [];
@@ -2836,8 +2845,17 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     {(editForm.images || []).map((url, idx) => (
-                      <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid #E5E7EB" }}>
-                        <img src={url} alt="" className="w-full h-full object-cover" />
+                      <div
+                        key={idx}
+                        draggable
+                        onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(idx)); }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); reorderEditImages(Number(e.dataTransfer.getData("text/plain")), idx); }}
+                        title="Drag to reorder"
+                        className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 cursor-move"
+                        style={{ border: "1px solid #E5E7EB" }}
+                      >
+                        <img src={url} alt="" className="w-full h-full object-cover" draggable={false} />
                         <button onClick={() => removeEditImage(idx)} title="Remove" className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center text-white text-[10px]" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
                       </div>
                     ))}
@@ -4025,6 +4043,13 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     if (uploaded.length) setForm((f) => ({ ...f, images: [...(f.images || []), ...uploaded] }));
   };
   const removeFormImage = (idx) => setForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
+  const reorderFormImages = (fromIdx, toIdx) => setForm((f) => {
+    const imgs = [...(f.images || [])];
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= imgs.length || toIdx >= imgs.length) return f;
+    const [moved] = imgs.splice(fromIdx, 1);
+    imgs.splice(toIdx, 0, moved);
+    return { ...f, images: imgs };
+  });
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [sellers, setSellers] = useState([]);
@@ -4142,6 +4167,15 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     if (uploaded.length) setEditForm((f) => ({ ...f, images: [...(f.images || []), ...uploaded] }));
   };
   const removeEditImage = (idx) => setEditForm((f) => ({ ...f, images: (f.images || []).filter((_, i) => i !== idx) }));
+  // Drag-and-drop reordering of a product's pictures while editing — drag a
+  // thumbnail onto another to move it to that position in the images array.
+  const reorderEditImages = (fromIdx, toIdx) => setEditForm((f) => {
+    const imgs = [...(f.images || [])];
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= imgs.length || toIdx >= imgs.length) return f;
+    const [moved] = imgs.splice(fromIdx, 1);
+    imgs.splice(toIdx, 0, moved);
+    return { ...f, images: imgs };
+  });
   const saveEdit = async (id) => {
     if (!editForm.name || editForm.cost === "" || editForm.sell === "") { notify("Fill in name, cost and sell price."); return; }
     const images = editForm.images || [];
@@ -4382,8 +4416,17 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <div><label className="text-xs text-gray-500">Emoji (fallback)</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div className="sm:col-span-6 flex items-center gap-3 flex-wrap">
           {(form.images || []).map((url, idx) => (
-            <div key={idx} className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px solid #E5E7EB" }}>
-              <img src={url} alt="" className="w-full h-full object-cover" />
+            <div
+              key={idx}
+              draggable
+              onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(idx)); }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); reorderFormImages(Number(e.dataTransfer.getData("text/plain")), idx); }}
+              title="Drag to reorder"
+              className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 cursor-move"
+              style={{ border: "1px solid #E5E7EB" }}
+            >
+              <img src={url} alt="" className="w-full h-full object-cover" draggable={false} />
               <button type="button" onClick={() => removeFormImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center text-white text-xs" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
             </div>
           ))}
@@ -4411,8 +4454,17 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   {(editForm.images || []).map((url, idx) => (
-                    <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid #E5E7EB" }}>
-                      <img src={url} alt="" className="w-full h-full object-cover" />
+                    <div
+                      key={idx}
+                      draggable
+                      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(idx)); }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => { e.preventDefault(); reorderEditImages(Number(e.dataTransfer.getData("text/plain")), idx); }}
+                      title="Drag to reorder"
+                      className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 cursor-move"
+                      style={{ border: "1px solid #E5E7EB" }}
+                    >
+                      <img src={url} alt="" className="w-full h-full object-cover" draggable={false} />
                       <button onClick={() => removeEditImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center text-white text-[10px]" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
                     </div>
                   ))}
