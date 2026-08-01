@@ -1654,6 +1654,11 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   // address bar reflects it even when it came from localStorage rather than the URL.
   useEffect(() => { onTabChange && onTabChange(tab); }, []); // eslint-disable-line
   const [region, setRegion] = useState("UAE"); // UAE | KSA — which country's dashboard is showing
+  // Which order status the Orders tab should open pre-filtered to — set when
+  // a dashboard stat card (Pending / Delivered / etc.) is clicked. "all"
+  // shows everything, same as opening Orders from the sidebar normally.
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState("all");
+  const goToOrders = (status = "all") => { setOrdersStatusFilter(status); setTab("orders"); };
   const [catalog, setCatalog] = useState([]);
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -1868,7 +1873,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         <div className="mt-8 space-y-1">
           {NAV.map((n) => (
             <button
-              key={n.id} onClick={() => setTab(n.id)}
+              key={n.id} onClick={() => { if (n.id === "orders") setOrdersStatusFilter("all"); setTab(n.id); }}
               className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out hover:scale-[1.03] hover:translate-x-1 active:scale-95"
               style={
                 tab === n.id
@@ -1952,7 +1957,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           {NAV.map((n, i) => (
             <button
               key={n.id}
-              onClick={() => { setTab(n.id); setMobileNavOpen(false); }}
+              onClick={() => { if (n.id === "orders") setOrdersStatusFilter("all"); setTab(n.id); setMobileNavOpen(false); }}
               className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/80 transition-all duration-300 ease-out hover:scale-[1.02] hover:translate-x-1 active:scale-95"
               style={{
                 animation: `dashFadeIn 0.35s ease-out ${i * 60}ms both`,
@@ -2135,7 +2140,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         <div key={tab + region} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
           {tab === "overview" && (
             <OverviewTab
-              session={session} orders={orders} listings={listings} catalog={catalog} setTab={setTab}
+              session={session} orders={orders} listings={listings} catalog={catalog} setTab={setTab} goToOrders={goToOrders}
               confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue}
               pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned}
               region={region} setRegion={setRegion}
@@ -2157,7 +2162,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               {tab === "orders" && (
                 isAdmin
                   ? <AdminOrdersPanel notify={notify} />
-                  : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} />
+                  : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} initialStatusFilter={ordersStatusFilter} />
               )}
               {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
@@ -2176,7 +2181,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   );
 }
 
-function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0, icon: Icon }) {
+function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = "", delay = 0, icon: Icon, onClick }) {
   const [shown, setShown] = useState(false);
   const [hover, setHover] = useState(false);
   const [display, setDisplay] = useState(0);
@@ -2205,7 +2210,11 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="relative rounded-2xl p-5 transition-all duration-500 cursor-default overflow-hidden"
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+      className={`relative rounded-2xl p-5 transition-all duration-500 overflow-hidden ${onClick ? "cursor-pointer" : "cursor-default"}`}
       style={{
         background: hover
           ? `linear-gradient(160deg, ${color}10, #ffffff 55%)`
@@ -2243,7 +2252,7 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
         )}
       </div>
       <div className="relative text-[26px] leading-tight font-extrabold mt-2.5 tracking-tight" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
-        {prefix}{display.toLocaleString()}
+        {prefix}{display.toLocaleString()}{suffix}
       </div>
       {sub && <div className="relative text-xs text-gray-400 mt-1">{sub}</div>}
     </div>
@@ -2322,7 +2331,7 @@ function ComingSoonPanel({ region }) {
 }
 
 function OverviewTab({
-  session, orders, listings, catalog, setTab,
+  session, orders, listings, catalog, setTab, goToOrders,
   region, setRegion,
   regionOrders, regionConfirmedProfit, regionDeliveredRevenue,
   regionUnpaidInvoice, regionPaidInvoice,
@@ -2333,26 +2342,30 @@ function OverviewTab({
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const regionOrdersThisWeek = regionOrders.filter((o) => o.createdAt && new Date(o.createdAt).getTime() >= sevenDaysAgo).length;
   const avgOrderValue = regionDelivered.length ? Math.round(regionDeliveredRevenue / regionDelivered.length) : 0;
+  // What share of all UAE orders have actually reached the customer —
+  // rounded to a whole percent; 0 orders shows 0% rather than dividing by zero.
+  const regionDeliveryRate = regionOrders.length ? Math.round((regionDelivered.length / regionOrders.length) * 100) : 0;
 
   const cards = [
-    { label: "Total orders", value: regionOrders.length, color: "#0B1F3A", icon: Boxes },
-    { label: "Pending", value: regionPending.length, color: "#F8B400", icon: ClipboardCheck },
-    { label: "Shipped", value: regionShipped.length, color: "#3B82F6", icon: Truck },
-    { label: "Delivered", value: regionDelivered.length, color: "#00C896", icon: CheckCircle2 },
-    { label: "Cancelled", value: regionCancelled.length, color: "#9CA3AF", icon: X },
-    { label: "Returned", value: regionReturned.length, color: "#EF4444", icon: RotateCcw },
-    { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck },
-    { label: "Unpaid invoice", value: regionUnpaidInvoice, prefix: "AED ", color: "#F8B400", icon: Receipt },
-    { label: "Paid invoice", value: regionPaidInvoice, prefix: "AED ", color: "#00C896", icon: CheckCircle2 },
-    { label: "Orders this week", value: regionOrdersThisWeek, color: "#3B82F6", icon: Clock },
-    { label: "Avg. order value", value: avgOrderValue, prefix: "AED ", color: "#8B5CF6", icon: CreditCard },
+    { label: "Total orders", value: regionOrders.length, color: "#0B1F3A", icon: Boxes, nav: { tab: "orders", status: "all" } },
+    { label: "Pending", value: regionPending.length, color: "#F8B400", icon: ClipboardCheck, nav: { tab: "orders", status: "pending" } },
+    { label: "Shipped", value: regionShipped.length, color: "#3B82F6", icon: Truck, nav: { tab: "orders", status: "shipped" } },
+    { label: "Delivered", value: regionDelivered.length, color: "#00C896", icon: CheckCircle2, nav: { tab: "orders", status: "delivered" } },
+    { label: "Delivery rate", value: regionDeliveryRate, suffix: "%", color: "#00C896", icon: TrendingUp, nav: { tab: "orders", status: "delivered" } },
+    { label: "Cancelled", value: regionCancelled.length, color: "#9CA3AF", icon: X, nav: { tab: "orders", status: "cancelled" } },
+    { label: "Returned", value: regionReturned.length, color: "#EF4444", icon: RotateCcw, nav: { tab: "orders", status: "returned" } },
+    { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck, nav: { tab: "orders", status: "delivered" } },
+    { label: "Unpaid invoice", value: regionUnpaidInvoice, prefix: "AED ", color: "#F8B400", icon: Receipt, nav: { tab: "invoices" } },
+    { label: "Paid invoice", value: regionPaidInvoice, prefix: "AED ", color: "#00C896", icon: CheckCircle2, nav: { tab: "invoices" } },
+    { label: "Orders this week", value: regionOrdersThisWeek, color: "#3B82F6", icon: Clock, nav: { tab: "orders", status: "all" } },
+    { label: "Avg. order value", value: avgOrderValue, prefix: "AED ", color: "#8B5CF6", icon: CreditCard, nav: { tab: "orders", status: "delivered" } },
   ];
   const breakdown = [
-    { label: "Pending", count: regionPending.length, color: "#F8B400" },
-    { label: "Shipped", count: regionShipped.length, color: "#3B82F6" },
-    { label: "Delivered", count: regionDelivered.length, color: "#00C896" },
-    { label: "Cancelled", count: regionCancelled.length, color: "#9CA3AF" },
-    { label: "Returned", count: regionReturned.length, color: "#EF4444" },
+    { label: "Pending", count: regionPending.length, color: "#F8B400", status: "pending" },
+    { label: "Shipped", count: regionShipped.length, color: "#3B82F6", status: "shipped" },
+    { label: "Delivered", count: regionDelivered.length, color: "#00C896", status: "delivered" },
+    { label: "Cancelled", count: regionCancelled.length, color: "#9CA3AF", status: "cancelled" },
+    { label: "Returned", count: regionReturned.length, color: "#EF4444", status: "returned" },
   ];
   const totalForBar = regionOrders.length || 1;
   const regions = [
@@ -2465,7 +2478,10 @@ function OverviewTab({
         <>
           <div key={region} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
             {cards.map((c, i) => (
-              <StatCard key={c.label} label={c.label} value={c.value} prefix={c.prefix} color={c.color} icon={c.icon} delay={i * 60} />
+              <StatCard
+                key={c.label} label={c.label} value={c.value} prefix={c.prefix} suffix={c.suffix} color={c.color} icon={c.icon} delay={i * 60}
+                onClick={c.nav ? () => (c.nav.tab === "orders" ? goToOrders(c.nav.status) : setTab(c.nav.tab)) : undefined}
+              />
             ))}
           </div>
 
@@ -2566,10 +2582,10 @@ function OverviewTab({
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
               {breakdown.map((b) => (
-                <div key={b.label} className="flex items-center gap-2 text-xs text-gray-500">
+                <button key={b.label} onClick={() => goToOrders(b.status)} className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors duration-150">
                   <span className="w-2.5 h-2.5 rounded-full" style={{ background: b.color }} />
                   {b.label} <b style={{ color: "#111827" }}>{b.count}</b>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -4339,7 +4355,16 @@ function AdminOrdersPanel({ notify }) {
   );
 }
 
-function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount }) {
+function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, initialStatusFilter = "all" }) {
+  // Seeded from the dashboard card that was clicked (e.g. "Delivered" opens
+  // here pre-filtered to delivered). Local state after that so the pills
+  // below can change it without needing to talk back to the Dashboard.
+  const [filter, setFilter] = useState(initialStatusFilter);
+  const deliveredCount = orders.filter((o) => o.status === "delivered").length;
+  const deliveryRate = orders.length ? Math.round((deliveredCount / orders.length) * 100) : 0;
+  const FILTER_OPTIONS = ["all", "pending", "confirmation_pending", "confirmed", "customer_cancelled_confirmation", "dispatched", "shipped", "delivered", "returned", "cancelled"];
+  const filteredOrders = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+
   return (
     <div>
       <div
@@ -4356,15 +4381,36 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount })
         <p className="text-sm text-white/70 mt-1 relative">Track your COD orders and their status as they move.</p>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4 mt-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" icon={ShieldCheck} delay={0} />
         <StatCard label="Paid COD" value={deliveredRevenue} prefix="AED " color="#3B82F6" icon={CreditCard} delay={100} />
+        <StatCard label="Delivery rate" value={deliveryRate} suffix="%" color="#00C896" icon={TrendingUp} delay={150} />
         <StatCard label="Returned" value={returnedCount} color="#EF4444" icon={RotateCcw} delay={200} />
       </div>
 
-      <div className="mt-8 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
-        {orders.length === 0 ? (
-          <div className="text-sm text-gray-400 py-10 text-center">No orders yet — place one from the Products tab.</div>
+      {/* Status filter pills — jump here pre-selected from a dashboard card, or pick one manually */}
+      <div className="flex flex-wrap gap-2 mt-6">
+        {FILTER_OPTIONS.map((s) => (
+          <button
+            key={s}
+            onClick={() => setFilter(s)}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all duration-150"
+            style={
+              filter === s
+                ? { background: "#0B1F3A", color: "#fff" }
+                : { background: "#F8FAFC", color: "#6B7280", border: "1px solid #E5E7EB" }
+            }
+          >
+            {s === "all" ? "All" : ORDER_STATUS_LABELS[s]}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+        {filteredOrders.length === 0 ? (
+          <div className="text-sm text-gray-400 py-10 text-center">
+            {orders.length === 0 ? "No orders yet — place one from the Products tab." : "No orders with this status."}
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
@@ -4372,7 +4418,7 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount })
               <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th>
             </tr></thead>
             <tbody>
-              {orders.map((o, i) => (
+              {filteredOrders.map((o, i) => (
                 <tr
                   key={o.id}
                   className="transition-colors duration-200 hover:bg-[#F5FBF9]"
