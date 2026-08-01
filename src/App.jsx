@@ -659,12 +659,36 @@ function DashboardPreview() {
 }
 
 /* ---------------- PRICING ---------------- */
-function Pricing() {
-  const plans = [
+const DEFAULT_PRICING = {
+  headline: "Simple pricing, built to scale with you.",
+  plans: [
     { name: "Starter", price: 0, unit: "/mo", desc: "For sellers testing the market", features: ["Up to 50 orders/mo", "1 warehouse zone", "Email support", "Standard shipping rates"], cta: "Start free" },
     { name: "Growth", price: 349, unit: "/mo", desc: "For sellers scaling across the Gulf", features: ["Up to 2,000 orders/mo", "All 6 GCC markets", "Priority support", "COD management", "API access"], cta: "Start free trial", highlighted: true },
     { name: "Enterprise", price: null, unit: "", desc: "For high-volume brands & marketplaces", features: ["Unlimited orders", "Dedicated warehouse space", "Dedicated account manager", "Custom integrations"], cta: "Talk to sales" },
-  ];
+  ],
+};
+
+function Pricing() {
+  // Pricing text is admin-editable (Admin tab → "Pricing section"), stored as
+  // JSON in app_settings under key "pricing_content". Falls back to the
+  // built-in defaults above until an admin saves their own copy.
+  const [content, setContent] = useState(DEFAULT_PRICING);
+  useEffect(() => {
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "pricing_content")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          try {
+            const parsed = JSON.parse(data.value);
+            if (parsed?.plans?.length) setContent(parsed);
+          } catch { /* keep defaults if stored value is malformed */ }
+        }
+      });
+  }, []);
+  const { headline, plans } = content;
   return (
     <section id="pricing" className="py-28" style={{ background: "#0B1F3A" }}>
       <div className="max-w-7xl mx-auto px-6">
@@ -672,7 +696,7 @@ function Pricing() {
           <div className="text-center max-w-xl mx-auto">
             <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#F8B400" }}>Pricing</span>
             <h2 className="mt-3 text-4xl md:text-5xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              Simple pricing, built to scale with you.
+              {headline}
             </h2>
           </div>
         </Reveal>
@@ -4399,6 +4423,37 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     notify("Review removed.");
   };
 
+  // Pricing section text: editable copy of the homepage pricing plans, saved
+  // as JSON in app_settings under "pricing_content". Loaded once on mount;
+  // starts from the same defaults the homepage falls back to.
+  const [pricingForm, setPricingForm] = useState(DEFAULT_PRICING);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  useEffect(() => {
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "pricing_content")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          try {
+            const parsed = JSON.parse(data.value);
+            if (parsed?.plans?.length) setPricingForm(parsed);
+          } catch { /* keep defaults if stored value is malformed */ }
+        }
+      });
+  }, []);
+  const updatePricingPlan = (idx, field, value) => {
+    setPricingForm((f) => ({ ...f, plans: f.plans.map((p, i) => (i === idx ? { ...p, [field]: value } : p)) }));
+  };
+  const savePricing = async () => {
+    setPricingSaving(true);
+    const { error } = await supabase.from("app_settings").upsert({ key: "pricing_content", value: JSON.stringify(pricingForm) });
+    setPricingSaving(false);
+    if (error) { notify("Could not save the pricing section."); return; }
+    notify("Pricing section updated — changes are live on the homepage.");
+  };
+
   const sellerOrderCount = (email) => allOrders.filter((o) => o.seller_email === email).length;
   const filteredSellers = sellers.filter((s) => {
     const q = sellerSearch.trim().toLowerCase();
@@ -4442,6 +4497,81 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Pricing section: edit the headline and the 3 plan cards shown on the
+          public homepage's Pricing section. Saves to Supabase, live instantly. */}
+      <div className="mt-6 rounded-2xl bg-white p-5" style={{ border: "1px solid #E5E7EB" }}>
+        <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Pricing section</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Edit the headline and the three plan cards shown on the homepage's Pricing section.</p>
+
+        <div className="mt-4">
+          <label className="text-xs font-semibold text-gray-500">Headline</label>
+          <input
+            value={pricingForm.headline}
+            onChange={(e) => setPricingForm((f) => ({ ...f, headline: e.target.value }))}
+            className="mt-1 w-full text-sm rounded-lg px-3 py-2"
+            style={{ border: "1px solid #E5E7EB" }}
+          />
+        </div>
+
+        <div className="mt-5 grid md:grid-cols-3 gap-4">
+          {pricingForm.plans.map((p, i) => (
+            <div key={i} className="rounded-xl p-4 space-y-2.5" style={{ border: "1px solid #E5E7EB" }}>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Plan name</label>
+                <input value={p.name} onChange={(e) => updatePricingPlan(i, "name", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Short description</label>
+                <input value={p.desc} onChange={(e) => updatePricingPlan(i, "desc", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs font-semibold text-gray-500">Price (AED, blank = Custom)</label>
+                  <input
+                    type="number"
+                    value={p.price ?? ""}
+                    onChange={(e) => updatePricingPlan(i, "price", e.target.value === "" ? null : Number(e.target.value))}
+                    className="mt-1 w-full text-sm rounded-lg px-3 py-2"
+                    style={{ border: "1px solid #E5E7EB" }}
+                  />
+                </div>
+                <div className="w-20">
+                  <label className="text-xs font-semibold text-gray-500">Unit</label>
+                  <input value={p.unit || ""} onChange={(e) => updatePricingPlan(i, "unit", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Features (one per line)</label>
+                <textarea
+                  value={(p.features || []).join("\n")}
+                  onChange={(e) => updatePricingPlan(i, "features", e.target.value.split("\n"))}
+                  rows={4}
+                  className="mt-1 w-full text-sm rounded-lg px-3 py-2"
+                  style={{ border: "1px solid #E5E7EB" }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Button text</label>
+                <input value={p.cta} onChange={(e) => updatePricingPlan(i, "cta", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                <input type="checkbox" checked={!!p.highlighted} onChange={(e) => updatePricingPlan(i, "highlighted", e.target.checked)} />
+                Highlight as "Most popular"
+              </label>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={savePricing}
+          disabled={pricingSaving}
+          className="mt-5 text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
+          style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)", opacity: pricingSaving ? 0.6 : 1 }}
+        >
+          {pricingSaving ? "Saving…" : "Save pricing section"}
+        </button>
       </div>
 
       {/* Sellers table: every signed-up seller, with contact details and signup date */}
