@@ -1867,7 +1867,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         <div className="relative flex items-center gap-2.5 px-2">
           <Logo />
           <span className="font-extrabold text-white text-xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Emirate<span style={{ background: isPremiumSeller ? "linear-gradient(90deg,#F8B400,#FFE29A)" : "linear-gradient(90deg,#00C896,#7FE8C9)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}>Fulfil</span>
+            Emirate<span style={{ color: isPremiumSeller ? "#F8B400" : "#00C896" }}>Fulfil</span>
           </span>
         </div>
         <div className="mt-8 space-y-1">
@@ -2464,7 +2464,7 @@ function OverviewTab({
               <span className="text-xs font-semibold tracking-widest" style={{ color: "#7FE8C9", fontFamily: "'Space Grotesk', sans-serif" }}>{timeLabel}</span>
             </div>
             <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {greeting}, <span style={{ background: isPremiumSeller ? "linear-gradient(90deg,#FFE29A,#F8B400)" : "linear-gradient(90deg,#7FE8C9,#00C896)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
+              {greeting}, <span style={{ color: isPremiumSeller ? "#F8B400" : "#00C896" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
             </h1>
             <p className="mt-1.5 text-sm text-white/60 max-w-md">
               {region === "UAE"
@@ -3651,7 +3651,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                 <div className="mt-2 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
                 <div
                   className="mt-2 text-xl font-extrabold"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", background: `linear-gradient(90deg, #0B1F3A, ${color})`, WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}
+                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#0B1F3A" }}
                 >
                   AED {Number(p.sell).toLocaleString()}
                 </div>
