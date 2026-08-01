@@ -1470,8 +1470,26 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             className="pointer-events-none absolute inset-0 opacity-[0.06]"
             style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "14px 14px" }}
           />
-          <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)", boxShadow: "0 10px 24px rgba(0,200,150,0.35)" }}>
-            <Globe2 className="w-7 h-7 text-white" />
+          <div className="relative w-14 h-14 flex items-center justify-center mb-3">
+            <div className="absolute inset-0 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)", boxShadow: "0 10px 24px rgba(0,200,150,0.35)" }}>
+              <Globe2 className="w-7 h-7 text-white" />
+            </div>
+            {/* Tiny package/truck/warehouse icons orbiting the globe — just for fun */}
+            <div className="absolute inset-0" style={{ animation: "orbitSpin 9s linear infinite" }}>
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#F8B400", boxShadow: "0 4px 10px rgba(248,180,0,0.4)" }}>
+                <Package className="w-3 h-3 text-white" />
+              </div>
+            </div>
+            <div className="absolute inset-0" style={{ animation: "orbitSpin 9s linear -3s infinite" }}>
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#0EA5E9", boxShadow: "0 4px 10px rgba(14,165,233,0.4)" }}>
+                <Truck className="w-3 h-3 text-white" />
+              </div>
+            </div>
+            <div className="absolute inset-0" style={{ animation: "orbitSpin 9s linear -6s infinite" }}>
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#EC4899", boxShadow: "0 4px 10px rgba(236,72,153,0.4)" }}>
+                <Warehouse className="w-3 h-3 text-white" />
+              </div>
+            </div>
           </div>
           <div className="relative text-white text-sm font-bold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Delivering across the Gulf</div>
           <p className="relative text-white/50 text-xs mt-1.5 leading-relaxed">UAE · KSA · Qatar · Oman · Bahrain · Kuwait</p>
@@ -1531,6 +1549,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           0% { box-shadow: 0 0 0 0 rgba(0,200,150,0.55); }
           70% { box-shadow: 0 0 0 8px rgba(0,200,150,0); }
           100% { box-shadow: 0 0 0 0 rgba(0,200,150,0); }
+        }
+        @keyframes orbitSpin {
+          from { transform: rotate(0deg) translateX(38px) rotate(0deg); }
+          to { transform: rotate(360deg) translateX(38px) rotate(-360deg); }
         }
       `}</style>
 
