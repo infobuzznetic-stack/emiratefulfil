@@ -1280,6 +1280,10 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
           <form onSubmit={submit} className="mt-6 space-y-5">
             {isSignup && (
               <>
+                <div className="rounded-xl px-4 py-3 text-xs leading-relaxed" style={{ background: "rgba(0,200,150,0.08)", border: "1px solid rgba(0,200,150,0.25)", color: "#B7F3E0" }}>
+                  Looking for 3PL fulfillment services, or want us to stock your products? Please contact our customer care team — this form is only for creating a seller dashboard account.
+                </div>
+
                 {/* --- Your details --- */}
                 <AuthSection title="Your details" delay="0.1s">
                   <div className="grid sm:grid-cols-2 gap-3">
