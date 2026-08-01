@@ -643,51 +643,32 @@ function DashboardPreview() {
         </Reveal>
 
         <Reveal delay={150}>
-          <div className="relative">
-            <div className="rounded-2xl p-5" style={{ background: "#0B1F3A", boxShadow: "0 30px 70px rgba(11,31,58,0.35)" }}>
-              <div className="flex items-center gap-1.5 mb-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-400/70" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/70" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-400/70" />
-              </div>
-              <div className="grid grid-cols-3 gap-3 mb-5">
-                {[
-                  { label: "Today's orders", val: 214, color: "#00C896" },
-                  { label: "Pending", val: 32, color: "#F8B400" },
-                  { label: "Delivered", val: 178, color: "#3B82F6" },
-                ].map((c, i) => (
-                  <div key={i} className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.05)" }}>
-                    <div className="text-2xl font-bold text-white"><Counter to={c.val} /></div>
-                    <div className="text-[11px] mt-1" style={{ color: c.color }}>{c.label}</div>
-                  </div>
+          <div className="rounded-2xl p-5" style={{ background: "#0B1F3A", boxShadow: "0 30px 70px rgba(11,31,58,0.35)" }}>
+            <div className="flex items-center gap-1.5 mb-4">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-400/70" />
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/70" />
+              <div className="w-2.5 h-2.5 rounded-full bg-green-400/70" />
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              {[
+                { label: "Today's orders", val: 214, color: "#00C896" },
+                { label: "Pending", val: 32, color: "#F8B400" },
+                { label: "Delivered", val: 178, color: "#3B82F6" },
+              ].map((c, i) => (
+                <div key={i} className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <div className="text-2xl font-bold text-white"><Counter to={c.val} /></div>
+                  <div className="text-[11px] mt-1" style={{ color: c.color }}>{c.label}</div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.05)" }}>
+              <div className="text-xs text-white/50 mb-4">Weekly fulfillment volume</div>
+              <div className="flex items-end gap-2.5 h-32">
+                {bars.map((h, i) => (
+                  <div key={i} className="flex-1 rounded-t-md" style={{ height: `${h}%`, background: "linear-gradient(180deg,#00C896,#0B4a3a)", transition: "height 1s ease", animation: `growBar 1.2s ease ${i * 0.08}s both` }} />
                 ))}
               </div>
-              <div className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.05)" }}>
-                <div className="text-xs text-white/50 mb-4">Weekly fulfillment volume</div>
-                <div className="flex items-end gap-2.5 h-32">
-                  {bars.map((h, i) => (
-                    <div key={i} className="flex-1 rounded-t-md" style={{ height: `${h}%`, background: "linear-gradient(180deg,#00C896,#0B4a3a)", transition: "height 1s ease", animation: `growBar 1.2s ease ${i * 0.08}s both` }} />
-                  ))}
-                </div>
-                <style>{`@keyframes growBar { from { transform: scaleY(0); transform-origin: bottom; } to { transform: scaleY(1); transform-origin: bottom; } }`}</style>
-              </div>
-            </div>
-
-            {/* Real photo badge — overlaps the dashboard mockup, bottom-left, so the
-                data feels backed by an actual team and fleet, not just numbers. */}
-            <div
-              className="hidden sm:flex absolute -bottom-8 -left-8 items-center gap-3 rounded-2xl p-2.5 pr-4"
-              style={{ background: "#ffffff", boxShadow: "0 20px 45px rgba(11,31,58,0.25)" }}
-            >
-              <img
-                src="/images/fleet-handoff.png"
-                alt="EmirateFulfil delivery handoff"
-                className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-              />
-              <div>
-                <div className="text-xs font-bold" style={{ color: "#0B1F3A" }}>Every order, delivered</div>
-                <div className="text-[11px]" style={{ color: "#6B7280" }}>Real fleet, real people</div>
-              </div>
+              <style>{`@keyframes growBar { from { transform: scaleY(0); transform-origin: bottom; } to { transform: scaleY(1); transform-origin: bottom; } }`}</style>
             </div>
           </div>
         </Reveal>
@@ -1939,21 +1920,6 @@ function OverviewTab({
   return (
     <div>
       <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
-        {/* Real warehouse + fleet photo, faded in from the right so the banner text
-            stays readable — gives the greeting card a grounded, "this is real"
-            feel instead of only illustration. Hidden on small screens. */}
-        {region === "UAE" && (
-          <div className="hidden md:block absolute inset-y-0 right-0 w-[60%] pointer-events-none">
-            <img
-              src="/images/fleet-warehouse.png"
-              alt="EmirateFulfil warehouse and delivery fleet"
-              className="w-full h-full object-cover"
-              style={{ opacity: 0.55 }}
-            />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(90deg,#0B1F3A 0%,rgba(11,31,58,0.55) 35%,rgba(11,31,58,0) 75%)" }} />
-          </div>
-        )}
-
         {/* subtle dot-grid texture */}
         <div
           className="absolute inset-0 opacity-[0.07]"
@@ -1963,15 +1929,60 @@ function OverviewTab({
         <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="absolute top-1/2 left-10 w-40 h-40 rounded-full opacity-10 blur-3xl -translate-y-1/2" style={{ background: "#3B82F6", animation: "floatY 7s ease-in-out infinite" }} />
 
-        {/* soft gold desert-dune wave along the very bottom edge of the card */}
+        {/* UAE skyline scene — Burj Khalifa + Burj Al Arab sail + a dhow on the water,
+            with a scatter of twinkling stars overhead. Hidden on small screens so it
+            never crowds the text. */}
         {region === "UAE" && (
-          <svg
-            viewBox="0 0 500 40"
-            preserveAspectRatio="none"
-            className="absolute bottom-0 left-0 w-full h-8 opacity-[0.12] pointer-events-none"
-          >
-            <path d="M0 30 Q60 10 130 24 T260 20 T390 26 T500 16 L500 40 L0 40 Z" fill="#F8B400" />
-          </svg>
+          <>
+            <svg
+              viewBox="0 0 340 170"
+              className="hidden md:block absolute bottom-0 right-0 w-[26rem] h-40 opacity-35 pointer-events-none"
+              style={{ animation: "floatY 8s ease-in-out infinite" }}
+            >
+              {/* stars */}
+              <circle cx="30" cy="18" r="1.6" fill="#F8B400" opacity="0.9"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="2.4s" repeatCount="indefinite" /></circle>
+              <circle cx="70" cy="30" r="1.2" fill="#FFD98A" opacity="0.7"><animate attributeName="opacity" values="0.7;0.15;0.7" dur="3.1s" repeatCount="indefinite" /></circle>
+              <circle cx="180" cy="14" r="1.4" fill="#F8B400" opacity="0.8"><animate attributeName="opacity" values="0.8;0.2;0.8" dur="2.8s" repeatCount="indefinite" /></circle>
+              <circle cx="250" cy="24" r="1.2" fill="#FFD98A" opacity="0.6"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="3.6s" repeatCount="indefinite" /></circle>
+
+              {/* Burj Al Arab — sail silhouette */}
+              <path d="M18 160 L18 90 Q18 40 58 30 L58 45 Q34 55 34 90 L34 160 Z" fill="#7FE8C9" opacity="0.9" />
+              <rect x="14" y="158" width="28" height="4" fill="#7FE8C9" opacity="0.9" />
+
+              {/* mid skyline */}
+              <rect x="66" y="110" width="16" height="50" fill="#7FE8C9" />
+              <rect x="88" y="85" width="13" height="75" fill="#7FE8C9" />
+              <rect x="106" y="118" width="15" height="42" fill="#7FE8C9" />
+
+              {/* Burj Khalifa — tapered spire */}
+              <polygon points="176,6 190,64 206,64 206,160 146,160 146,64 162,64" fill="#F8B400" />
+              <rect x="172" y="0" width="4" height="10" fill="#F8B400" />
+
+              {/* mid-right skyline */}
+              <rect x="220" y="98" width="15" height="62" fill="#7FE8C9" />
+              <rect x="242" y="78" width="13" height="82" fill="#7FE8C9" />
+              <rect x="262" y="112" width="17" height="48" fill="#7FE8C9" />
+              <rect x="286" y="92" width="14" height="68" fill="#7FE8C9" />
+
+              {/* waterline */}
+              <rect x="0" y="160" width="340" height="1.5" fill="#7FE8C9" opacity="0.5" />
+
+              {/* dhow boat gliding along the waterline */}
+              <g style={{ animation: "boatDrift 14s ease-in-out infinite" }}>
+                <path d="M0 160 Q10 154 22 160 Z" fill="#F8B400" opacity="0.85" />
+                <path d="M6 160 L6 146 L15 160 Z" fill="#F8B400" opacity="0.85" />
+              </g>
+            </svg>
+
+            {/* soft gold desert-dune wave along the very bottom edge of the card */}
+            <svg
+              viewBox="0 0 500 40"
+              preserveAspectRatio="none"
+              className="absolute bottom-0 left-0 w-full h-8 opacity-[0.12] pointer-events-none"
+            >
+              <path d="M0 30 Q60 10 130 24 T260 20 T390 26 T500 16 L500 40 L0 40 Z" fill="#F8B400" />
+            </svg>
+          </>
         )}
 
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
