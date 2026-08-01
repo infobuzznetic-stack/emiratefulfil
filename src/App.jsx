@@ -2084,7 +2084,17 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
   }, [product.id]);
   const galleryImages = Array.isArray(product.images) && product.images.length ? product.images : (product.image_url ? [product.image_url] : []);
   const [activeImg, setActiveImg] = useState(0);
+  const [galleryHover, setGalleryHover] = useState(false);
   useEffect(() => { setActiveImg(0); }, [product.id]);
+  // Auto-scroll through the product images every 3s. Pauses while the
+  // user's mouse is over the gallery so it doesn't fight with manual clicks.
+  useEffect(() => {
+    if (galleryImages.length <= 1 || galleryHover) return;
+    const id = setInterval(() => {
+      setActiveImg((i) => (i + 1) % galleryImages.length);
+    }, 3000);
+    return () => clearInterval(id);
+  }, [galleryImages.length, galleryHover]);
   const category = product.category || "Product";
   const description = product.description || `${product.name} is one of our best-selling ${category.toLowerCase()} items — carefully sourced, quality-checked, and shipped from our regional warehouse. It's fulfilled across every emirate with cash-on-delivery, so customers can pay when the order arrives at their door.`;
   const highlights = [
@@ -2153,7 +2163,12 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
             />
             <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896" }} />
             <div className="pointer-events-none absolute -bottom-10 -left-10 w-40 h-40 rounded-full opacity-25 blur-3xl" style={{ background: "#F8B400" }} />
-            <div className="relative rounded-2xl bg-white flex items-center justify-center overflow-hidden" style={{ minHeight: 360, boxShadow: "0 20px 45px rgba(0,0,0,0.25)" }}>
+            <div
+              className="relative rounded-2xl bg-white flex items-center justify-center overflow-hidden"
+              style={{ minHeight: 360, boxShadow: "0 20px 45px rgba(0,0,0,0.25)" }}
+              onMouseEnter={() => setGalleryHover(true)}
+              onMouseLeave={() => setGalleryHover(false)}
+            >
               <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)", boxShadow: "0 6px 16px rgba(248,180,0,0.4)" }}>Best Seller</span>
               {galleryImages.length > 0 ? (
                 <img src={galleryImages[activeImg] || galleryImages[0]} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
