@@ -355,10 +355,25 @@ function Hero({ onSignup }) {
           <circle cx="100" cy="90" r="2.4" fill="#1F2937" />
           <circle cx="120" cy="90" r="2.4" fill="#1F2937" />
           <path d="M98 100 Q110 109 122 100" stroke="#1F2937" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-          <ellipse cx="92" cy="98" rx="4" ry="2.5" fill="#F8B400" opacity="0.35" />
-          <ellipse cx="128" cy="98" rx="4" ry="2.5" fill="#F8B400" opacity="0.35" />
+          {/* twinkling sparkle stars — the courier just made a happy delivery */}
+          <circle cx="150" cy="55" r="2.2" fill="#F8B400"><animate attributeName="opacity" values="1;0.15;1" dur="1.8s" repeatCount="indefinite" /></circle>
+          <circle cx="170" cy="72" r="1.6" fill="#7FE8C9"><animate attributeName="opacity" values="1;0.15;1" dur="2.3s" repeatCount="indefinite" begin="0.4s" /></circle>
+          <circle cx="60" cy="65" r="1.8" fill="#F8B400"><animate attributeName="opacity" values="1;0.15;1" dur="2.1s" repeatCount="indefinite" begin="0.8s" /></circle>
         </svg>
       </div>
+
+      {/* Delivery truck drifting along the bottom of the hero, on a loop */}
+      <div className="hidden md:block absolute left-0 right-0 bottom-6 h-10 overflow-hidden pointer-events-none opacity-25">
+        <div style={{ animation: "truckDrive 16s linear infinite" }}>
+          <Truck className="w-9 h-9 text-white" />
+        </div>
+      </div>
+      <style>{`
+        @keyframes truckDrive {
+          from { transform: translateX(-60px); }
+          to { transform: translateX(calc(100vw + 60px)); }
+        }
+      `}</style>
 
       <div className="relative max-w-7xl mx-auto px-6 pt-40 pb-28 text-center">
         <Reveal>
