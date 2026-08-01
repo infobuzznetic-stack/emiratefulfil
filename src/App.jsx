@@ -84,6 +84,42 @@ async function uploadTicketImage(file) {
 
 const FONT_LINK_ID = "emiratefulfil-fonts";
 
+// Some `app_settings` values (like the customer-reviews JSON, which can
+// include long Arabic quotes) can be bigger than a single row's `value`
+// column comfortably holds. Rather than requiring anyone to go into
+// Supabase and widen the column by hand, we just split big values into
+// small numbered rows (key, key:1, key:2, ...) and reassemble them on
+// read. Small values still fit in one row exactly like before.
+const SETTINGS_CHUNK_SIZE = 180;
+
+async function saveChunkedSetting(baseKey, value) {
+  const str = value ?? "";
+  const chunks = [];
+  for (let i = 0; i < str.length; i += SETTINGS_CHUNK_SIZE) chunks.push(str.slice(i, i + SETTINGS_CHUNK_SIZE));
+  if (chunks.length === 0) chunks.push("");
+
+  // Clean up any leftover chunk rows from a previous, longer save before
+  // writing the new ones (so old trailing chunks don't linger).
+  const { data: existing } = await supabase.from("app_settings").select("key").like("key", `${baseKey}:%`);
+  const keepKeys = chunks.map((_, i) => `${baseKey}:${i}`);
+  const staleKeys = (existing || []).map((r) => r.key).filter((k) => !keepKeys.includes(k));
+  if (staleKeys.length) await supabase.from("app_settings").delete().in("key", staleKeys);
+
+  const rows = chunks.map((c, i) => ({ key: `${baseKey}:${i}`, value: c }));
+  const { error } = await supabase.from("app_settings").upsert(rows, { onConflict: "key" });
+  return { error };
+}
+
+async function loadChunkedSetting(baseKey) {
+  const { data: rows, error } = await supabase
+    .from("app_settings")
+    .select("key,value")
+    .like("key", `${baseKey}:%`);
+  if (error || !rows || !rows.length) return null;
+  rows.sort((a, b) => (parseInt(a.key.split(":").pop(), 10) || 0) - (parseInt(b.key.split(":").pop(), 10) || 0));
+  return rows.map((r) => r.value ?? "").join("");
+}
+
 function useGoogleFonts() {
   useEffect(() => {
     if (document.getElementById(FONT_LINK_ID)) return;
@@ -765,19 +801,18 @@ function Testimonials() {
   // stored as JSON in app_settings under key "testimonials_content".
   const [items, setItems] = useState(DEFAULT_TESTIMONIALS);
   useEffect(() => {
-    supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "testimonials_content")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          try {
-            const parsed = JSON.parse(data.value);
-            if (Array.isArray(parsed) && parsed.length) setItems(parsed);
-          } catch { /* keep defaults if stored value is malformed */ }
-        }
-      });
+    (async () => {
+      let raw = await loadChunkedSetting("testimonials_content");
+      if (!raw) {
+        const { data } = await supabase.from("app_settings").select("value").eq("key", "testimonials_content").maybeSingle();
+        raw = data?.value || null;
+      }
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) setItems(parsed);
+      } catch { /* keep defaults if stored value is malformed */ }
+    })();
   }, []);
   return (
     <section id="testimonials" className="py-28" style={{ background: "#F8FAFC" }}>
@@ -1054,7 +1089,7 @@ function Toast({ message }) {
   if (!message) return null;
   return (
     <div
-      className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-full text-sm font-semibold text-white shadow-xl"
+      className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-xl max-w-[90vw] sm:max-w-md text-center"
       style={{ background: "#0B1F3A" }}
     >
       {message}
@@ -4716,23 +4751,26 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   };
 
   // Customer reviews: editable copy of the homepage testimonials, saved as
-  // JSON in app_settings under "testimonials_content".
+  // JSON in app_settings under "testimonials_content" — split across
+  // several rows via saveChunkedSetting/loadChunkedSetting since this JSON
+  // (long quotes, Arabic names) can be bigger than one row comfortably holds.
   const [testimonialsForm, setTestimonialsForm] = useState(DEFAULT_TESTIMONIALS);
   const [testimonialsSaving, setTestimonialsSaving] = useState(false);
   useEffect(() => {
-    supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "testimonials_content")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          try {
-            const parsed = JSON.parse(data.value);
-            if (Array.isArray(parsed) && parsed.length) setTestimonialsForm(parsed);
-          } catch { /* keep defaults if stored value is malformed */ }
-        }
-      });
+    (async () => {
+      // Prefer the new chunked rows; fall back to the original single-row
+      // value for sites that saved before this change.
+      let raw = await loadChunkedSetting("testimonials_content");
+      if (!raw) {
+        const { data } = await supabase.from("app_settings").select("value").eq("key", "testimonials_content").maybeSingle();
+        raw = data?.value || null;
+      }
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) setTestimonialsForm(parsed);
+      } catch { /* keep defaults if stored value is malformed */ }
+    })();
   }, []);
   const updateTestimonial = (idx, field, value) => {
     setTestimonialsForm((list) => list.map((t, i) => (i === idx ? { ...t, [field]: value } : t)));
@@ -4745,9 +4783,14 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
   };
   const saveTestimonials = async () => {
     setTestimonialsSaving(true);
-    const { error } = await supabase.from("app_settings").upsert({ key: "testimonials_content", value: JSON.stringify(testimonialsForm) });
+    const payload = JSON.stringify(testimonialsForm);
+    const { error } = await saveChunkedSetting("testimonials_content", payload);
     setTestimonialsSaving(false);
-    if (error) { notify("Could not save the reviews."); return; }
+    if (error) {
+      console.error("Save reviews failed:", error, "payload size:", payload.length);
+      notify(error.message ? `Could not save the reviews: ${error.message}` : "Could not save the reviews.");
+      return;
+    }
     notify("Customer reviews updated — changes are live on the homepage.");
   };
 
