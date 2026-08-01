@@ -1741,6 +1741,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         </div>
       )}
       <style>{`
+        @keyframes waveHand {
+          0%, 60%, 100% { transform: rotate(0deg); }
+          10% { transform: rotate(14deg); }
+          20% { transform: rotate(-8deg); }
+          30% { transform: rotate(14deg); }
+          40% { transform: rotate(-4deg); }
+          50% { transform: rotate(10deg); }
+        }
         @keyframes dashFadeIn {
           from { opacity: 0; transform: translateY(-6px); }
           to { opacity: 1; transform: translateY(0); }
@@ -2034,11 +2042,11 @@ function OverviewTab({
               <span className="text-xs font-semibold tracking-widest" style={{ color: "#7FE8C9", fontFamily: "'Space Grotesk', sans-serif" }}>{timeLabel}</span>
             </div>
             <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {greeting}, <span style={{ background: "linear-gradient(90deg,#7FE8C9,#00C896)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{session.name.split(" ")[0]}</span>
+              {greeting}, <span style={{ background: "linear-gradient(90deg,#7FE8C9,#00C896)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
             </h1>
             <p className="mt-1.5 text-sm text-white/60 max-w-md">
               {region === "UAE"
-                ? <>Here's how your UAE store is doing today — {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>
+                ? <>Your UAE fulfillment partner is working smoothly. {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>
                 : <>Preview your future {region === "KSA" ? "Saudi" : "Qatar"} storefront below.</>}
             </p>
           </div>
