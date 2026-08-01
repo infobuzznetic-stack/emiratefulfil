@@ -1716,14 +1716,16 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
 
   // Whether Admin has marked this seller as "Premium" — just a badge/status,
   // doesn't change which products they see (that's the per-product "Visible to" list).
-  const [isPremiumSeller, setIsPremiumSeller] = useState(false);
+  const [isPremiumSeller, setIsPremiumSeller] = useState(() => readLocal(`ef_premium_${session.email}`, false));
 
   const reload = async () => {
     setCatalog(await fetchCatalog());
     setListings(await fetchListings(session.email));
     setOrders(await fetchOrders(session.email));
     const premiumEmails = await fetchPremiumSellerEmails();
-    setIsPremiumSeller(premiumEmails.includes(session.email));
+    const premium = premiumEmails.includes(session.email);
+    setIsPremiumSeller(premium);
+    writeLocal(`ef_premium_${session.email}`, premium);
     if (isAdmin) {
       const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
       setSellerCount(count || 0);
