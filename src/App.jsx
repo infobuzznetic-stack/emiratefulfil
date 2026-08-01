@@ -5,7 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText, Bell,
+  Eye, Printer, FileText, Bell, Crown,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1867,7 +1867,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         <div className="relative flex items-center gap-2.5 px-2">
           <Logo />
           <span className="font-extrabold text-white text-xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Emirate<span style={{ background: "linear-gradient(90deg,#00C896,#7FE8C9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Fulfil</span>
+            Emirate<span style={{ background: isPremiumSeller ? "linear-gradient(90deg,#F8B400,#FFE29A)" : "linear-gradient(90deg,#00C896,#7FE8C9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Fulfil</span>
           </span>
         </div>
         <div className="mt-8 space-y-1">
@@ -2011,6 +2011,15 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           0%, 100% { opacity: 0.55; transform: scale(0.85); }
           50% { opacity: 1; transform: scale(1.15); }
         }
+        @keyframes goldShimmer {
+          0% { transform: translateX(-120%) skewX(-15deg); }
+          100% { transform: translateX(220%) skewX(-15deg); }
+        }
+        @keyframes goldPulseRing {
+          0% { box-shadow: 0 0 0 0 rgba(248,180,0,0.45); }
+          70% { box-shadow: 0 0 0 10px rgba(248,180,0,0); }
+          100% { box-shadow: 0 0 0 0 rgba(248,180,0,0); }
+        }
       `}</style>
 
       {/* Main */}
@@ -2027,9 +2036,9 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             {isPremiumSeller && (
               <span
                 className="ml-2 flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
-                style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f" }}
+                style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b", animation: "goldPulseRing 2.4s infinite" }}
               >
-                <Sparkles className="w-3 h-3" /> Premium Seller
+                <Crown className="w-3 h-3" /> Premium Seller
               </span>
             )}
           </div>
@@ -2107,12 +2116,31 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               onClick={() => { setProfileOpen((v) => !v); setLangOpen(false); setNotifOpen(false); }}
               className="flex items-center gap-3"
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#0B7A5E)" }}>
-                {(session.name || session.email || "?").trim()[0]?.toUpperCase()}
+              <div className="relative flex-shrink-0">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                  style={
+                    isPremiumSeller
+                      ? { background: "linear-gradient(135deg,#F8B400,#c98f00)", boxShadow: "0 0 0 2px #FFE29A, 0 6px 14px rgba(248,180,0,0.45)" }
+                      : { background: "linear-gradient(135deg,#00C896,#0B7A5E)" }
+                  }
+                >
+                  {(session.name || session.email || "?").trim()[0]?.toUpperCase()}
+                </div>
+                {isPremiumSeller && (
+                  <div
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400)", boxShadow: "0 2px 6px rgba(248,180,0,0.6)" }}
+                  >
+                    <Crown className="w-3 h-3" style={{ color: "#3a2a0b" }} />
+                  </div>
+                )}
               </div>
               <div className="text-left">
                 <div className="text-sm font-bold" style={{ color: "#111827" }}>{session.name || session.email}</div>
-                <div className="text-xs" style={{ color: "#6B7280" }}>Business Account</div>
+                <div className="text-xs flex items-center gap-1" style={isPremiumSeller ? { color: "#c98f00" } : { color: "#6B7280" }}>
+                  {isPremiumSeller && <Crown className="w-3 h-3" />} {isPremiumSeller ? "Premium Account" : "Business Account"}
+                </div>
               </div>
               <ChevronDown className="w-4 h-4 text-gray-400" />
             </button>
@@ -2183,7 +2211,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   );
 }
 
-function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = "", delay = 0, icon: Icon, onClick }) {
+function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = "", delay = 0, icon: Icon, onClick, goldRing = false }) {
   const [shown, setShown] = useState(false);
   const [hover, setHover] = useState(false);
   const [display, setDisplay] = useState(0);
@@ -2221,10 +2249,10 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = 
         background: hover
           ? `linear-gradient(160deg, ${color}10, #ffffff 55%)`
           : "#ffffff",
-        border: `1px solid ${hover ? color + "55" : "#E5E7EB"}`,
+        border: `1px solid ${hover ? color + "55" : (goldRing ? "rgba(248,180,0,0.35)" : "#E5E7EB")}`,
         opacity: shown ? 1 : 0,
         transform: shown ? (hover ? "translateY(-6px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
-        boxShadow: hover ? `0 22px 40px -12px ${color}55` : "0 1px 2px rgba(16,24,40,0.04)",
+        boxShadow: hover ? `0 22px 40px -12px ${color}55` : (goldRing ? "0 2px 10px -2px rgba(248,180,0,0.25)" : "0 1px 2px rgba(16,24,40,0.04)"),
       }}
     >
       <div
@@ -2399,11 +2427,17 @@ function OverviewTab({
           style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         />
         {isPremiumSeller && (
+          <div
+            className="absolute inset-y-0 w-1/3 pointer-events-none"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent)", animation: "goldShimmer 4.5s ease-in-out infinite" }}
+          />
+        )}
+        {isPremiumSeller && (
           <span
             className="absolute top-5 right-6 flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full z-10"
-            style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b", boxShadow: "0 6px 16px rgba(248,180,0,0.5)" }}
+            style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b", boxShadow: "0 6px 16px rgba(248,180,0,0.5)", animation: "goldPulseRing 2.4s infinite" }}
           >
-            <Sparkles className="w-3.5 h-3.5" style={{ animation: "sparkleTwinkle 2s ease-in-out infinite" }} /> Premium Seller
+            <Crown className="w-3.5 h-3.5" style={{ animation: "sparkleTwinkle 2s ease-in-out infinite" }} /> Premium Seller
           </span>
         )}
         <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: isPremiumSeller ? "#F8B400" : "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
@@ -2493,11 +2527,19 @@ function OverviewTab({
         <ComingSoonPanel region={region} />
       ) : (
         <>
+          {isPremiumSeller && (
+            <div className="flex items-center gap-2 mb-3">
+              <Crown className="w-4 h-4" style={{ color: "#F8B400" }} />
+              <span className="text-xs font-bold tracking-wide uppercase" style={{ color: "#c98f00" }}>Premium insights</span>
+              <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, rgba(248,180,0,0.4), transparent)" }} />
+            </div>
+          )}
           <div key={region} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
             {cards.map((c, i) => (
               <StatCard
                 key={c.label} label={c.label} value={c.value} prefix={c.prefix} suffix={c.suffix} color={c.color} icon={c.icon} delay={i * 60}
                 onClick={c.nav ? () => (c.nav.tab === "orders" ? goToOrders(c.nav.status) : setTab(c.nav.tab)) : undefined}
+                goldRing={isPremiumSeller}
               />
             ))}
           </div>
