@@ -576,6 +576,49 @@ function OrderFlow() {
   );
 }
 
+/* ---------------- IN ACTION (real fleet / warehouse / delivery photos) ---------------- */
+function InAction() {
+  const shots = [
+    { src: "/images/fleet-warehouse.png", label: "Source → Warehouse → Pack → Deliver", caption: "Our branded fleet & fulfillment hubs across the UAE" },
+    { src: "/images/fleet-doorstep.png", label: "Doorstep delivery", caption: "Every order lands right at the customer's door, on time" },
+    { src: "/images/fleet-handoff.png", label: "Verified handoff", caption: "Friendly, uniformed riders your customers can trust" },
+  ];
+  return (
+    <section className="py-28" style={{ background: "#0B1F3A" }}>
+      <div className="max-w-7xl mx-auto px-6">
+        <Reveal>
+          <div className="text-center max-w-xl mx-auto">
+            <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#00e0aa" }}>On the ground</span>
+            <h2 className="mt-3 text-4xl md:text-5xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              A real fleet. A real network.
+            </h2>
+            <p className="mt-4 text-white/55">From our warehouse floor to the customer's doorstep — this is EmirateFulfil in action.</p>
+          </div>
+        </Reveal>
+
+        <div className="mt-14 grid md:grid-cols-3 gap-6">
+          {shots.map((s, i) => (
+            <Reveal key={i} delay={i * 120}>
+              <div className="group rounded-2xl overflow-hidden relative" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.35)" }}>
+                <img
+                  src={s.src}
+                  alt={s.label}
+                  className="w-full h-72 object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 40%, rgba(8,18,33,0.92) 100%)" }} />
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <div className="text-xs font-bold tracking-wide uppercase" style={{ color: "#F8B400" }}>{s.label}</div>
+                  <div className="mt-1 text-sm text-white/85">{s.caption}</div>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------- DASHBOARD PREVIEW ---------------- */
 function DashboardPreview() {
   const bars = [40, 65, 50, 80, 62, 90, 74];
@@ -5373,6 +5416,7 @@ function HomePage({ session, onNav, onLogout }) {
       <Hero onSignup={() => onNav("signup")} />
       <TrustStrip />
       <Features />
+      <InAction />
       <OrderFlow />
       <DashboardPreview />
       <Pricing />
