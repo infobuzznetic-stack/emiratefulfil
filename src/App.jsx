@@ -2585,6 +2585,7 @@ const ORDER_STATUS_STYLES = {
   pending: { background: "rgba(248,180,0,0.15)", color: "#b07d00" },
   confirmation_pending: { background: "rgba(234,88,12,0.12)", color: "#c2410c" },
   confirmed: { background: "rgba(14,165,233,0.12)", color: "#0284c7" },
+  customer_cancelled_confirmation: { background: "rgba(244,63,94,0.12)", color: "#e11d48" },
   dispatched: { background: "rgba(139,92,246,0.14)", color: "#7c3aed" },
   shipped: { background: "rgba(59,130,246,0.12)", color: "#3B82F6" },
   delivered: { background: "rgba(0,200,150,0.15)", color: "#00a67e" },
@@ -2595,6 +2596,7 @@ const ORDER_STATUS_LABELS = {
   pending: "Pending",
   confirmation_pending: "Order confirmation pending",
   confirmed: "Order confirmed",
+  customer_cancelled_confirmation: "Customer cancel on confirmation",
   dispatched: "Order dispatched",
   shipped: "Shipped",
   delivered: "Delivered",
@@ -4275,9 +4277,9 @@ function AdminOrdersPanel({ notify }) {
                             <div className="text-gray-700 font-medium">{o.city || "—"}</div>
                             <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
                           </td>
-                          <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
+                          <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned" || o.status === "customer_cancelled_confirmation") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
                           <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>
-                            AED {(o.status === "cancelled" || o.status === "returned") ? 0 : (Number(o.sell_price) - Number(o.list_price != null ? o.list_price : o.sell_price)) * o.qty}
+                            AED {(o.status === "cancelled" || o.status === "returned" || o.status === "customer_cancelled_confirmation") ? 0 : (Number(o.sell_price) - Number(o.list_price != null ? o.list_price : o.sell_price)) * o.qty}
                           </td>
                           <td className="px-4 py-3">
                             <select
@@ -4289,6 +4291,7 @@ function AdminOrdersPanel({ notify }) {
                               <option value="pending">Pending</option>
                               <option value="confirmation_pending">Order confirmation pending</option>
                               <option value="confirmed">Order confirmed</option>
+                              <option value="customer_cancelled_confirmation">Customer cancel on confirmation</option>
                               <option value="dispatched">Order dispatched</option>
                               <option value="shipped">Shipped</option>
                               <option value="delivered">Delivered</option>
@@ -4297,7 +4300,7 @@ function AdminOrdersPanel({ notify }) {
                             </select>
                           </td>
                           <td className="px-4 py-3">
-                            {o.status === "cancelled" ? (
+                            {(o.status === "cancelled" || o.status === "customer_cancelled_confirmation") ? (
                               <span className="text-xs text-gray-300">—</span>
                             ) : (
                               <div className="flex items-center gap-1.5">
