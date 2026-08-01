@@ -1849,7 +1849,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
 
   return (
     <div style={{ fontFamily: "Inter, sans-serif", background: "linear-gradient(180deg,#EEF2F8 0%,#F8FAFC 320px,#F8FAFC 100%)", position: "relative", overflow: "hidden" }} className="min-h-screen flex">
-      <div className="pointer-events-none absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full opacity-[0.10] blur-3xl" style={{ background: "#00C896" }} />
+      <div className="pointer-events-none absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full opacity-[0.10] blur-3xl" style={{ background: isPremiumSeller ? "#F8B400" : "#00C896" }} />
       <div className="pointer-events-none absolute top-40 -right-32 w-[380px] h-[380px] rounded-full opacity-[0.08] blur-3xl" style={{ background: "#F8B400" }} />
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-72" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0.04), transparent)" }} />
       {/* Sidebar */}
@@ -1877,13 +1877,15 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out hover:scale-[1.03] hover:translate-x-1 active:scale-95"
               style={
                 tab === n.id
-                  ? { background: "rgba(0,200,150,0.15)", color: "#00C896", boxShadow: "0 4px 14px rgba(0,200,150,0.18)" }
+                  ? (isPremiumSeller
+                      ? { background: "rgba(248,180,0,0.16)", color: "#F8B400", boxShadow: "0 4px 14px rgba(248,180,0,0.22)" }
+                      : { background: "rgba(0,200,150,0.15)", color: "#00C896", boxShadow: "0 4px 14px rgba(0,200,150,0.18)" })
                   : { color: "rgba(255,255,255,0.6)" }
               }
             >
               <n.icon
                 className="w-4.5 h-4.5 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110"
-                style={tab === n.id ? { color: "#00C896" } : {}}
+                style={tab === n.id ? { color: isPremiumSeller ? "#F8B400" : "#00C896" } : {}}
               />
               <span className="flex-1 text-left transition-transform duration-300 group-hover:translate-x-0.5">{n.label}</span>
               {n.count > 0 && (
@@ -2140,7 +2142,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         <div key={tab + region} style={{ animation: "dashTabIn 0.35s ease-out both" }}>
           {tab === "overview" && (
             <OverviewTab
-              session={session} orders={orders} listings={listings} catalog={catalog} setTab={setTab} goToOrders={goToOrders}
+              session={session} orders={orders} listings={listings} catalog={catalog} setTab={setTab} goToOrders={goToOrders} isPremiumSeller={isPremiumSeller}
               confirmedProfit={confirmedProfit} deliveredRevenue={deliveredRevenue}
               pending={pending} shipped={shipped} delivered={delivered} cancelled={cancelled} returned={returned}
               region={region} setRegion={setRegion}
@@ -2331,7 +2333,7 @@ function ComingSoonPanel({ region }) {
 }
 
 function OverviewTab({
-  session, orders, listings, catalog, setTab, goToOrders,
+  session, orders, listings, catalog, setTab, goToOrders, isPremiumSeller,
   region, setRegion,
   regionOrders, regionConfirmedProfit, regionDeliveredRevenue,
   regionUnpaidInvoice, regionPaidInvoice,
@@ -2383,15 +2385,30 @@ function OverviewTab({
 
   return (
     <div>
-      <div className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7" style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }}>
+      <div
+        className="relative overflow-hidden rounded-3xl px-7 py-8 mb-7"
+        style={
+          isPremiumSeller
+            ? { background: "linear-gradient(120deg,#1a1405 0%,#3a2a0b 45%,#7a5a0a 90%,#F8B400 145%)", border: "1px solid rgba(248,180,0,0.45)", boxShadow: "0 0 0 1px rgba(248,180,0,0.12), 0 20px 50px -20px rgba(248,180,0,0.35)" }
+            : { background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }
+        }
+      >
         {/* subtle dot-grid texture */}
         <div
           className="absolute inset-0 opacity-[0.07]"
           style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         />
-        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
+        {isPremiumSeller && (
+          <span
+            className="absolute top-5 right-6 flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full z-10"
+            style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b", boxShadow: "0 6px 16px rgba(248,180,0,0.5)" }}
+          >
+            <Sparkles className="w-3.5 h-3.5" style={{ animation: "sparkleTwinkle 2s ease-in-out infinite" }} /> Premium Seller
+          </span>
+        )}
+        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: isPremiumSeller ? "#F8B400" : "#00C896", animation: "blobMove 9s ease-in-out infinite" }} />
         <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
-        <div className="absolute top-1/2 left-10 w-40 h-40 rounded-full opacity-10 blur-3xl -translate-y-1/2" style={{ background: "#3B82F6", animation: "floatY 7s ease-in-out infinite" }} />
+        <div className="absolute top-1/2 left-10 w-40 h-40 rounded-full opacity-10 blur-3xl -translate-y-1/2" style={{ background: isPremiumSeller ? "#FFD98A" : "#3B82F6", animation: "floatY 7s ease-in-out infinite" }} />
 
         {/* soft gold desert-dune wave along the very bottom edge of the card */}
         {region === "UAE" && (
@@ -2413,7 +2430,7 @@ function OverviewTab({
               <span className="text-xs font-semibold tracking-widest" style={{ color: "#7FE8C9", fontFamily: "'Space Grotesk', sans-serif" }}>{timeLabel}</span>
             </div>
             <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {greeting}, <span style={{ background: "linear-gradient(90deg,#7FE8C9,#00C896)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
+              {greeting}, <span style={{ background: isPremiumSeller ? "linear-gradient(90deg,#FFE29A,#F8B400)" : "linear-gradient(90deg,#7FE8C9,#00C896)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
             </h1>
             <p className="mt-1.5 text-sm text-white/60 max-w-md">
               {region === "UAE"
@@ -2446,14 +2463,14 @@ function OverviewTab({
                 className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto"
                 style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", backdropFilter: "blur(6px)" }}
               >
-                <div className="relative w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 6px 16px rgba(0,200,150,0.4)", animation: "livePulse 2.4s infinite" }}>
+                <div className="relative w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isPremiumSeller ? "linear-gradient(135deg,#F8B400,#c98f00)" : "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: isPremiumSeller ? "0 6px 16px rgba(248,180,0,0.5)" : "0 6px 16px rgba(0,200,150,0.4)", animation: "livePulse 2.4s infinite" }}>
                   <Sparkles className="w-5 h-5 text-white" style={{ animation: "sparkleTwinkle 2.2s ease-in-out infinite" }} />
                   <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full" style={{ background: "#F8B400", animation: "sparkleTwinkle 1.6s ease-in-out infinite 0.3s" }} />
-                  <span className="absolute -bottom-1 -left-1 w-1.5 h-1.5 rounded-full" style={{ background: "#7FE8C9", animation: "sparkleTwinkle 1.9s ease-in-out infinite 0.7s" }} />
+                  <span className="absolute -bottom-1 -left-1 w-1.5 h-1.5 rounded-full" style={{ background: isPremiumSeller ? "#FFE29A" : "#7FE8C9", animation: "sparkleTwinkle 1.9s ease-in-out infinite 0.7s" }} />
                 </div>
                 <div className="text-right flex-1 sm:flex-initial">
                   <div className="text-[11px] font-medium text-white/50 uppercase tracking-wide">Confirmed profit</div>
-                  <div className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
+                  <div className="text-2xl font-extrabold" style={{ color: isPremiumSeller ? "#FFE29A" : "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
                 </div>
               </div>
             )}
