@@ -628,24 +628,82 @@ function Pricing() {
 
 /* ---------------- ABOUT / STORY (supplier + delivery partner) ---------------- */
 function AboutStory() {
+  const [ref, visible] = useReveal();
   return (
-    <section className="py-28" style={{ background: "#0B1F3A" }}>
-      <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+    <section className="py-28 relative overflow-hidden" style={{ background: "linear-gradient(180deg,#0B1F3A 0%,#0a1a30 100%)" }}>
+      <style>{`
+        @keyframes aboutBlob { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(20px,-24px) scale(1.06);} }
+        @keyframes vanBounce { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-6px);} }
+        @keyframes routeDash { to { stroke-dashoffset: -60; } }
+        @keyframes liveDot { 0%{ box-shadow: 0 0 0 0 rgba(0,200,150,0.6);} 70%{ box-shadow: 0 0 0 10px rgba(0,200,150,0);} 100%{ box-shadow: 0 0 0 0 rgba(0,200,150,0);} }
+      `}</style>
+      <div className="absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full opacity-25 blur-3xl pointer-events-none" style={{ background: "#F8B400", animation: "aboutBlob 12s ease-in-out infinite" }} />
+      <div className="absolute -bottom-24 -right-24 w-[460px] h-[460px] rounded-full opacity-20 blur-3xl pointer-events-none" style={{ background: "#00C896", animation: "aboutBlob 16s ease-in-out infinite reverse" }} />
+
+      <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
         <Reveal>
-          <div className="relative rounded-3xl overflow-hidden" style={{ boxShadow: "0 30px 70px rgba(0,0,0,0.35)" }}>
-            <img
-              src="https://images.unsplash.com/photo-1667514045886-e79279ebe179?fm=jpg&q=80&w=1200&auto=format&fit=crop"
-              alt="Delivery partner carrying a package"
-              className="w-full h-[420px] object-cover"
-            />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 40%, rgba(11,31,58,0.85) 100%)" }} />
+          <div ref={ref} className="relative rounded-3xl overflow-hidden" style={{ boxShadow: "0 30px 70px rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <svg viewBox="0 0 600 420" className="w-full h-[420px]">
+              <defs>
+                <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0F2E52" />
+                  <stop offset="100%" stopColor="#081221" />
+                </linearGradient>
+              </defs>
+              <rect width="600" height="420" fill="url(#skyG)" />
+              {/* skyline */}
+              <g opacity="0.5" fill="#12294a">
+                <rect x="20" y="230" width="50" height="150" />
+                <rect x="80" y="180" width="40" height="200" />
+                <rect x="130" y="250" width="55" height="130" />
+                <rect x="440" y="200" width="45" height="180" />
+                <rect x="495" y="240" width="60" height="140" />
+                <rect x="380" y="260" width="40" height="120" />
+              </g>
+              {/* stars */}
+              {[...Array(14)].map((_, i) => (
+                <circle key={i} cx={20 + (i * 41) % 560} cy={20 + (i * 27) % 140} r="1.6" fill="#ffffff" opacity={0.3 + (i % 4) * 0.15} />
+              ))}
+              {/* road */}
+              <rect x="0" y="330" width="600" height="90" fill="#0d1b30" />
+              <g stroke="#F8B400" strokeWidth="5" strokeDasharray="26 22" opacity="0.8">
+                <line x1="0" y1="374" x2="600" y2="374">
+                  <animate attributeName="x1" from="0" to="-48" dur="1.1s" repeatCount="indefinite" />
+                  <animate attributeName="x2" from="600" to="552" dur="1.1s" repeatCount="indefinite" />
+                </line>
+              </g>
+
+              {/* branded van, gently bouncing */}
+              <g style={{ animation: "vanBounce 2.4s ease-in-out infinite", transformOrigin: "300px 330px" }}>
+                <rect x="150" y="255" width="230" height="78" rx="12" fill="#ffffff" />
+                <path d="M380 333 L380 278 Q380 266 392 266 L415 266 Q430 266 438 279 L456 305 Q461 313 461 322 L461 333 Z" fill="#ffffff" />
+                <rect x="150" y="255" width="230" height="18" rx="8" fill="#0B1F3A" />
+                <rect x="397" y="279" width="42" height="24" rx="4" fill="#9fd8ff" opacity="0.85" />
+                <rect x="150" y="300" width="311" height="15" fill="#00C896" />
+                <rect x="150" y="315" width="311" height="5" fill="#F8B400" />
+                <text x="163" y="295" fontFamily="'Plus Jakarta Sans', sans-serif" fontWeight="800" fontSize="19" fill="#0B1F3A">
+                  Emirate<tspan fill="#00a67e">Fulfil</tspan>
+                </text>
+                <line x1="380" y1="266" x2="380" y2="333" stroke="#0B1F3A" strokeWidth="3" />
+                <circle cx="205" cy="336" r="19" fill="#0d1b30" />
+                <circle cx="205" cy="336" r="8" fill="#c9d3de" />
+                <circle cx="410" cy="336" r="19" fill="#0d1b30" />
+                <circle cx="410" cy="336" r="8" fill="#c9d3de" />
+              </g>
+            </svg>
+
+            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 55%, rgba(8,18,33,0.9) 100%)" }} />
+            <div className="absolute top-5 left-5 flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(8,18,33,0.7)", border: "1px solid rgba(0,200,150,0.35)" }}>
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#00C896", animation: "liveDot 1.8s infinite" }} />
+              <span className="text-[11px] font-semibold text-white/80 tracking-wide">Live on the road</span>
+            </div>
             <div className="absolute bottom-6 left-6 right-6 flex items-center gap-3">
               <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
                 <Truck className="w-5 h-5 text-white" />
               </div>
               <div>
                 <div className="text-white font-bold text-sm">We deliver it ourselves</div>
-                <div className="text-white/60 text-xs">Own riders &amp; vans across the UAE</div>
+                <div className="text-white/60 text-xs">Own branded riders &amp; vans across the UAE</div>
               </div>
             </div>
           </div>
@@ -666,7 +724,13 @@ function AboutStory() {
               { icon: MapPin, title: "On the ground in the UAE", desc: "Local knowledge of every emirate, every neighborhood, every shortcut." },
               { icon: ShieldCheck, title: "Accountable end-to-end", desc: "One team responsible from warehouse shelf to doorstep handover." },
             ].map((f, i) => (
-              <div key={i} className="p-5 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div
+                key={i}
+                className="p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,200,150,0.09)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+              >
                 <f.icon className="w-5 h-5" style={{ color: "#00C896" }} />
                 <div className="mt-3 text-white font-semibold text-sm">{f.title}</div>
                 <div className="mt-1 text-white/50 text-xs leading-relaxed">{f.desc}</div>
@@ -683,6 +747,11 @@ function AboutStory() {
 function BrandedVan() {
   return (
     <svg viewBox="0 0 600 340" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+      <style>{`
+        @keyframes fleetVanFloat { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-5px);} }
+        @keyframes fleetLine { to { stroke-dashoffset: -40; } }
+        @keyframes fleetWheelSpin { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -18; } }
+      `}</style>
       <defs>
         <linearGradient id="vanSky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#0F2E52" />
@@ -698,8 +767,14 @@ function BrandedVan() {
       <circle cx="90" cy="80" r="46" fill="#F8B400" opacity="0.15" />
       <circle cx="520" cy="60" r="60" fill="#00C896" opacity="0.12" />
 
+      {/* speed lines behind the van */}
+      <g stroke="#00C896" strokeWidth="3" opacity="0.5" strokeDasharray="18 14">
+        <line x1="20" y1="190" x2="90" y2="190" style={{ animation: "fleetLine 0.9s linear infinite" }} />
+        <line x1="10" y1="210" x2="80" y2="210" style={{ animation: "fleetLine 1.1s linear infinite" }} />
+      </g>
+
       {/* van body */}
-      <g>
+      <g style={{ animation: "fleetVanFloat 2.6s ease-in-out infinite" }}>
         <rect x="90" y="140" width="330" height="100" rx="14" fill="url(#vanBody)" />
         <path d="M420 240 L420 165 Q420 150 435 150 L470 150 Q490 150 500 168 L525 205 Q532 216 532 228 L532 240 Z" fill="url(#vanBody)" />
         <rect x="90" y="140" width="330" height="24" rx="10" fill="#0B1F3A" />
@@ -720,14 +795,74 @@ function BrandedVan() {
         {/* windshield line */}
         <line x1="420" y1="150" x2="420" y2="240" stroke="#0B1F3A" strokeWidth="4" />
 
-        {/* wheels */}
+        {/* wheels, with a spinning hub ring */}
         <circle cx="175" cy="245" r="28" fill="#12294a" />
-        <circle cx="175" cy="245" r="12" fill="#c9d3de" />
+        <circle cx="175" cy="245" r="14" fill="none" stroke="#c9d3de" strokeWidth="3" strokeDasharray="6 5" style={{ animation: "fleetWheelSpin 0.5s linear infinite", transformOrigin: "175px 245px" }} />
         <circle cx="470" cy="245" r="28" fill="#12294a" />
-        <circle cx="470" cy="245" r="12" fill="#c9d3de" />
+        <circle cx="470" cy="245" r="14" fill="none" stroke="#c9d3de" strokeWidth="3" strokeDasharray="6 5" style={{ animation: "fleetWheelSpin 0.5s linear infinite", transformOrigin: "470px 245px" }} />
       </g>
 
       <rect x="0" y="266" width="600" height="74" fill="#081221" />
+    </svg>
+  );
+}
+
+function BrandedWarehouse() {
+  return (
+    <svg viewBox="0 0 600 340" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+      <style>{`
+        @keyframes boxDrop { 0%{ transform: translateY(-14px); opacity: 0;} 40%{ opacity: 1;} 100%{ transform: translateY(0); opacity: 1;} }
+        @keyframes forkliftMove { 0%,100%{ transform: translateX(0);} 50%{ transform: translateX(18px);} }
+        @keyframes warehouseGlow { 0%,100%{ opacity: 0.5;} 50%{ opacity: 0.9;} }
+      `}</style>
+      <defs>
+        <linearGradient id="whSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#132a4d" />
+          <stop offset="100%" stopColor="#081221" />
+        </linearGradient>
+      </defs>
+      <rect width="600" height="340" fill="url(#whSky)" />
+
+      {/* warehouse structure */}
+      <rect x="40" y="70" width="520" height="230" fill="#0F2440" stroke="#1c3a63" strokeWidth="2" />
+      <path d="M20 90 L300 30 L580 90 Z" fill="#0B1F3A" />
+      <rect x="0" y="300" width="600" height="40" fill="#081221" />
+
+      {/* EmirateFulfil signage board */}
+      <rect x="210" y="52" width="180" height="34" rx="6" fill="#00C896" style={{ animation: "warehouseGlow 2.4s ease-in-out infinite" }} />
+      <text x="228" y="75" fontFamily="'Plus Jakarta Sans', sans-serif" fontWeight="800" fontSize="17" fill="#04140f">
+        EmirateFulfil
+      </text>
+
+      {/* shelving with boxes */}
+      {[0, 1, 2].map((row) => (
+        <g key={row}>
+          <line x1="70" y1={130 + row * 55} x2="530" y2={130 + row * 55} stroke="#2a4a78" strokeWidth="4" />
+          {[0, 1, 2, 3, 4, 5, 6].map((col) => {
+            const colors = ["#F8B400", "#00C896", "#e5e9ef"];
+            return (
+              <rect
+                key={col}
+                x={80 + col * 66}
+                y={130 + row * 55 - 34}
+                width="46"
+                height="34"
+                rx="3"
+                fill={colors[(row + col) % 3]}
+                style={{ animation: `boxDrop 0.6s ease ${(row * 7 + col) * 0.05}s both` }}
+              />
+            );
+          })}
+        </g>
+      ))}
+
+      {/* forklift moving along the floor */}
+      <g style={{ animation: "forkliftMove 3.2s ease-in-out infinite" }}>
+        <rect x="90" y="272" width="46" height="22" rx="3" fill="#F8B400" />
+        <rect x="126" y="256" width="6" height="40" fill="#c9d3de" />
+        <circle cx="102" cy="298" r="9" fill="#12294a" />
+        <circle cx="128" cy="298" r="9" fill="#12294a" />
+      </g>
     </svg>
   );
 }
@@ -738,13 +873,13 @@ function Fleet() {
       title: "Our delivery fleet",
       desc: "Branded EmirateFulfil vans on the road every day, dispatching orders across all seven emirates.",
       icon: Truck,
-      graphic: true,
+      Graphic: BrandedVan,
     },
     {
-      img: "https://images.unsplash.com/photo-1685483749753-0dab7e144794?fm=jpg&q=80&w=1200&auto=format&fit=crop",
       title: "Our warehouses",
       desc: "Stock held, organized, and ready to pick — close to where your customers are.",
       icon: Warehouse,
+      Graphic: BrandedWarehouse,
     },
   ];
   return (
@@ -762,16 +897,9 @@ function Fleet() {
         <div className="mt-14 grid md:grid-cols-2 gap-6">
           {cards.map((c, i) => (
             <Reveal key={i} delay={i * 100}>
-              <div className="group relative rounded-2xl overflow-hidden h-80" style={{ boxShadow: "0 10px 30px rgba(16,24,40,0.08)" }}>
-                {c.graphic ? <BrandedVan /> : (
-                  <img src={c.img} alt={c.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                )}
-                <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 35%, rgba(11,31,58,0.9) 100%)" }} />
-                {!c.graphic && (
-                  <span className="absolute top-4 right-4 text-[11px] font-bold px-3 py-1 rounded-full" style={{ background: "rgba(0,200,150,0.9)", color: "#04140f" }}>
-                    EmirateFulfil
-                  </span>
-                )}
+              <div className="group relative rounded-2xl overflow-hidden h-80 transition-transform duration-300 hover:-translate-y-1.5" style={{ boxShadow: "0 10px 30px rgba(16,24,40,0.08)" }}>
+                <c.Graphic />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 40%, rgba(8,18,33,0.92) 100%)" }} />
                 <div className="absolute bottom-6 left-6 right-6">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
                     <c.icon className="w-5 h-5 text-white" />
@@ -791,16 +919,20 @@ function Fleet() {
 /* ---------------- UAE DELIVERY COVERAGE ---------------- */
 function CoverageMap() {
   const emirates = [
-    { name: "Dubai", eta: "Same-day" },
-    { name: "Abu Dhabi", eta: "Same-day" },
-    { name: "Sharjah", eta: "Same-day" },
-    { name: "Ajman", eta: "Next-day" },
-    { name: "Umm Al Quwain", eta: "Next-day" },
-    { name: "Ras Al Khaimah", eta: "Next-day" },
-    { name: "Fujairah", eta: "Next-day" },
+    { name: "Dubai", eta: "Same-day", top: "50%", left: "50%" },
+    { name: "Abu Dhabi", eta: "Same-day", top: "70%", left: "32%" },
+    { name: "Sharjah", eta: "Same-day", top: "42%", left: "56%" },
+    { name: "Ajman", eta: "Next-day", top: "38%", left: "58%" },
+    { name: "Umm Al Quwain", eta: "Next-day", top: "33%", left: "60%" },
+    { name: "Ras Al Khaimah", eta: "Next-day", top: "19%", left: "63%" },
+    { name: "Fujairah", eta: "Next-day", top: "31%", left: "73%" },
   ];
   return (
     <section className="py-28" style={{ background: "#0B1F3A" }}>
+      <style>{`
+        @keyframes mapPing { 0%{ box-shadow: 0 0 0 0 rgba(0,200,150,0.55);} 70%{ box-shadow: 0 0 0 14px rgba(0,200,150,0);} 100%{ box-shadow: 0 0 0 0 rgba(0,200,150,0);} }
+        @keyframes mapRoute { to { stroke-dashoffset: -200; } }
+      `}</style>
       <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
         <Reveal>
           <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#F8B400" }}>Delivery coverage</span>
@@ -812,7 +944,13 @@ function CoverageMap() {
           </p>
           <div className="mt-8 grid sm:grid-cols-2 gap-3">
             {emirates.map((e, i) => (
-              <div key={i} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div
+                key={i}
+                className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-colors duration-300"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+                onMouseEnter={(ev) => (ev.currentTarget.style.background = "rgba(0,200,150,0.1)")}
+                onMouseLeave={(ev) => (ev.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+              >
                 <span className="flex items-center gap-2 text-sm text-white font-medium">
                   <MapPin className="w-4 h-4 flex-shrink-0" style={{ color: "#00C896" }} /> {e.name}
                 </span>
@@ -823,13 +961,38 @@ function CoverageMap() {
         </Reveal>
 
         <Reveal delay={150}>
-          <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/United_Arab_Emirates_adm_location_map.svg/800px-United_Arab_Emirates_adm_location_map.svg.png"
-              alt="Map of the United Arab Emirates"
-              className="w-full h-auto rounded-xl"
-              style={{ background: "#0F2440" }}
-            />
+          <div className="relative rounded-2xl p-6 overflow-hidden" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="relative w-full" style={{ aspectRatio: "4 / 5" }}>
+              <img
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/United_Arab_Emirates_adm_location_map.svg/800px-United_Arab_Emirates_adm_location_map.svg.png"
+                alt="Map of the United Arab Emirates"
+                className="absolute inset-0 w-full h-full object-contain rounded-xl"
+                style={{ background: "#0F2440", filter: "brightness(0.9) saturate(1.15)" }}
+              />
+              {/* animated route connecting the coverage points */}
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+                <polyline
+                  points="32,70 50,50 56,42 58,38 60,33 63,19 73,31"
+                  fill="none"
+                  stroke="#F8B400"
+                  strokeWidth="0.6"
+                  strokeDasharray="3 2.5"
+                  opacity="0.85"
+                  style={{ animation: "mapRoute 3.5s linear infinite" }}
+                />
+              </svg>
+              {emirates.map((e, i) => (
+                <div key={i} className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center" style={{ top: e.top, left: e.left }}>
+                  <span
+                    className="block w-3 h-3 rounded-full"
+                    style={{ background: "#00C896", border: "2px solid #ffffff", animation: `mapPing 2s ease-in-out ${i * 0.25}s infinite` }}
+                  />
+                  <span className="mt-1 text-[9px] font-semibold text-white whitespace-nowrap px-1.5 py-0.5 rounded" style={{ background: "rgba(8,18,33,0.75)" }}>
+                    {e.name}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </Reveal>
       </div>
