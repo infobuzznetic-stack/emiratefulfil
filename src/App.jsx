@@ -497,46 +497,137 @@ function TrustStrip() {
   );
 }
 
-/* ---------------- FEATURES ---------------- */
+/* ---------------- FEATURES (plan comparison table) ---------------- */
+// Replaces the old icon-grid Features section with a "Our Features" style
+// comparison table: feature rows down the left, plan columns across the
+// top (each cell either a short text value or a check/cross). Content is
+// admin-editable (Admin tab → "Features comparison"), stored as JSON in
+// app_settings under key "features_table_content" (chunked — see
+// saveChunkedSetting/loadChunkedSetting — since the full table can exceed
+// one row's column size). Falls back to DEFAULT_FEATURES_TABLE until an
+// admin saves their own version, so a fresh install still looks complete.
+const DEFAULT_FEATURES_TABLE = {
+  headline: "Our Features",
+  plans: [
+    { name: "Starter", badge: "FREE", subtitle: "For experts", price: "$0" },
+    { name: "Growth", badge: "POPULAR", subtitle: "For growing sellers", price: "$349" },
+    { name: "Enterprise", badge: "GOLD", subtitle: "For beginners", price: "Custom" },
+  ],
+  rows: [
+    { label: "Account manager", type: "text", values: ["Junior", "Mid-level", "Senior"] },
+    { label: "Response time", type: "text", values: ["4 hours", "2 hours", "On priority basis"] },
+    { label: "Dropshipping available in", type: "text", values: ["PAK, KSA, UAE", "All GCC markets", "All available markets"] },
+    { label: "WhatsApp group access", type: "check", values: [false, true, true] },
+    { label: "Trending winning products", type: "check", values: [false, true, true] },
+    { label: "Winning creatives & strategy", type: "check", values: [false, true, true] },
+    { label: "Private sourcing products", type: "check", values: [false, false, true] },
+    { label: "Customer support", type: "check", values: [true, true, true] },
+    { label: "Custom packaging", type: "check", values: [false, true, true] },
+    { label: "Product financing", type: "check", values: [false, false, true] },
+  ],
+};
+
+// Header background per plan column, cycled by index so the table still
+// looks intentional whether an admin has 2, 3, or more plan columns.
+const FEATURES_TABLE_HEADER_STYLES = [
+  { bg: "#12294a", badgeBg: "rgba(255,255,255,0.14)", badgeColor: "#fff", text: "#fff", sub: "rgba(255,255,255,0.65)" },
+  { bg: "#00C896", badgeBg: "rgba(11,31,58,0.18)", badgeColor: "#0B1F3A", text: "#fff", sub: "rgba(11,31,58,0.65)" },
+  { bg: "#F8B400", badgeBg: "rgba(11,31,58,0.15)", badgeColor: "#0B1F3A", text: "#0B1F3A", sub: "rgba(11,31,58,0.65)" },
+];
+
 function Features() {
-  const items = [
-    { icon: Zap, title: "Same-day dispatch", desc: "Orders placed before 2 PM ship the same day from any of our regional hubs." },
-    { icon: ShieldCheck, title: "Verified suppliers", desc: "Every supplier on the network is vetted for quality, stock accuracy, and reliability." },
-    { icon: Globe2, title: "Six-country reach", desc: "One integration delivers into the UAE, KSA, Qatar, Oman, Bahrain and Kuwait." },
-    { icon: ClipboardCheck, title: "COD handled for you", desc: "Cash-on-delivery collection, reconciliation, and payout — fully managed." },
-    { icon: Boxes, title: "Real-time inventory", desc: "Stock levels sync across every warehouse the moment they change." },
-    { icon: RotateCcw, title: "Effortless returns", desc: "Customers initiate returns in a click; suppliers restock automatically." },
-  ];
+  const [content, setContent] = useState(DEFAULT_FEATURES_TABLE);
+  useEffect(() => {
+    (async () => {
+      // Prefer the new chunked rows; fall back to the original single-row
+      // value for sites that saved before this change.
+      let raw = await loadChunkedSetting("features_table_content");
+      if (!raw) {
+        const { data } = await supabase.from("app_settings").select("value").eq("key", "features_table_content").maybeSingle();
+        raw = data?.value || null;
+      }
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.plans?.length && parsed?.rows?.length) setContent(parsed);
+      } catch { /* keep defaults if stored value is malformed */ }
+    })();
+  }, []);
+
+  const { headline, plans, rows } = content;
+
   return (
     <section id="services" className="py-28" style={{ background: "#F8FAFC" }}>
       <div className="max-w-7xl mx-auto px-6">
         <Reveal>
-          <div className="max-w-xl">
-            <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#00a67e" }}>Why EmirateFulfil</span>
-            <h2 className="mt-3 text-4xl md:text-5xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              Everything fulfillment needs, under one roof.
-            </h2>
-          </div>
+          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#00a67e" }}>Why EmirateFulfil</span>
         </Reveal>
 
-        <div className="mt-14 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((f, i) => (
-            <Reveal key={i} delay={i * 80}>
-              <div
-                className="group h-full p-7 rounded-2xl bg-white transition-all duration-300 hover:-translate-y-1.5"
-                style={{ border: "1px solid #E5E7EB", boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 20px 40px rgba(0,200,150,0.15)")}
-                onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 2px rgba(16,24,40,0.04)")}
-              >
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-5" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
-                  <f.icon className="w-5 h-5 text-white" />
+        <Reveal delay={80}>
+          <div
+            className="mt-6 rounded-2xl overflow-hidden"
+            style={{ border: "1px solid #E5E7EB", boxShadow: "0 20px 50px rgba(11,31,58,0.08)" }}
+          >
+            <div className="overflow-x-auto">
+              <div style={{ minWidth: 760 }}>
+                <div className="grid" style={{ gridTemplateColumns: `1.5fr repeat(${plans.length}, 1fr)` }}>
+                  {/* header row */}
+                  <div className="p-7 flex items-end" style={{ background: "#fff" }}>
+                    <h2 className="text-3xl md:text-4xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      {headline}
+                    </h2>
+                  </div>
+                  {plans.map((p, i) => {
+                    const s = FEATURES_TABLE_HEADER_STYLES[i % FEATURES_TABLE_HEADER_STYLES.length];
+                    return (
+                      <div key={i} className="p-6 text-center" style={{ background: s.bg }}>
+                        <span
+                          className="inline-block text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full"
+                          style={{ background: s.badgeBg, color: s.badgeColor }}
+                        >
+                          {p.badge}
+                        </span>
+                        <div className="mt-2 text-xs font-semibold" style={{ color: s.sub }}>{p.subtitle}</div>
+                        <div className="mt-1 text-2xl font-extrabold" style={{ color: s.text, fontFamily: "'Space Grotesk', sans-serif" }}>{p.price}</div>
+                      </div>
+                    );
+                  })}
+
+                  {/* feature rows */}
+                  {rows.map((r, ri) => (
+                    <React.Fragment key={ri}>
+                      <div
+                        className="px-7 py-4 text-sm font-semibold flex items-center"
+                        style={{ color: "#111827", background: ri % 2 === 0 ? "#fff" : "#F8FAFC", borderTop: "1px solid #EEF1F5" }}
+                      >
+                        {r.label}
+                      </div>
+                      {plans.map((_, pi) => (
+                        <div
+                          key={pi}
+                          className="px-4 py-4 flex items-center justify-center text-xs"
+                          style={{ background: ri % 2 === 0 ? "#fff" : "#F8FAFC", borderTop: "1px solid #EEF1F5" }}
+                        >
+                          {r.type === "text" ? (
+                            <span className="font-semibold text-center" style={{ color: "#374151" }}>{r.values?.[pi] ?? ""}</span>
+                          ) : r.values?.[pi] ? (
+                            <span className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "#E6FBF4", color: "#00a67e" }}>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </span>
+                          ) : (
+                            <span className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "#F3F4F6", color: "#9CA3AF" }}>
+                              <X className="w-3.5 h-3.5" />
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </React.Fragment>
+                  ))}
                 </div>
-                <h3 className="font-bold text-lg" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed" style={{ color: "#6B7280" }}>{f.desc}</p>
               </div>
-            </Reveal>
-          ))}
-        </div>
+            </div>
+          </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -4861,6 +4952,66 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     notify("Pricing section updated — changes are live on the homepage.");
   };
 
+  // Features comparison table: editable copy of the homepage's "Our
+  // Features" plan-comparison table (Home → Features section), saved as
+  // JSON in app_settings under "features_table_content" — chunked the same
+  // way testimonials are, since headline + plans + rows can add up to more
+  // than one row's column comfortably holds.
+  const [featuresTableForm, setFeaturesTableForm] = useState(DEFAULT_FEATURES_TABLE);
+  const [featuresTableSaving, setFeaturesTableSaving] = useState(false);
+  useEffect(() => {
+    (async () => {
+      let raw = await loadChunkedSetting("features_table_content");
+      if (!raw) {
+        const { data } = await supabase.from("app_settings").select("value").eq("key", "features_table_content").maybeSingle();
+        raw = data?.value || null;
+      }
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.plans?.length && parsed?.rows?.length) setFeaturesTableForm(parsed);
+      } catch { /* keep defaults if stored value is malformed */ }
+    })();
+  }, []);
+  const updateFeaturesPlan = (idx, field, value) => {
+    setFeaturesTableForm((f) => ({ ...f, plans: f.plans.map((p, i) => (i === idx ? { ...p, [field]: value } : p)) }));
+  };
+  const updateFeaturesRow = (rowIdx, field, value) => {
+    setFeaturesTableForm((f) => ({ ...f, rows: f.rows.map((r, i) => (i === rowIdx ? { ...r, [field]: value } : r)) }));
+  };
+  const updateFeaturesRowCell = (rowIdx, planIdx, value) => {
+    setFeaturesTableForm((f) => ({
+      ...f,
+      rows: f.rows.map((r, i) => {
+        if (i !== rowIdx) return r;
+        const values = [...(r.values || [])];
+        values[planIdx] = value;
+        return { ...r, values };
+      }),
+    }));
+  };
+  const addFeaturesRow = () => {
+    setFeaturesTableForm((f) => ({
+      ...f,
+      rows: [...f.rows, { label: "New feature", type: "check", values: f.plans.map(() => false) }],
+    }));
+  };
+  const removeFeaturesRow = (rowIdx) => {
+    setFeaturesTableForm((f) => ({ ...f, rows: f.rows.filter((_, i) => i !== rowIdx) }));
+  };
+  const saveFeaturesTable = async () => {
+    setFeaturesTableSaving(true);
+    const payload = JSON.stringify(featuresTableForm);
+    const { error } = await saveChunkedSetting("features_table_content", payload);
+    setFeaturesTableSaving(false);
+    if (error) {
+      console.error("Save features table failed:", error, "payload size:", payload.length);
+      notify(error.message ? `Could not save the features table: ${error.message}` : "Could not save the features table.");
+      return;
+    }
+    notify("Features section updated — changes are live on the homepage.");
+  };
+
   // Customer reviews: editable copy of the homepage testimonials, saved as
   // JSON in app_settings under "testimonials_content" — split across
   // several rows via saveChunkedSetting/loadChunkedSetting since this JSON
@@ -5022,6 +5173,112 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
           style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)", opacity: pricingSaving ? 0.6 : 1 }}
         >
           {pricingSaving ? "Saving…" : "Save pricing section"}
+        </button>
+      </div>
+
+      {/* Features comparison table: edit the "Our Features" plan-comparison
+          table shown on the homepage's Features section. Saves to Supabase,
+          live instantly. */}
+      <div className="mt-6 rounded-2xl bg-white p-5" style={{ border: "1px solid #E5E7EB" }}>
+        <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Features comparison</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Edit the "Our Features" table shown on the homepage — the heading, the {featuresTableForm.plans.length} plan columns, and every feature row.</p>
+
+        <div className="mt-4">
+          <label className="text-xs font-semibold text-gray-500">Table heading</label>
+          <input
+            value={featuresTableForm.headline}
+            onChange={(e) => setFeaturesTableForm((f) => ({ ...f, headline: e.target.value }))}
+            className="mt-1 w-full text-sm rounded-lg px-3 py-2"
+            style={{ border: "1px solid #E5E7EB" }}
+          />
+        </div>
+
+        {/* Plan column headers */}
+        <div className="mt-5 grid md:grid-cols-3 gap-4">
+          {featuresTableForm.plans.map((p, i) => (
+            <div key={i} className="rounded-xl p-4 space-y-2.5" style={{ border: "1px solid #E5E7EB" }}>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Plan name (internal)</label>
+                <input value={p.name} onChange={(e) => updateFeaturesPlan(i, "name", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Badge (e.g. FREE, GOLD)</label>
+                <input value={p.badge} onChange={(e) => updateFeaturesPlan(i, "badge", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Subtitle</label>
+                <input value={p.subtitle} onChange={(e) => updateFeaturesPlan(i, "subtitle", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Price label (e.g. $0, Custom)</label>
+                <input value={p.price} onChange={(e) => updateFeaturesPlan(i, "price", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Feature rows */}
+        <div className="mt-6 space-y-3">
+          <label className="text-xs font-semibold text-gray-500">Feature rows</label>
+          {featuresTableForm.rows.map((r, ri) => (
+            <div key={ri} className="rounded-xl p-4" style={{ border: "1px solid #E5E7EB" }}>
+              <div className="flex items-center gap-2">
+                <input
+                  value={r.label}
+                  onChange={(e) => updateFeaturesRow(ri, "label", e.target.value)}
+                  placeholder="Feature name"
+                  className="flex-1 text-sm rounded-lg px-3 py-2"
+                  style={{ border: "1px solid #E5E7EB" }}
+                />
+                <select
+                  value={r.type}
+                  onChange={(e) => updateFeaturesRow(ri, "type", e.target.value)}
+                  className="text-sm rounded-lg px-2 py-2"
+                  style={{ border: "1px solid #E5E7EB" }}
+                >
+                  <option value="check">Check / cross</option>
+                  <option value="text">Text value</option>
+                </select>
+                <button onClick={() => removeFeaturesRow(ri)} className="text-xs font-semibold px-3 py-2 rounded-lg" style={{ border: "1px solid #FCA5A5", color: "#DC2626" }}>
+                  Remove
+                </button>
+              </div>
+
+              <div className="mt-3 grid" style={{ gridTemplateColumns: `repeat(${featuresTableForm.plans.length}, 1fr)`, gap: "0.5rem" }}>
+                {featuresTableForm.plans.map((p, pi) => (
+                  <div key={pi}>
+                    <label className="text-[11px] font-semibold text-gray-400">{p.name}</label>
+                    {r.type === "text" ? (
+                      <input
+                        value={r.values?.[pi] ?? ""}
+                        onChange={(e) => updateFeaturesRowCell(ri, pi, e.target.value)}
+                        className="mt-1 w-full text-sm rounded-lg px-3 py-2"
+                        style={{ border: "1px solid #E5E7EB" }}
+                      />
+                    ) : (
+                      <label className="mt-1 flex items-center gap-2 text-xs font-semibold text-gray-500 rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }}>
+                        <input type="checkbox" checked={!!r.values?.[pi]} onChange={(e) => updateFeaturesRowCell(ri, pi, e.target.checked)} />
+                        {r.values?.[pi] ? "Included" : "Not included"}
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <button onClick={addFeaturesRow} className="text-sm font-semibold px-4 py-2 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>
+            + Add feature row
+          </button>
+        </div>
+
+        <button
+          onClick={saveFeaturesTable}
+          disabled={featuresTableSaving}
+          className="mt-5 text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
+          style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)", opacity: featuresTableSaving ? 0.6 : 1 }}
+        >
+          {featuresTableSaving ? "Saving…" : "Save features section"}
         </button>
       </div>
 
