@@ -1554,6 +1554,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           from { transform: rotate(0deg) translateX(38px) rotate(0deg); }
           to { transform: rotate(360deg) translateX(38px) rotate(-360deg); }
         }
+        @keyframes sparkleTwinkle {
+          0%, 100% { opacity: 0.55; transform: scale(0.85); }
+          50% { opacity: 1; transform: scale(1.15); }
+        }
       `}</style>
 
       {/* Main */}
@@ -1631,15 +1635,24 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", delay = 0
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="relative rounded-2xl p-5 bg-white transition-all duration-500 cursor-default overflow-hidden"
+      className="relative rounded-2xl p-5 transition-all duration-500 cursor-default overflow-hidden"
       style={{
-        border: "1px solid #E5E7EB",
+        background: hover
+          ? `linear-gradient(160deg, ${color}10, #ffffff 55%)`
+          : "#ffffff",
+        border: `1px solid ${hover ? color + "55" : "#E5E7EB"}`,
         opacity: shown ? 1 : 0,
-        transform: shown ? (hover ? "translateY(-5px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
-        boxShadow: hover ? `0 20px 36px -10px ${color}40` : "0 1px 2px rgba(16,24,40,0.04)",
+        transform: shown ? (hover ? "translateY(-6px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
+        boxShadow: hover ? `0 22px 40px -12px ${color}55` : "0 1px 2px rgba(16,24,40,0.04)",
       }}
     >
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${color}, ${color}00)` }} />
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px] rounded-full transition-all duration-500"
+        style={{
+          background: `linear-gradient(90deg, ${color}, ${color}00)`,
+          boxShadow: hover ? `0 0 12px 1px ${color}90` : "none",
+        }}
+      />
       <div
         className="absolute -top-6 -right-6 w-24 h-24 rounded-full transition-opacity duration-500"
         style={{ background: `radial-gradient(circle, ${color}25, transparent 70%)`, opacity: hover ? 1 : 0.5 }}
@@ -1895,8 +1908,10 @@ function OverviewTab({
                 className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto"
                 style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", backdropFilter: "blur(6px)" }}
               >
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 6px 16px rgba(0,200,150,0.4)" }}>
-                  <Sparkles className="w-5 h-5 text-white" />
+                <div className="relative w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 6px 16px rgba(0,200,150,0.4)", animation: "livePulse 2.4s infinite" }}>
+                  <Sparkles className="w-5 h-5 text-white" style={{ animation: "sparkleTwinkle 2.2s ease-in-out infinite" }} />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full" style={{ background: "#F8B400", animation: "sparkleTwinkle 1.6s ease-in-out infinite 0.3s" }} />
+                  <span className="absolute -bottom-1 -left-1 w-1.5 h-1.5 rounded-full" style={{ background: "#7FE8C9", animation: "sparkleTwinkle 1.9s ease-in-out infinite 0.7s" }} />
                 </div>
                 <div className="text-right flex-1 sm:flex-initial">
                   <div className="text-[11px] font-medium text-white/50 uppercase tracking-wide">Confirmed profit</div>
@@ -1930,15 +1945,22 @@ function OverviewTab({
           </div>
 
           {/* Quick actions */}
-          <div className="rounded-2xl p-5 bg-white mt-6" style={{ border: "1px solid #E5E7EB" }}>
-            <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Quick actions</div>
+          <div className="rounded-2xl p-5 bg-white mt-6 transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(139,92,246,0.14)" }}>
+                <Zap className="w-4 h-4" style={{ color: "#8B5CF6" }} />
+              </div>
+              <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Quick actions</div>
+            </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {quickActions.map((q) => (
                 <button
                   key={q.label}
                   onClick={() => setTab(q.tab)}
-                  className="group flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md active:scale-95"
+                  className="group flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-300 ease-out hover:-translate-y-0.5 active:scale-95"
                   style={{ border: "1px solid #F3F4F6" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = q.color + "55"; e.currentTarget.style.boxShadow = `0 12px 24px -8px ${q.color}45`; e.currentTarget.style.background = q.color + "0A"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#F3F4F6"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "transparent"; }}
                 >
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110" style={{ background: q.color + "1A" }}>
                     <q.icon className="w-4.5 h-4.5" style={{ color: q.color }} />
@@ -1950,8 +1972,13 @@ function OverviewTab({
           </div>
 
           <div className="grid lg:grid-cols-3 gap-5 mt-6">
-            <div className="lg:col-span-2 rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-              <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent UAE orders</div>
+            <div className="lg:col-span-2 rounded-2xl p-6 bg-white transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
+                  <Truck className="w-4 h-4" style={{ color: "#00C896" }} />
+                </div>
+                <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent UAE orders</div>
+              </div>
               {regionOrders.length === 0 ? (
                 <div className="text-sm text-gray-400">No UAE orders yet — log one from Orders with a buyer city in Dubai, Abu Dhabi, Sharjah…</div>
               ) : (
@@ -1967,8 +1994,13 @@ function OverviewTab({
               )}
             </div>
             <div className="space-y-5">
-              <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-                <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Top listing</div>
+              <div className="rounded-2xl p-6 bg-white transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(248,180,0,0.14)" }}>
+                    <Star className="w-4 h-4" style={{ color: "#F8B400" }} />
+                  </div>
+                  <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Top listing</div>
+                </div>
                 {topListing ? (
                   <>
                     <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center" style={{ background: "#F8FAFC" }}>
@@ -1981,19 +2013,30 @@ function OverviewTab({
                   <div className="text-sm text-gray-400">Add a listing to see it here.</div>
                 )}
               </div>
-              <div className="rounded-2xl p-6 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-                <div className="font-bold text-sm mb-1" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>This week</div>
-                <div className="text-3xl font-bold mt-2" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{regionOrdersThisWeek}</div>
-                <div className="text-xs text-gray-400 mt-1">order{regionOrdersThisWeek === 1 ? "" : "s"} logged in the last 7 days</div>
+              <div className="relative rounded-2xl p-6 overflow-hidden transition-all duration-300 hover:shadow-lg" style={{ background: "linear-gradient(155deg, rgba(0,200,150,0.08), #ffffff 60%)", border: "1px solid #E5E7EB" }}>
+                <div className="pointer-events-none absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-40 blur-2xl" style={{ background: "#00C896" }} />
+                <div className="relative flex items-center gap-2.5 mb-1">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.14)" }}>
+                    <TrendingUp className="w-4 h-4" style={{ color: "#00C896" }} />
+                  </div>
+                  <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>This week</div>
+                </div>
+                <div className="relative text-3xl font-bold mt-2" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{regionOrdersThisWeek}</div>
+                <div className="relative text-xs text-gray-400 mt-1">order{regionOrdersThisWeek === 1 ? "" : "s"} logged in the last 7 days</div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl p-6 bg-white mt-5" style={{ border: "1px solid #E5E7EB" }}>
-            <div className="font-bold text-sm mb-4" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>UAE order status breakdown</div>
+          <div className="rounded-2xl p-6 bg-white mt-5 transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(59,130,246,0.14)" }}>
+                <ClipboardCheck className="w-4 h-4" style={{ color: "#3B82F6" }} />
+              </div>
+              <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>UAE order status breakdown</div>
+            </div>
             <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
               {breakdown.map((b) => (
-                <div key={b.label} className="h-full transition-all duration-700" style={{ width: `${(b.count / totalForBar) * 100}%`, background: b.color }} />
+                <div key={b.label} className="h-full transition-all duration-700" style={{ width: `${(b.count / totalForBar) * 100}%`, background: b.color, boxShadow: b.count > 0 ? `0 0 8px 0 ${b.color}80 inset` : "none" }} />
               ))}
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
