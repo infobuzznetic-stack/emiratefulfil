@@ -3344,6 +3344,7 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
 function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, sellerEmail, isAdmin = false, onCatalogChanged }) {
   const [view, setView] = useState("list"); // list | detail | cart | checkout | success
   const [activeProduct, setActiveProduct] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState(() => readLocal(`ef_cart_${sellerEmail}`, []));
   const [checkoutItems, setCheckoutItems] = useState([]);
   const [checkoutFrom, setCheckoutFrom] = useState("detail");
@@ -3537,8 +3538,25 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
           )}
         </button>
       </div>
+      {/* Search bar */}
+      <div className="mt-5 relative">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="🔍 Search products..."
+          className="w-full rounded-2xl px-5 py-3 text-sm font-medium outline-none"
+          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", backdropFilter: "blur(6px)", "::placeholder": { color: "rgba(255,255,255,0.4)" } }}
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-lg leading-none"
+          >✕</button>
+        )}
+      </div>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {catalog.map((p, i) => {
+        {catalog.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.category || "").toLowerCase().includes(searchQuery.toLowerCase())).map((p, i) => {
           const color = catColor(p.category);
           const qty = getQty(p.id);
           if (isAdmin && editingId === p.id) {
@@ -3695,6 +3713,9 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
           );
         })}
       </div>
+      {searchQuery && catalog.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.category || "").toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+        <div className="text-center py-16 text-white/50 text-sm">No products found for "{searchQuery}"</div>
+      )}
     </div>
   );
 }
