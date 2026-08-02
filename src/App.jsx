@@ -5254,6 +5254,185 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Admin</h1>
       <p className="text-sm text-gray-500 mt-1">Manage the shared product catalog every seller sees, and track signups.</p>
 
+      <div className="mt-6 rounded-2xl p-6" style={{ border: "1px solid #E5E7EB", background: "linear-gradient(135deg,#0B1F3A08,#00C89608)" }}>
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4" style={{ color: "#F8B400" }} />
+          <h3 className="font-bold text-sm" style={{ color: "#0B1F3A" }}>Import product from a link</h3>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">Paste a product page URL from Temu, Noon, Amazon, MyZamil, Arabia Dropshipping, Wavebit, etc. — we'll try to pull the title, price, pictures and description into the form below for you to review before saving.</p>
+        <div className="mt-3 grid sm:grid-cols-6 gap-3 items-end">
+          <div className="sm:col-span-1">
+            <label className="text-xs text-gray-500">Source</label>
+            <select value={importSource} onChange={(e) => setImportSource(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }}>
+              {IMPORT_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="sm:col-span-4">
+            <label className="text-xs text-gray-500">Product link</label>
+            <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} placeholder="https://…" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} />
+          </div>
+          <div className="sm:col-span-1">
+            <button type="button" onClick={fetchProductFromLink} disabled={importLoading} className="w-full text-sm font-semibold py-2.5 rounded-full text-white disabled:opacity-60" style={{ background: "#0B1F3A" }}>
+              {importLoading ? "Fetching…" : "Fetch"}
+            </button>
+          </div>
+        </div>
+        {importError && <p className="mt-2 text-xs font-medium" style={{ color: "#EF4444" }}>{importError} — no problem, just fill the form below in by hand.</p>}
+        <p className="mt-2 text-[11px] text-gray-400">Some sites (especially Amazon and Temu) block automatic access — if fetching fails, add the details manually in the form below. Either way, always double-check Cost, Category and price before saving.</p>
+      </div>
+
+      <form onSubmit={addProduct} className="mt-6 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="sm:col-span-2"><label className="text-xs text-gray-500">Product name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div><label className="text-xs text-gray-500">Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div><label className="text-xs text-gray-500">Stock quantity</label><input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div><label className="text-xs text-gray-500">Emoji (fallback)</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div className="sm:col-span-6 flex items-center gap-3 flex-wrap">
+          {(form.images || []).map((url, idx) => (
+            <div
+              key={idx}
+              draggable
+              onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(idx)); }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); reorderFormImages(Number(e.dataTransfer.getData("text/plain")), idx); }}
+              title="Drag to reorder"
+              className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 cursor-move"
+              style={{ border: "1px solid #E5E7EB" }}
+            >
+              <img src={url} alt="" className="w-full h-full object-cover" draggable={false} />
+              <button type="button" onClick={() => removeFormImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center text-white text-xs" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
+            </div>
+          ))}
+          {(form.images || []).length === 0 && (
+            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+              <ProductThumb product={form} size={26} />
+            </div>
+          )}
+          {(form.images || []).length < 4 && (
+            <label className="text-sm font-semibold px-4 py-2 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: formImageUploading ? 0.6 : 1 }}>
+              {formImageUploading ? "Uploading…" : "Upload pictures (up to 4)"}
+              <input type="file" accept="image/*" multiple onChange={uploadFormImages} disabled={formImageUploading} className="hidden" />
+            </label>
+          )}
+          <span className="text-xs text-gray-400">{(form.images || []).length}/4</span>
+        </div>
+        <div className="sm:col-span-6">
+          <label className="text-xs text-gray-500">Visible to</label>
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            <label className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style={form.assignedSellers.length === 0 ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+              <input type="checkbox" className="hidden" checked={form.assignedSellers.length === 0} onChange={() => setForm((f) => ({ ...f, assignedSellers: [] }))} />
+              All sellers
+            </label>
+            {sellers.map((s) => (
+              <label key={s.id} className="text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style={form.assignedSellers.includes(s.email) ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                <input type="checkbox" className="hidden" checked={form.assignedSellers.includes(s.email)} onChange={() => toggleFormSeller(s.email)} />
+                {s.email}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-gray-400">{form.assignedSellers.length === 0 ? "This product will be visible to every seller." : `Only visible to ${form.assignedSellers.length} selected seller(s).`}</p>
+        </div>
+        <div className="sm:col-span-6">
+          <label className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer w-fit" style={form.isPremium ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
+            <input type="checkbox" className="hidden" checked={form.isPremium} onChange={() => setForm((f) => ({ ...f, isPremium: !f.isPremium }))} />
+            <Sparkles className="w-3.5 h-3.5" /> Premium product
+          </label>
+          <p className="mt-1 text-[11px] text-gray-400">{form.isPremium ? "Only shown to sellers marked Premium (see the Sellers table below)." : "Not marked Premium — visible to all sellers per the setting above."}</p>
+        </div>
+        <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
+      </form>
+
+      <div className="mt-8 rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+        <button onClick={() => setBulkOpen((v) => !v)} className="w-full flex items-center justify-between text-left">
+          <span className="text-sm font-semibold flex items-center gap-2" style={{ color: "#0B1F3A" }}>
+            <BadgeCheck className="w-4 h-4" /> Bulk visibility manager
+          </span>
+          <ChevronDown className="w-4 h-4 transition-transform" style={{ transform: bulkOpen ? "rotate(180deg)" : "none", color: "#6B7280" }} />
+        </button>
+        <p className="mt-1 text-[11px] text-gray-400">Pick who below, then tick products in the list — each one is assigned to that group right away, no need to open Edit on every product.</p>
+
+        {bulkOpen && (
+          <div className="mt-4">
+            <label className="text-xs text-gray-500">Who should see the ticked products?</label>
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setBulkTarget("all")}
+                className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={bulkTarget === "all" ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
+              >
+                🌐 All sellers
+              </button>
+              <button
+                onClick={() => setBulkTarget("premium")}
+                className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={bulkTarget === "premium" ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Premium
+              </button>
+              {sellers.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setBulkTarget(s.email)}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full"
+                  style={bulkTarget === s.email ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
+                >
+                  {s.email}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-gray-400">
+              {bulkTarget === "all" && "Ticking a product makes it public to every seller and clears Premium/seller-only restrictions."}
+              {bulkTarget === "premium" && "Ticking a product marks it Premium — only visible to sellers marked Premium in the Sellers table."}
+              {bulkTarget !== "all" && bulkTarget !== "premium" && `Ticking a product adds ${bulkTarget} to its allowed sellers (other sellers already assigned stay assigned too).`}
+            </p>
+
+            <input
+              value={bulkSearch}
+              onChange={(e) => setBulkSearch(e.target.value)}
+              placeholder="Search products…"
+              className="mt-3 w-full rounded-lg px-3 py-2 text-sm"
+              style={{ border: "1px solid #E5E7EB" }}
+            />
+
+            <div className="mt-2 max-h-96 overflow-y-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
+              {catalog
+                .filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase()))
+                .map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+                    style={{ borderBottom: "1px solid #F3F4F6" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isProductInBulkTarget(p)}
+                      disabled={bulkTogglingId === p.id}
+                      onChange={() => toggleBulkTarget(p)}
+                    />
+                    <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
+                      <ProductThumb product={p} size={16} />
+                    </div>
+                    <span className="text-sm font-medium flex-1 truncate">{p.name}</span>
+                    {bulkTogglingId === p.id ? (
+                      <span className="text-[11px] text-gray-400 flex-shrink-0">Saving…</span>
+                    ) : (
+                      <span className="text-[11px] flex-shrink-0" style={{ color: (p.assignedSellerEmails || []).length ? "#F8B400" : "#9CA3AF" }}>
+                        {p.isPremium ? "✨ Premium" : (p.assignedSellerEmails || []).length ? `🔒 ${p.assignedSellerEmails.length}` : "🌐 All"}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              {catalog.filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase())).length === 0 && (
+                <div className="px-3 py-6 text-center text-xs text-gray-400">No products match.</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Total sellers signed up" value={sellers.length || sellerCount} color="#00C896" />
         <StatCard label="Pending seller approvals" value={sellers.filter((s) => s.approval_status !== "approved" && s.approval_status !== "deactivated").length} color="#F8B400" />
@@ -5669,184 +5848,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
       {invoiceManagerSeller && (
         <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
       )}
-
-      <div className="mt-8 rounded-2xl p-6" style={{ border: "1px solid #E5E7EB", background: "linear-gradient(135deg,#0B1F3A08,#00C89608)" }}>
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4" style={{ color: "#F8B400" }} />
-          <h3 className="font-bold text-sm" style={{ color: "#0B1F3A" }}>Import product from a link</h3>
-        </div>
-        <p className="text-xs text-gray-500 mt-1">Paste a product page URL from Temu, Noon, Amazon, MyZamil, Arabia Dropshipping, Wavebit, etc. — we'll try to pull the title, price, pictures and description into the form below for you to review before saving.</p>
-        <div className="mt-3 grid sm:grid-cols-6 gap-3 items-end">
-          <div className="sm:col-span-1">
-            <label className="text-xs text-gray-500">Source</label>
-            <select value={importSource} onChange={(e) => setImportSource(e.target.value)} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }}>
-              {IMPORT_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="sm:col-span-4">
-            <label className="text-xs text-gray-500">Product link</label>
-            <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} placeholder="https://…" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} />
-          </div>
-          <div className="sm:col-span-1">
-            <button type="button" onClick={fetchProductFromLink} disabled={importLoading} className="w-full text-sm font-semibold py-2.5 rounded-full text-white disabled:opacity-60" style={{ background: "#0B1F3A" }}>
-              {importLoading ? "Fetching…" : "Fetch"}
-            </button>
-          </div>
-        </div>
-        {importError && <p className="mt-2 text-xs font-medium" style={{ color: "#EF4444" }}>{importError} — no problem, just fill the form below in by hand.</p>}
-        <p className="mt-2 text-[11px] text-gray-400">Some sites (especially Amazon and Temu) block automatic access — if fetching fails, add the details manually in the form below. Either way, always double-check Cost, Category and price before saving.</p>
-      </div>
-
-      <form onSubmit={addProduct} className="mt-6 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="sm:col-span-2"><label className="text-xs text-gray-500">Product name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Cost (AED)</label><input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Stock quantity</label><input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div><label className="text-xs text-gray-500">Emoji (fallback)</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <div className="sm:col-span-6 flex items-center gap-3 flex-wrap">
-          {(form.images || []).map((url, idx) => (
-            <div
-              key={idx}
-              draggable
-              onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(idx)); }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); reorderFormImages(Number(e.dataTransfer.getData("text/plain")), idx); }}
-              title="Drag to reorder"
-              className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 cursor-move"
-              style={{ border: "1px solid #E5E7EB" }}
-            >
-              <img src={url} alt="" className="w-full h-full object-cover" draggable={false} />
-              <button type="button" onClick={() => removeFormImage(idx)} title="Remove this picture" className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center text-white text-xs" style={{ background: "rgba(0,0,0,0.55)" }}>×</button>
-            </div>
-          ))}
-          {(form.images || []).length === 0 && (
-            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-              <ProductThumb product={form} size={26} />
-            </div>
-          )}
-          {(form.images || []).length < 4 && (
-            <label className="text-sm font-semibold px-4 py-2 rounded-full cursor-pointer" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A", opacity: formImageUploading ? 0.6 : 1 }}>
-              {formImageUploading ? "Uploading…" : "Upload pictures (up to 4)"}
-              <input type="file" accept="image/*" multiple onChange={uploadFormImages} disabled={formImageUploading} className="hidden" />
-            </label>
-          )}
-          <span className="text-xs text-gray-400">{(form.images || []).length}/4</span>
-        </div>
-        <div className="sm:col-span-6">
-          <label className="text-xs text-gray-500">Visible to</label>
-          <div className="mt-1 flex items-center gap-2 flex-wrap">
-            <label className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style={form.assignedSellers.length === 0 ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
-              <input type="checkbox" className="hidden" checked={form.assignedSellers.length === 0} onChange={() => setForm((f) => ({ ...f, assignedSellers: [] }))} />
-              All sellers
-            </label>
-            {sellers.map((s) => (
-              <label key={s.id} className="text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style={form.assignedSellers.includes(s.email) ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
-                <input type="checkbox" className="hidden" checked={form.assignedSellers.includes(s.email)} onChange={() => toggleFormSeller(s.email)} />
-                {s.email}
-              </label>
-            ))}
-          </div>
-          <p className="mt-1 text-[11px] text-gray-400">{form.assignedSellers.length === 0 ? "This product will be visible to every seller." : `Only visible to ${form.assignedSellers.length} selected seller(s).`}</p>
-        </div>
-        <div className="sm:col-span-6">
-          <label className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer w-fit" style={form.isPremium ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
-            <input type="checkbox" className="hidden" checked={form.isPremium} onChange={() => setForm((f) => ({ ...f, isPremium: !f.isPremium }))} />
-            <Sparkles className="w-3.5 h-3.5" /> Premium product
-          </label>
-          <p className="mt-1 text-[11px] text-gray-400">{form.isPremium ? "Only shown to sellers marked Premium (see the Sellers table below)." : "Not marked Premium — visible to all sellers per the setting above."}</p>
-        </div>
-        <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
-        <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
-      </form>
-
-      <div className="mt-8 rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
-        <button onClick={() => setBulkOpen((v) => !v)} className="w-full flex items-center justify-between text-left">
-          <span className="text-sm font-semibold flex items-center gap-2" style={{ color: "#0B1F3A" }}>
-            <BadgeCheck className="w-4 h-4" /> Bulk visibility manager
-          </span>
-          <ChevronDown className="w-4 h-4 transition-transform" style={{ transform: bulkOpen ? "rotate(180deg)" : "none", color: "#6B7280" }} />
-        </button>
-        <p className="mt-1 text-[11px] text-gray-400">Pick who below, then tick products in the list — each one is assigned to that group right away, no need to open Edit on every product.</p>
-
-        {bulkOpen && (
-          <div className="mt-4">
-            <label className="text-xs text-gray-500">Who should see the ticked products?</label>
-            <div className="mt-1 flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => setBulkTarget("all")}
-                className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                style={bulkTarget === "all" ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
-              >
-                🌐 All sellers
-              </button>
-              <button
-                onClick={() => setBulkTarget("premium")}
-                className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                style={bulkTarget === "premium" ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Premium
-              </button>
-              {sellers.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setBulkTarget(s.email)}
-                  className="text-xs font-medium px-3 py-1.5 rounded-full"
-                  style={bulkTarget === s.email ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
-                >
-                  {s.email}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1.5 text-[11px] text-gray-400">
-              {bulkTarget === "all" && "Ticking a product makes it public to every seller and clears Premium/seller-only restrictions."}
-              {bulkTarget === "premium" && "Ticking a product marks it Premium — only visible to sellers marked Premium in the Sellers table."}
-              {bulkTarget !== "all" && bulkTarget !== "premium" && `Ticking a product adds ${bulkTarget} to its allowed sellers (other sellers already assigned stay assigned too).`}
-            </p>
-
-            <input
-              value={bulkSearch}
-              onChange={(e) => setBulkSearch(e.target.value)}
-              placeholder="Search products…"
-              className="mt-3 w-full rounded-lg px-3 py-2 text-sm"
-              style={{ border: "1px solid #E5E7EB" }}
-            />
-
-            <div className="mt-2 max-h-96 overflow-y-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
-              {catalog
-                .filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase()))
-                .map((p) => (
-                  <label
-                    key={p.id}
-                    className="flex items-center gap-3 px-3 py-2 cursor-pointer"
-                    style={{ borderBottom: "1px solid #F3F4F6" }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isProductInBulkTarget(p)}
-                      disabled={bulkTogglingId === p.id}
-                      onChange={() => toggleBulkTarget(p)}
-                    />
-                    <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
-                      <ProductThumb product={p} size={16} />
-                    </div>
-                    <span className="text-sm font-medium flex-1 truncate">{p.name}</span>
-                    {bulkTogglingId === p.id ? (
-                      <span className="text-[11px] text-gray-400 flex-shrink-0">Saving…</span>
-                    ) : (
-                      <span className="text-[11px] flex-shrink-0" style={{ color: (p.assignedSellerEmails || []).length ? "#F8B400" : "#9CA3AF" }}>
-                        {p.isPremium ? "✨ Premium" : (p.assignedSellerEmails || []).length ? `🔒 ${p.assignedSellerEmails.length}` : "🌐 All"}
-                      </span>
-                    )}
-                  </label>
-                ))}
-              {catalog.filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase())).length === 0 && (
-                <div className="px-3 py-6 text-center text-xs text-gray-400">No products match.</div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
 
       <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.map((p) => (
