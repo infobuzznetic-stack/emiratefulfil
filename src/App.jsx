@@ -4870,6 +4870,42 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     notify(isPremium ? "Premium badge removed for this seller." : "Seller marked as Premium.");
   };
 
+  // Bulk visibility manager — pick a target once (All sellers / Premium /
+  // one specific seller), then tick products in a simple checklist and each
+  // one is assigned to that target immediately, instead of opening the
+  // pencil-edit form product by product.
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkTarget, setBulkTarget] = useState("all"); // "all" | "premium" | a seller's email
+  const [bulkSearch, setBulkSearch] = useState("");
+  const [bulkTogglingId, setBulkTogglingId] = useState(null);
+  const isProductInBulkTarget = (p) => {
+    if (bulkTarget === "all") return !(p.assignedSellerEmails || []).length && !p.isPremium;
+    if (bulkTarget === "premium") return !!p.isPremium;
+    return (p.assignedSellerEmails || []).includes(bulkTarget);
+  };
+  const toggleBulkTarget = async (p) => {
+    const already = isProductInBulkTarget(p);
+    let patch = null;
+    if (bulkTarget === "all") {
+      // "All sellers" only supports turning a product public — there's no
+      // meaningful "remove from everyone" here, so unchecking is a no-op
+      // (use the Premium or a specific-seller target to restrict it instead).
+      if (already) { notify("To restrict this product, pick Premium or a specific seller above instead."); return; }
+      patch = { assigned_seller_emails: [], is_premium: false };
+    } else if (bulkTarget === "premium") {
+      patch = { is_premium: !already };
+    } else {
+      const emails = p.assignedSellerEmails || [];
+      const next = already ? emails.filter((e) => e !== bulkTarget) : [...emails, bulkTarget];
+      patch = { assigned_seller_emails: next };
+    }
+    setBulkTogglingId(p.id);
+    const { error } = await supabase.from("products").update(patch).eq("id", p.id);
+    setBulkTogglingId(null);
+    if (error) { notify("Could not update visibility."); return; }
+    onCatalogChanged();
+  };
+
   // Site logo: pick a picture from your computer, it's uploaded to Supabase
   // Storage and saved as the shared logo everyone sees (navbar, footer,
   // login page, dashboard sidebar).
@@ -5723,6 +5759,94 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         <div className="sm:col-span-6"><label className="text-xs text-gray-500">Description (shown on the product's page)</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <button className="sm:col-span-6 text-sm font-semibold py-2.5 rounded-full text-white" style={{ background: "#0B1F3A" }}>+ Add product to catalog</button>
       </form>
+
+      <div className="mt-8 rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+        <button onClick={() => setBulkOpen((v) => !v)} className="w-full flex items-center justify-between text-left">
+          <span className="text-sm font-semibold flex items-center gap-2" style={{ color: "#0B1F3A" }}>
+            <BadgeCheck className="w-4 h-4" /> Bulk visibility manager
+          </span>
+          <ChevronDown className="w-4 h-4 transition-transform" style={{ transform: bulkOpen ? "rotate(180deg)" : "none", color: "#6B7280" }} />
+        </button>
+        <p className="mt-1 text-[11px] text-gray-400">Pick who below, then tick products in the list — each one is assigned to that group right away, no need to open Edit on every product.</p>
+
+        {bulkOpen && (
+          <div className="mt-4">
+            <label className="text-xs text-gray-500">Who should see the ticked products?</label>
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setBulkTarget("all")}
+                className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={bulkTarget === "all" ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
+              >
+                🌐 All sellers
+              </button>
+              <button
+                onClick={() => setBulkTarget("premium")}
+                className="text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={bulkTarget === "premium" ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Premium
+              </button>
+              {sellers.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setBulkTarget(s.email)}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full"
+                  style={bulkTarget === s.email ? { background: "#F8B400", color: "#04140f" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
+                >
+                  {s.email}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-gray-400">
+              {bulkTarget === "all" && "Ticking a product makes it public to every seller and clears Premium/seller-only restrictions."}
+              {bulkTarget === "premium" && "Ticking a product marks it Premium — only visible to sellers marked Premium in the Sellers table."}
+              {bulkTarget !== "all" && bulkTarget !== "premium" && `Ticking a product adds ${bulkTarget} to its allowed sellers (other sellers already assigned stay assigned too).`}
+            </p>
+
+            <input
+              value={bulkSearch}
+              onChange={(e) => setBulkSearch(e.target.value)}
+              placeholder="Search products…"
+              className="mt-3 w-full rounded-lg px-3 py-2 text-sm"
+              style={{ border: "1px solid #E5E7EB" }}
+            />
+
+            <div className="mt-2 max-h-96 overflow-y-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
+              {catalog
+                .filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase()))
+                .map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+                    style={{ borderBottom: "1px solid #F3F4F6" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isProductInBulkTarget(p)}
+                      disabled={bulkTogglingId === p.id}
+                      onChange={() => toggleBulkTarget(p)}
+                    />
+                    <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
+                      <ProductThumb product={p} size={16} />
+                    </div>
+                    <span className="text-sm font-medium flex-1 truncate">{p.name}</span>
+                    {bulkTogglingId === p.id ? (
+                      <span className="text-[11px] text-gray-400 flex-shrink-0">Saving…</span>
+                    ) : (
+                      <span className="text-[11px] flex-shrink-0" style={{ color: (p.assignedSellerEmails || []).length ? "#F8B400" : "#9CA3AF" }}>
+                        {p.isPremium ? "✨ Premium" : (p.assignedSellerEmails || []).length ? `🔒 ${p.assignedSellerEmails.length}` : "🌐 All"}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              {catalog.filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase())).length === 0 && (
+                <div className="px-3 py-6 text-center text-xs text-gray-400">No products match.</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.map((p) => (
