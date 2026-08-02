@@ -3545,13 +3545,13 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="🔍 Search products..."
-          className="w-full rounded-2xl px-5 py-3 text-sm font-medium outline-none"
-          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", backdropFilter: "blur(6px)", "::placeholder": { color: "rgba(255,255,255,0.4)" } }}
+          className="w-full rounded-2xl px-5 py-3 text-sm font-medium outline-none placeholder-gray-400"
+          style={{ background: "#fff", border: "1px solid #E5E7EB", color: "#0B1F3A", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery("")}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-lg leading-none"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-lg leading-none"
           >✕</button>
         )}
       </div>
