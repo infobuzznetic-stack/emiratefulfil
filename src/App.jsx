@@ -1136,7 +1136,7 @@ async function fetchOrders(email) {
     sellPrice: Number(o.sell_price), costPrice: Number(o.cost_price),
     listPrice: o.list_price != null ? Number(o.list_price) : Number(o.sell_price),
     buyer: o.buyer, city: o.city, status: o.status,
-    customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address,
+    customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address, notes: o.notes,
     trackingNumber: o.tracking_number, paymentStatus: o.payment_status || "unpaid",
     deliveryCharge: o.delivery_charge != null ? Number(o.delivery_charge) : DELIVERY_CHARGE,
     createdAt: o.created_at,
@@ -1787,6 +1787,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       id: newOrder.id, seller_email: session.email, product_id: newOrder.productId, product_name: newOrder.productName,
       qty: newOrder.qty, sell_price: newOrder.sellPrice, cost_price: newOrder.costPrice, list_price: newOrder.listPrice ?? newOrder.sellPrice, buyer: newOrder.buyer, city: newOrder.city,
       customer_email: newOrder.customerEmail || null, customer_phone: newOrder.customerPhone || null, customer_address: newOrder.customerAddress || null,
+      notes: newOrder.notes || null,
       status: "pending", payment_status: "unpaid", delivery_charge: newOrder.deliveryCharge,
     });
     if (error) { notify("Could not save order."); return null; }
@@ -3224,7 +3225,7 @@ function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
 }
 
 function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
-  const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "" });
+  const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
   const deliveryTotal = items.length * DELIVERY_CHARGE;
@@ -3267,6 +3268,10 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
           <div>
             <label className="text-xs text-gray-500">Delivery address <span className="text-red-500">*</span></label>
             <textarea required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Building, street, area / landmark" rows={3} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Any instructions for this order (optional)</label>
+            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="e.g. call before delivery, gift wrap, deliver after 6pm…" rows={2} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
           </div>
           <button disabled={busy} className="w-full mt-2 text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
             {busy ? "Placing order…" : `Place order — AED ${total}`}
@@ -3440,7 +3445,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
         productId: item.id, productName: item.name, qty: item.qty,
         sellPrice: item.sell, costPrice: item.cost, listPrice: item.listSell, deliveryCharge: DELIVERY_CHARGE,
         buyer: customer.name, city: customer.emirate,
-        customerPhone: customer.phone, customerAddress: customer.address,
+        customerPhone: customer.phone, customerAddress: customer.address, notes: customer.notes,
       });
       if (result) created.push(result);
     }
@@ -4333,6 +4338,7 @@ function AdminOrdersPanel({ notify }) {
                         <th className="px-4 py-3">Customer</th>
                         <th className="px-4 py-3">Email / Phone</th>
                         <th className="px-4 py-3">Address / Emirate</th>
+                        <th className="px-4 py-3">Instructions</th>
                         <th className="px-4 py-3">Amount</th>
                         <th className="px-4 py-3">Profit</th>
                         <th className="px-4 py-3">Status</th>
@@ -4353,6 +4359,9 @@ function AdminOrdersPanel({ notify }) {
                           <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
                             <div className="text-gray-700 font-medium">{o.city || "—"}</div>
                             <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
+                          </td>
+                          <td className="px-4 py-3 text-xs min-w-[160px] max-w-[220px] whitespace-normal break-words" style={{ color: o.notes ? "#0B1F3A" : "#9CA3AF" }}>
+                            {o.notes || "—"}
                           </td>
                           <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.status === "cancelled" || o.status === "returned" || o.status === "customer_cancelled_confirmation") ? 0 : o.sell_price * o.qty + (Number(o.delivery_charge) || 0)}</td>
                           <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>
