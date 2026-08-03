@@ -1118,6 +1118,36 @@ async function fetchPremiumSellerEmails() {
 async function savePremiumSellerEmails(list) {
   return saveChunkedSetting(PREMIUM_SELLERS_KEY, JSON.stringify(list));
 }
+// Custom display order for the Products page — a plain list of product IDs,
+// stored the same chunked way as the premium-sellers list above. Admin sets
+// this by dragging products up/down in the "Reorder products" panel; every
+// seller (and the buyer-facing product grid) then shows products in this
+// order instead of database insert order. Any product not yet in this list
+// (e.g. one just added) falls back to the end, in its normal catalog order.
+const PRODUCT_ORDER_KEY = "product_display_order";
+async function fetchProductOrder() {
+  const raw = await loadChunkedSetting(PRODUCT_ORDER_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+async function saveProductOrder(list) {
+  return saveChunkedSetting(PRODUCT_ORDER_KEY, JSON.stringify(list));
+}
+function applyProductOrder(catalog, orderIds) {
+  if (!orderIds || !orderIds.length) return catalog;
+  const byId = new Map(catalog.map((p) => [p.id, p]));
+  const ordered = [];
+  const seen = new Set();
+  for (const id of orderIds) {
+    const p = byId.get(id);
+    if (p) { ordered.push(p); seen.add(id); }
+  }
+  for (const p of catalog) { if (!seen.has(p.id)) ordered.push(p); }
+  return ordered;
+}
 async function fetchListings(email) {
   const { data, error } = await supabase.from("listings").select("product_id").eq("seller_email", email);
   if (error) { console.error(error); return []; }
@@ -1719,7 +1749,9 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   const [isPremiumSeller, setIsPremiumSeller] = useState(() => readLocal(`ef_premium_${session.email}`, false));
 
   const reload = async () => {
-    setCatalog(await fetchCatalog());
+    const rawCatalog = await fetchCatalog();
+    const order = await fetchProductOrder();
+    setCatalog(applyProductOrder(rawCatalog, order));
     setListings(await fetchListings(session.email));
     setOrders(await fetchOrders(session.email));
     const premiumEmails = await fetchPremiumSellerEmails();
@@ -1732,6 +1764,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     }
   };
   useEffect(() => { reload(); }, []); // eslint-disable-line
+
+  // Admin drags products into a new order in the "Reorder products" panel —
+  // update on screen immediately (optimistic), then persist the new order so
+  // it sticks for every seller after their next reload.
+  const reorderCatalog = async (newOrderedList) => {
+    setCatalog(newOrderedList);
+    await saveProductOrder(newOrderedList.map((p) => p.id));
+  };
 
   // A product Admin has assigned to specific sellers only shows up for
   // those sellers (and for Admin, who manages everything). A product with
@@ -2207,7 +2247,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               )}
             </>
           )}
-          {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} />}
+          {tab === "admin" && isAdmin && <AdminTab catalog={catalog} sellerCount={sellerCount} notify={notify} onCatalogChanged={reload} onReorder={reorderCatalog} />}
         </div>
       </main>
     </div>
@@ -4791,7 +4831,7 @@ function LightField({ label, type = "text", value, onChange, placeholder }) {
   );
 }
 
-function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
+function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder }) {
   const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false });
   // "Import from link" — Admin pastes a product URL from Temu / Noon / Amazon /
   // Wavebit / a dropshipping site, we fetch the page server-side (Edge
@@ -4977,6 +5017,27 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     onCatalogChanged();
     if (failed) notify(`Updated ${targets.length - failed} of ${targets.length} — ${failed} failed, try again.`);
     else notify(turningOn ? `Marked ${targets.length} product${targets.length === 1 ? "" : "s"}.` : `Unmarked ${targets.length} product${targets.length === 1 ? "" : "s"}.`);
+  };
+
+  // Reorder products — drag a row up/down to change the order everyone
+  // (sellers + the buyer-facing grid) sees them in. Plain HTML5 drag & drop,
+  // no library needed. Search only filters what's visible in this admin
+  // list; dragging is disabled while a search is active because moving a
+  // row within a filtered subset can't unambiguously map to a position in
+  // the full list.
+  const [reorderOpen, setReorderOpen] = useState(false);
+  const [reorderSearch, setReorderSearch] = useState("");
+  const [dragIndex, setDragIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const moveProduct = async (fromIndex, toIndex) => {
+    if (fromIndex === toIndex || fromIndex == null || toIndex == null) return;
+    const next = catalog.slice();
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    setReorderSaving(true);
+    await onReorder(next);
+    setReorderSaving(false);
   };
 
   // Site logo: pick a picture from your computer, it's uploaded to Supabase
@@ -5526,6 +5587,69 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
         )}
       </div>
 
+      {/* Reorder products — drag rows to set the order sellers see them in */}
+      <div className="mt-6 rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
+        <button onClick={() => setReorderOpen((v) => !v)} className="w-full flex items-center justify-between text-left">
+          <span className="text-sm font-semibold flex items-center gap-2" style={{ color: "#0B1F3A" }}>
+            <Boxes className="w-4 h-4" /> Reorder products
+          </span>
+          <ChevronDown className="w-4 h-4 transition-transform" style={{ transform: reorderOpen ? "rotate(180deg)" : "none", color: "#6B7280" }} />
+        </button>
+        <p className="mt-1 text-[11px] text-gray-400">Drag a product up or down to change the order it shows up in on every seller's Products page — the top of this list is the first product they see.</p>
+
+        {reorderOpen && (
+          <div className="mt-4">
+            <input
+              value={reorderSearch}
+              onChange={(e) => setReorderSearch(e.target.value)}
+              placeholder="Search products…"
+              className="w-full rounded-lg px-3 py-2 text-sm"
+              style={{ border: "1px solid #E5E7EB" }}
+            />
+            {reorderSearch.trim() && (
+              <p className="mt-1.5 text-[11px]" style={{ color: "#F8B400" }}>Clear the search box to drag and reorder — dragging is only available on the full, unfiltered list.</p>
+            )}
+
+            <div className="mt-2 max-h-96 overflow-y-auto rounded-xl" style={{ border: "1px solid #E5E7EB", opacity: reorderSaving ? 0.6 : 1, pointerEvents: reorderSaving ? "none" : "auto" }}>
+              {catalog
+                .map((p, i) => ({ p, i }))
+                .filter(({ p }) => p.name.toLowerCase().includes(reorderSearch.trim().toLowerCase()))
+                .map(({ p, i }) => (
+                  <div
+                    key={p.id}
+                    draggable={!reorderSearch.trim()}
+                    onDragStart={() => setDragIndex(i)}
+                    onDragOver={(e) => { e.preventDefault(); if (!reorderSearch.trim()) setDragOverIndex(i); }}
+                    onDragLeave={() => setDragOverIndex((cur) => (cur === i ? null : cur))}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      moveProduct(dragIndex, i);
+                      setDragIndex(null);
+                      setDragOverIndex(null);
+                    }}
+                    onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+                    className="flex items-center gap-3 px-3 py-2"
+                    style={{
+                      borderBottom: "1px solid #F3F4F6",
+                      background: dragOverIndex === i ? "#F0FDF9" : "transparent",
+                      cursor: reorderSearch.trim() ? "default" : "grab",
+                    }}
+                  >
+                    <span className="text-gray-300 flex-shrink-0" style={{ fontSize: 16, lineHeight: 1 }}>⠿</span>
+                    <span className="text-[11px] w-6 flex-shrink-0 text-gray-400">{i + 1}</span>
+                    <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
+                      <ProductThumb product={p} size={16} />
+                    </div>
+                    <span className="text-sm font-medium flex-1 truncate">{p.name}</span>
+                  </div>
+                ))}
+              {catalog.filter((p) => p.name.toLowerCase().includes(reorderSearch.trim().toLowerCase())).length === 0 && (
+                <div className="px-3 py-6 text-center text-xs text-gray-400">No products match.</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Total sellers signed up" value={sellers.length || sellerCount} color="#00C896" />
