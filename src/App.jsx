@@ -4936,6 +4936,38 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     onCatalogChanged();
   };
 
+  // "Select all" — applies the current target to every product in the
+  // (search-filtered) list at once, instead of ticking one by one. Toggles
+  // back off the same way, except for "All sellers" where unchecking has no
+  // meaningful effect (same rule as the single-product checkbox above).
+  const [bulkSelectAllLoading, setBulkSelectAllLoading] = useState(false);
+  const buildBulkPatch = (p, turningOn) => {
+    if (bulkTarget === "all") return { assigned_seller_emails: [], is_premium: false };
+    if (bulkTarget === "premium") return { is_premium: turningOn };
+    const emails = p.assignedSellerEmails || [];
+    const next = turningOn ? [...emails, bulkTarget] : emails.filter((e) => e !== bulkTarget);
+    return { assigned_seller_emails: next };
+  };
+  const toggleSelectAllBulk = async (filteredProducts, allCurrentlySelected) => {
+    if (filteredProducts.length === 0) return;
+    const turningOn = !allCurrentlySelected;
+    if (bulkTarget === "all" && !turningOn) {
+      notify("To restrict these products, pick Premium or a specific seller above instead.");
+      return;
+    }
+    const targets = filteredProducts.filter((p) => isProductInBulkTarget(p) !== turningOn);
+    if (targets.length === 0) return;
+    setBulkSelectAllLoading(true);
+    const results = await Promise.all(
+      targets.map((p) => supabase.from("products").update(buildBulkPatch(p, turningOn)).eq("id", p.id))
+    );
+    setBulkSelectAllLoading(false);
+    const failed = results.filter((r) => r.error).length;
+    onCatalogChanged();
+    if (failed) notify(`Updated ${targets.length - failed} of ${targets.length} — ${failed} failed, try again.`);
+    else notify(turningOn ? `Marked ${targets.length} product${targets.length === 1 ? "" : "s"}.` : `Unmarked ${targets.length} product${targets.length === 1 ? "" : "s"}.`);
+  };
+
   // Site logo: pick a picture from your computer, it's uploaded to Supabase
   // Storage and saved as the shared logo everyone sees (navbar, footer,
   // login page, dashboard sidebar).
@@ -5426,38 +5458,59 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
               style={{ border: "1px solid #E5E7EB" }}
             />
 
-            <div className="mt-2 max-h-96 overflow-y-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
-              {catalog
-                .filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase()))
-                .map((p) => (
-                  <label
-                    key={p.id}
-                    className="flex items-center gap-3 px-3 py-2 cursor-pointer"
-                    style={{ borderBottom: "1px solid #F3F4F6" }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isProductInBulkTarget(p)}
-                      disabled={bulkTogglingId === p.id}
-                      onChange={() => toggleBulkTarget(p)}
-                    />
-                    <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
-                      <ProductThumb product={p} size={16} />
-                    </div>
-                    <span className="text-sm font-medium flex-1 truncate">{p.name}</span>
-                    {bulkTogglingId === p.id ? (
-                      <span className="text-[11px] text-gray-400 flex-shrink-0">Saving…</span>
-                    ) : (
-                      <span className="text-[11px] flex-shrink-0" style={{ color: (p.assignedSellerEmails || []).length ? "#F8B400" : "#9CA3AF" }}>
-                        {p.isPremium ? "✨ Premium" : (p.assignedSellerEmails || []).length ? `🔒 ${p.assignedSellerEmails.length}` : "🌐 All"}
-                      </span>
+            {(() => {
+              const filteredBulkProducts = catalog.filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase()));
+              const selectedCount = filteredBulkProducts.filter(isProductInBulkTarget).length;
+              const allSelected = filteredBulkProducts.length > 0 && selectedCount === filteredBulkProducts.length;
+              return (
+                <>
+                  <div className="mt-2 flex items-center justify-between px-1">
+                    <label className="flex items-center gap-2 text-xs font-medium cursor-pointer select-none" style={{ color: "#374151" }}>
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => { if (el) el.indeterminate = selectedCount > 0 && !allSelected; }}
+                        disabled={bulkSelectAllLoading || filteredBulkProducts.length === 0}
+                        onChange={() => toggleSelectAllBulk(filteredBulkProducts, allSelected)}
+                      />
+                      {bulkSelectAllLoading ? "Updating…" : "Select all"}
+                    </label>
+                    <span className="text-[11px] text-gray-400">{selectedCount} of {filteredBulkProducts.length} selected</span>
+                  </div>
+
+                  <div className="mt-1 max-h-96 overflow-y-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
+                    {filteredBulkProducts.map((p) => (
+                      <label
+                        key={p.id}
+                        className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+                        style={{ borderBottom: "1px solid #F3F4F6" }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isProductInBulkTarget(p)}
+                          disabled={bulkTogglingId === p.id || bulkSelectAllLoading}
+                          onChange={() => toggleBulkTarget(p)}
+                        />
+                        <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "#F8FAFC" }}>
+                          <ProductThumb product={p} size={16} />
+                        </div>
+                        <span className="text-sm font-medium flex-1 truncate">{p.name}</span>
+                        {bulkTogglingId === p.id ? (
+                          <span className="text-[11px] text-gray-400 flex-shrink-0">Saving…</span>
+                        ) : (
+                          <span className="text-[11px] flex-shrink-0" style={{ color: (p.assignedSellerEmails || []).length ? "#F8B400" : "#9CA3AF" }}>
+                            {p.isPremium ? "✨ Premium" : (p.assignedSellerEmails || []).length ? `🔒 ${p.assignedSellerEmails.length}` : "🌐 All"}
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                    {filteredBulkProducts.length === 0 && (
+                      <div className="px-3 py-6 text-center text-xs text-gray-400">No products match.</div>
                     )}
-                  </label>
-                ))}
-              {catalog.filter((p) => p.name.toLowerCase().includes(bulkSearch.trim().toLowerCase())).length === 0 && (
-                <div className="px-3 py-6 text-center text-xs text-gray-400">No products match.</div>
-              )}
-            </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
