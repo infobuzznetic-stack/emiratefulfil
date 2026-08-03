@@ -4957,6 +4957,17 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged }) {
     }
     const targets = filteredProducts.filter((p) => isProductInBulkTarget(p) !== turningOn);
     if (targets.length === 0) return;
+
+    // Safety confirmation — this can change a lot of products in one click,
+    // so make sure that's really the intent before writing to the database.
+    if (targets.length > 5) {
+      const targetLabel = bulkTarget === "all" ? "All sellers (public)" : bulkTarget === "premium" ? "Premium" : bulkTarget;
+      const ok = window.confirm(
+        `${turningOn ? "Mark" : "Unmark"} ${targets.length} product${targets.length === 1 ? "" : "s"} as "${targetLabel}"?\n\nThis updates them all right away — this can't be undone in one click.`
+      );
+      if (!ok) return;
+    }
+
     setBulkSelectAllLoading(true);
     const results = await Promise.all(
       targets.map((p) => supabase.from("products").update(buildBulkPatch(p, turningOn)).eq("id", p.id))
