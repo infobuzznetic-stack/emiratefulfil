@@ -3264,7 +3264,46 @@ function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
   );
 }
 
-function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
+// Standalone COD-amount box for one checkout line item. Keeps its OWN typed
+// text in local state (instead of a value derived straight from the order
+// total), so selecting-all + Backspace/Cut genuinely empties the box and the
+// seller can type a fresh number — nothing snaps back mid-typing. The order
+// total only gets clamped to the actual price once the seller leaves the
+// field (onBlur); typing itself is never blocked or auto-corrected.
+function CodAmountRow({ it, baseTotal, initialCodAmount, onUpdateItemPrice }) {
+  const [raw, setRaw] = useState(String(initialCodAmount));
+  const parsed = raw === "" ? NaN : parseFloat(raw);
+  const itemProfit = isNaN(parsed) ? null : parsed - baseTotal;
+
+  const commit = () => {
+    let entered = parseFloat(raw);
+    if (isNaN(entered) || entered < 0) entered = baseTotal;
+    setRaw(String(entered));
+    onUpdateItemPrice(it.id, (entered - DELIVERY_CHARGE) / it.qty);
+  };
+
+  return (
+    <>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <label className="text-xs text-gray-500 whitespace-nowrap">COD Amount (what customer pays)</label>
+        <input
+          type="number" inputMode="decimal" value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          onBlur={commit}
+          className="w-24 rounded-lg px-2 py-1.5 text-sm text-right font-semibold"
+          style={{ border: "1px solid #E5E7EB" }}
+        />
+      </div>
+      <div className="mt-1.5 flex items-center justify-between text-xs font-semibold" style={{ color: "#00a67e" }}>
+        <span>Your profit is</span>
+        <span>AED {itemProfit === null ? "—" : itemProfit.toFixed(2)}</span>
+      </div>
+    </>
+  );
+}
+
+
   const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
@@ -3330,7 +3369,6 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
               const subtotal = it.listSell * it.qty;
               const baseTotal = subtotal + DELIVERY_CHARGE;
               const codAmount = it.sell * it.qty + DELIVERY_CHARGE;
-              const itemProfit = codAmount - baseTotal;
               return (
                 <div key={it.id} className="text-sm">
                   <div className="flex items-center justify-between font-semibold" style={{ color: "#111827" }}>
@@ -3348,31 +3386,13 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
                     <span>Total (actual price)</span>
                     <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {baseTotal}</span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <label className="text-xs text-gray-500 whitespace-nowrap">COD Amount (what customer pays)</label>
-                    <input
-                      type="number" inputMode="decimal" min={baseTotal} value={codAmount}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const entered = raw === "" ? 0 : parseFloat(raw);
-                        const newSell = ((isNaN(entered) ? 0 : entered) - DELIVERY_CHARGE) / it.qty;
-                        onUpdateItemPrice(it.id, newSell);
-                      }}
-                      onBlur={(e) => {
-                        const raw = e.target.value;
-                        let entered = raw === "" ? baseTotal : parseFloat(raw);
-                        if (isNaN(entered) || entered < baseTotal) entered = baseTotal;
-                        const newSell = (entered - DELIVERY_CHARGE) / it.qty;
-                        onUpdateItemPrice(it.id, newSell);
-                      }}
-                      className="w-24 rounded-lg px-2 py-1.5 text-sm text-right font-semibold"
-                      style={{ border: "1px solid #E5E7EB" }}
-                    />
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between text-xs font-semibold" style={{ color: "#00a67e" }}>
-                    <span>Your profit is</span>
-                    <span>AED {itemProfit.toFixed(2)}</span>
-                  </div>
+                  <CodAmountRow
+                    key={it.id}
+                    it={it}
+                    baseTotal={baseTotal}
+                    initialCodAmount={codAmount}
+                    onUpdateItemPrice={onUpdateItemPrice}
+                  />
                 </div>
               );
             })}
