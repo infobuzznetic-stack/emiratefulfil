@@ -3303,7 +3303,7 @@ function CodAmountRow({ it, baseTotal, initialCodAmount, onUpdateItemPrice }) {
   );
 }
 
-
+function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
   const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
