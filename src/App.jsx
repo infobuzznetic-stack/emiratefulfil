@@ -3264,17 +3264,22 @@ function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
   );
 }
 
-function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice }) {
+function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
   const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
   const deliveryTotal = items.length * DELIVERY_CHARGE;
   const total = itemsTotal + deliveryTotal;
+  const baseTotal = items.reduce((s, it) => s + it.listSell * it.qty + DELIVERY_CHARGE, 0);
   const profitTotal = items.reduce((s, it) => s + (it.sell * it.qty + DELIVERY_CHARGE) - (it.listSell * it.qty + DELIVERY_CHARGE), 0);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.phone || !form.address) return;
+    if (total <= baseTotal) {
+      notify?.("COD amount should be greater than the order price.");
+      return;
+    }
     setBusy(true);
     await onSubmit(form);
     setBusy(false);
@@ -3546,7 +3551,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     return <CartView items={cart} onUpdateQty={updateCartQty} onRemove={removeFromCart} onBack={() => setView("list")} onCheckout={goToCartCheckout} total={cartTotal} />;
   }
   if (view === "checkout") {
-    return <CheckoutForm items={checkoutItems} onBack={() => setView(checkoutFrom)} onSubmit={placeOrder} onUpdateItemPrice={updateCheckoutItemPrice} />;
+    return <CheckoutForm items={checkoutItems} onBack={() => setView(checkoutFrom)} onSubmit={placeOrder} onUpdateItemPrice={updateCheckoutItemPrice} notify={notify} />;
   }
 
   const CATEGORY_COLORS = {
