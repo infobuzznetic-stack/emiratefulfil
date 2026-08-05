@@ -6565,9 +6565,12 @@ function TicketsTab({
   const [showNewForm, setShowNewForm] = useState(false);
   const [newSubject, setNewSubject] = useState("");
   const [newBody, setNewBody] = useState("");
+  const [newImageFile, setNewImageFile] = useState(null);
+  const [newImagePreview, setNewImagePreview] = useState(null);
   const [creating, setCreating] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef(null);
+  const newFormFileInputRef = useRef(null);
 
   const loadTickets = async () => {
     setTicketsLoading(true);
@@ -6586,23 +6589,37 @@ function TicketsTab({
     }
   };
 
+  const pickNewImage = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { notify && notify("Please choose an image file."); return; }
+    setNewImageFile(file);
+    setNewImagePreview(URL.createObjectURL(file));
+  };
+  const clearNewImage = () => { setNewImageFile(null); setNewImagePreview(null); if (newFormFileInputRef.current) newFormFileInputRef.current.value = ""; };
+
   const createTicket = async () => {
     if (!newSubject.trim() || !newBody.trim()) { notify && notify(`Add a ${subjectLabel.toLowerCase()} and a message.`); return; }
     setCreating(true);
+    let imageUrl = null;
+    if (newImageFile) {
+      const { url, error: imgErr } = await uploadTicketImage(newImageFile);
+      if (imgErr) { setCreating(false); notify && notify(imgErr); return; }
+      imageUrl = url;
+    }
     const id = idPrefix + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10);
     const { error } = await supabase.from("tickets").insert({
       id, seller_email: session.email, seller_name: session.name || session.email, subject: newSubject.trim(), status: "open", category,
     });
     if (error) { setCreating(false); notify && notify("Could not create it — please try again."); return; }
     const { error: msgError } = await supabase.from("ticket_messages").insert({
-      ticket_id: id, sender: "seller", sender_name: session.name || session.email, body: newBody.trim(),
+      ticket_id: id, sender: "seller", sender_name: session.name || session.email, body: newBody.trim(), image_url: imageUrl,
     });
     setCreating(false);
     if (msgError) { notify && notify("Sent, but the message failed to attach."); }
     const newTicket = { id, sellerEmail: session.email, sellerName: session.name || session.email, subject: newSubject.trim(), status: "open", createdAt: new Date().toISOString() };
     setTickets((prev) => [newTicket, ...prev]);
-    setMessages((prev) => ({ ...prev, [id]: [{ id: "local-" + id, ticketId: id, sender: "seller", senderName: session.name || session.email, body: newBody.trim(), createdAt: new Date().toISOString() }] }));
-    setNewSubject(""); setNewBody(""); setShowNewForm(false);
+    setMessages((prev) => ({ ...prev, [id]: [{ id: "local-" + id, ticketId: id, sender: "seller", senderName: session.name || session.email, body: newBody.trim(), imageUrl, createdAt: new Date().toISOString() }] }));
+    setNewSubject(""); setNewBody(""); clearNewImage(); setShowNewForm(false);
     setSelectedId(id);
     notify && notify(createdMsg);
   };
@@ -6670,7 +6687,7 @@ function TicketsTab({
             </div>
           </div>
           <button
-            onClick={() => setShowNewForm((v) => !v)}
+            onClick={() => { setShowNewForm((v) => !v); clearNewImage(); }}
             className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95"
             style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 22px rgba(0,200,150,0.35)" }}
           >
@@ -6709,6 +6726,39 @@ function TicketsTab({
                 className="mt-1.5 w-full rounded-xl px-4 py-2.5 text-sm outline-none resize-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
                 style={{ border: "1px solid #E5E7EB" }}
               />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Photo (optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                ref={newFormFileInputRef}
+                className="hidden"
+                onChange={(e) => pickNewImage(e.target.files?.[0])}
+              />
+              {newImagePreview ? (
+                <div className="mt-1.5 relative inline-block">
+                  <img src={newImagePreview} alt="Selected" className="rounded-xl max-h-40 object-cover" style={{ border: "1px solid #E5E7EB" }} />
+                  <button
+                    onClick={clearNewImage}
+                    type="button"
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-white transition-transform duration-200 hover:scale-110"
+                    style={{ background: "#EF4444" }}
+                    title="Remove picture"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => newFormFileInputRef.current?.click()}
+                  className="mt-1.5 w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors duration-200 hover:bg-gray-50"
+                  style={{ border: "1px dashed #D1D5DB", color: "#6B7280" }}
+                >
+                  <ImagePlus className="w-4 h-4" /> Attach a picture
+                </button>
+              )}
             </div>
             <button
               onClick={createTicket}
