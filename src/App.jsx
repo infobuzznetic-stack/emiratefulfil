@@ -2062,6 +2062,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           70% { box-shadow: 0 0 0 10px rgba(248,180,0,0); }
           100% { box-shadow: 0 0 0 0 rgba(248,180,0,0); }
         }
+        @keyframes marqueeScroll {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
       `}</style>
 
       {/* Main */}
@@ -2380,6 +2384,40 @@ function LiveClock() {
   return { dateLabel, timeLabel, greeting };
 }
 
+// Continuously-scrolling announcement strip for the top of the seller
+// dashboard (e.g. "UAE Dropshipping is Live · Returns & Order Confirmation
+// are FREE"). Text is duplicated into two back-to-back groups and the
+// track is animated from 0% to -50%, so the loop is seamless no matter
+// how long the text is.
+function MarqueeTicker({ text, speedSec = 20 }) {
+  const copies = Array.from({ length: 4 });
+  const Group = () => (
+    <div className="flex items-center flex-shrink-0">
+      {copies.map((_, i) => (
+        <span
+          key={i}
+          className="flex items-center gap-2 px-6 text-xs sm:text-sm font-semibold whitespace-nowrap"
+          style={{ color: "#7FE8C9", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
+          {text}
+        </span>
+      ))}
+    </div>
+  );
+  return (
+    <div
+      className="relative overflow-hidden rounded-full mb-7"
+      style={{ background: "#0B1F3A", border: "1px solid rgba(0,200,150,0.22)" }}
+    >
+      <div className="flex py-2.5" style={{ width: "max-content", animation: `marqueeScroll ${speedSec}s linear infinite` }}>
+        <Group />
+        <Group />
+      </div>
+    </div>
+  );
+}
+
 function ComingSoonPanel({ region }) {
   const info = {
     KSA: { flag: "🇸🇦", name: "Saudi Arabia" },
@@ -2455,6 +2493,7 @@ function OverviewTab({
 
   return (
     <div>
+      <MarqueeTicker text="🇦🇪 UAE Dropshipping is Live  ·  Returns & Order Confirmation are FREE" />
       <div
         className="relative overflow-hidden rounded-3xl px-4 py-6 sm:px-7 sm:py-8 mb-7"
         style={
