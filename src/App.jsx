@@ -1782,8 +1782,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   const visibleCatalog = isAdmin
     ? catalog
     : catalog
-        .filter((p) => !(p.assignedSellerEmails || []).length || p.assignedSellerEmails.includes(session.email))
-        .filter((p) => !p.isPremium || isPremiumSeller);
+        .filter((p) => !(p.assignedSellerEmails || []).length || p.assignedSellerEmails.includes(session.email));
 
   // Live-updates: when Admin changes an order's status (ship / deliver /
   // return it), reflect the new status here right away and drop a
@@ -2231,7 +2230,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           )}
           {(tab === "settings" || tab === "support" || tab === "tickets" || region === "UAE") && (
             <>
-              {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} onCatalogChanged={reload} />}
+              {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
                 isAdmin
                   ? <AdminOrdersPanel notify={notify} />
@@ -3414,7 +3413,8 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
   );
 }
 
-function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, sellerEmail, isAdmin = false, onCatalogChanged }) {
+function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, sellerEmail, isAdmin = false, isPremiumSeller = false, onCatalogChanged }) {
+  const [showGoldModal, setShowGoldModal] = useState(false);
   const [view, setView] = useState("list"); // list | detail | cart | checkout | success
   const [activeProduct, setActiveProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -3686,25 +3686,36 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             );
           }
           const inStock = (p.stock ?? 0) > 0;
+          const isLocked = p.isPremium && !isPremiumSeller && !isAdmin;
           return (
             <div
               key={p.id}
-              onClick={() => openProduct(p)}
+              onClick={() => isLocked ? setShowGoldModal(true) : openProduct(p)}
               className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1.5 cursor-pointer overflow-hidden flex flex-col"
               style={{
-                border: "1px solid #E5E7EB",
+                border: isLocked ? "1px solid #F8B400" : "1px solid #E5E7EB",
                 animation: `dashTabIn 0.35s ease-out ${i * 40}ms both`,
-                boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
+                boxShadow: isLocked ? "0 2px 12px rgba(248,180,0,0.18)" : "0 1px 2px rgba(16,24,40,0.04)",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 24px 40px -14px ${color}45`)}
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 2px rgba(16,24,40,0.04)")}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = isLocked ? "0 8px 28px rgba(248,180,0,0.35)" : `0 24px 40px -14px ${color}45`)}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = isLocked ? "0 2px 12px rgba(248,180,0,0.18)" : "0 1px 2px rgba(16,24,40,0.04)")}
             >
+              {/* Gold lock overlay for non-premium sellers */}
+              {isLocked && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl" style={{ background: "rgba(11,31,58,0.72)", backdropFilter: "blur(3px)" }}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2" style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", boxShadow: "0 6px 20px rgba(248,180,0,0.5)" }}>
+                    <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white"><path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6zm9 14H6V10h12v10zm-6-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+                  </div>
+                  <div className="text-white font-bold text-xs text-center px-3" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Gold Plan Only</div>
+                  <div className="mt-1.5 text-[10px] text-white/60 text-center px-4">Tap to unlock this premium product</div>
+                </div>
+              )}
               {/* Gradient accent bar, same touch used across the dashboard's cards */}
               <div className="absolute top-0 left-0 right-0 h-[3px] z-10" style={{ background: `linear-gradient(90deg, ${color}, ${color}00)` }} />
 
               {/* ── Image ── */}
               <div className="relative w-full aspect-square flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(160deg, ${color}14, ${color}05)` }}>
-                <div className="transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full">
+                <div className={`transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full${isLocked ? " blur-sm select-none pointer-events-none" : ""}`}>
                   <ProductThumb product={p} size={56} className="w-full h-full" />
                 </div>
                 {/* Diagonal shine sweep on hover */}
@@ -3788,6 +3799,78 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
       </div>
       {searchQuery && catalog.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.category || "").toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
         <div className="text-center py-16 text-white/50 text-sm">No products found for "{searchQuery}"</div>
+      )}
+
+      {/* Gold Plan Unlock Modal */}
+      {showGoldModal && (
+        <div className="fixed inset-0 z-[99] flex items-center justify-center px-4" style={{ background: "rgba(11,31,58,0.75)", backdropFilter: "blur(6px)" }} onClick={() => setShowGoldModal(false)}>
+          <div
+            className="relative w-full max-w-sm rounded-3xl overflow-hidden"
+            style={{ background: "#0B1F3A", border: "1px solid rgba(248,180,0,0.4)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)", animation: "dashTabIn 0.3s ease-out both" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Gold shimmer top bar */}
+            <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #F8B400, #FFE29A, #c98f00)" }} />
+
+            {/* Glowing orbs */}
+            <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-3xl" style={{ background: "#F8B400" }} />
+            <div className="pointer-events-none absolute -bottom-10 -left-10 w-32 h-32 rounded-full opacity-20 blur-3xl" style={{ background: "#00C896" }} />
+
+            <div className="relative px-8 pt-8 pb-7 text-center">
+              {/* Lock icon */}
+              <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", boxShadow: "0 10px 30px rgba(248,180,0,0.5)" }}>
+                <svg viewBox="0 0 24 24" className="w-8 h-8 fill-white"><path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6zm9 14H6V10h12v10zm-6-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-3" style={{ background: "rgba(248,180,0,0.18)", color: "#F8B400" }}>
+                <Crown className="w-3 h-3" /> Premium Product
+              </div>
+
+              <h2 className="text-xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Purchase Gold Plan<br />To Unlock Products
+              </h2>
+              <p className="mt-2.5 text-sm text-white/55 leading-relaxed">
+                This is an exclusive product available only to Gold Plan sellers. Upgrade your account to get access to premium sourcing, winning products & private creatives.
+              </p>
+
+              {/* Benefits list */}
+              <div className="mt-5 text-left space-y-2.5">
+                {[
+                  "Access to all premium & trending products",
+                  "Winning creatives & ad strategy included",
+                  "Private sourcing & product financing",
+                  "Senior account manager — priority support",
+                ].map((b, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "rgba(248,180,0,0.2)" }}>
+                      <svg viewBox="0 0 12 12" className="w-2.5 h-2.5" fill="#F8B400"><path d="M10 3L5 8.5 2 5.5" stroke="#F8B400" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
+                    </div>
+                    <span className="text-xs text-white/70">{b}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA buttons */}
+              <div className="mt-6 flex flex-col gap-2.5">
+                <a
+                  href="https://wa.me/?text=Hi%2C+I%27m+interested+in+upgrading+to+the+Gold+Plan+on+EmirateFulfil"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full text-sm font-bold py-3 rounded-xl text-center transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+                  style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f", boxShadow: "0 8px 20px rgba(248,180,0,0.4)" }}
+                >
+                  🚀 Upgrade to Gold Plan
+                </a>
+                <button
+                  onClick={() => setShowGoldModal(false)}
+                  className="w-full text-sm font-semibold py-2.5 rounded-xl text-white/50 hover:text-white/80 transition-colors"
+                >
+                  Maybe later
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
