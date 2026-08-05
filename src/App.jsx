@@ -1172,13 +1172,13 @@ async function fetchOrders(email) {
     createdAt: o.created_at,
   }));
 }
-async function fetchTickets(email) {
-  const { data, error } = await supabase.from("tickets").select("*").eq("seller_email", email).order("created_at", { ascending: false });
+async function fetchTickets(email, category = "support") {
+  const { data, error } = await supabase.from("tickets").select("*").eq("seller_email", email).eq("category", category).order("created_at", { ascending: false });
   if (error) { console.error(error); return []; }
   return data.map((t) => ({ id: t.id, sellerEmail: t.seller_email, sellerName: t.seller_name, subject: t.subject, status: t.status || "open", createdAt: t.created_at }));
 }
-async function fetchAllTickets() {
-  const { data, error } = await supabase.from("tickets").select("*").order("created_at", { ascending: false });
+async function fetchAllTickets(category = "support") {
+  const { data, error } = await supabase.from("tickets").select("*").eq("category", category).order("created_at", { ascending: false });
   if (error) { console.error(error); return []; }
   return data.map((t) => ({ id: t.id, sellerEmail: t.seller_email, sellerName: t.seller_name, subject: t.subject, status: t.status || "open", createdAt: t.created_at }));
 }
@@ -1646,7 +1646,7 @@ function writeLocal(key, value) {
    page/tab (e.g. /dashboard/products) instead of always staying
    on "/", so refreshing or sharing a link lands on the right page.
 ============================================================ */
-const DASHBOARD_TABS = ["overview", "products", "orders", "invoices", "settings", "support", "tickets", "admin"];
+const DASHBOARD_TABS = ["overview", "products", "orders", "invoices", "settings", "requests", "support", "tickets", "admin"];
 
 function pathToRoute(pathname) {
   const parts = pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
@@ -1884,6 +1884,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     { id: "orders", label: "Orders", icon: Truck, count: orders.length },
     { id: "invoices", label: "Invoices", icon: Receipt },
     { id: "settings", label: "Seller Details", icon: Sparkles },
+    { id: "requests", label: "Product Requests", icon: Package },
     { id: "support", label: "Customer Support", icon: LifeBuoy },
     { id: "tickets", label: "Tickets", icon: MessageCircle },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
@@ -2193,6 +2194,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             {profileOpen && (
               <div className="absolute right-0 top-14 w-60 rounded-2xl bg-white shadow-xl z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
                 {[
+                  { icon: Package, label: "Product Requests", tab: "requests" },
                   { icon: LifeBuoy, label: "Customer Support", tab: "support" },
                   { icon: FileText, label: "Tickets", tab: "tickets" },
                   { icon: User, label: "Seller Details", tab: "settings" },
@@ -2227,12 +2229,12 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {/* Settings, Support, Tickets, and Admin aren't country-specific, so they stay open regardless of the region switch.
+          {/* Settings, Product Requests, Support, Tickets, and Admin aren't country-specific, so they stay open regardless of the region switch.
               Every other tab is UAE-only for now — switching to KSA/Qatar shows Coming Soon everywhere. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "support" && tab !== "tickets" && tab !== "admin" && region !== "UAE" && (
+          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "support" && tab !== "tickets" && tab !== "admin" && region !== "UAE" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "support" || tab === "tickets" || region === "UAE") && (
+          {(tab === "settings" || tab === "requests" || tab === "support" || tab === "tickets" || region === "UAE") && (
             <>
               {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
@@ -2242,6 +2244,11 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               )}
               {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
+              {tab === "requests" && (
+                isAdmin
+                  ? <AdminTicketsPanel notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests — all sellers" subheading={(openCount) => `${openCount} open request${openCount === 1 ? "" : "s"} waiting on a reply.`} emptyText="No product requests here." replyPlaceholder="Reply as Admin…" senderDisplayName="Admin" />
+                  : <TicketsTab session={session} notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests" subheading="Can't find a product in the catalog? Tell Admin what you're after and they'll source it." newButtonLabel="+ New request" listLabel="Your requests" emptyText="No product requests yet — ask for something not in the catalog." subjectLabel="Product name" subjectPlaceholder="e.g. Wireless earbuds with charging case" bodyLabel="Details" bodyPlaceholder="Quantity, budget, a reference link or photo, target price…" createdMsg="Request sent — Admin will reply here." adminDisplayName="Admin" />
+              )}
               {tab === "support" && <SupportTab session={session} />}
               {tab === "tickets" && (
                 isAdmin
@@ -6520,7 +6527,7 @@ function TicketThread({ messages, loading, viewerRole }) {
               }
             >
               <div className={`text-[10px] font-semibold mb-0.5 ${mine ? "text-white/70" : "text-gray-400"}`}>
-                {m.sender === "admin" ? "Customer Support" : m.senderName || "Seller"}
+                {m.senderName || (m.sender === "admin" ? "Admin" : "Seller")}
               </div>
               {m.imageUrl && (
                 <img
@@ -6540,7 +6547,14 @@ function TicketThread({ messages, loading, viewerRole }) {
   );
 }
 
-function TicketsTab({ session, notify }) {
+function TicketsTab({
+  session, notify, category = "support", icon: HeaderIcon = MessageCircle, idPrefix = "TCK",
+  heading = "Tickets", subheading = "Raise an issue and chat with Customer Support directly until it's resolved.",
+  newButtonLabel = "+ New ticket", listLabel = "Your tickets", emptyText = "No tickets yet — raise one if you need help.",
+  subjectLabel = "Subject", subjectPlaceholder = "e.g. Payout for order ORD123456 is late",
+  bodyLabel = "Message", bodyPlaceholder = "Describe the issue in detail…",
+  createdMsg = "Ticket created — Customer Support will reply here.", adminDisplayName = "Customer Support",
+}) {
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
@@ -6557,10 +6571,10 @@ function TicketsTab({ session, notify }) {
 
   const loadTickets = async () => {
     setTicketsLoading(true);
-    setTickets(await fetchTickets(session.email));
+    setTickets(await fetchTickets(session.email, category));
     setTicketsLoading(false);
   };
-  useEffect(() => { loadTickets(); }, []); // eslint-disable-line
+  useEffect(() => { loadTickets(); }, [category]); // eslint-disable-line
 
   const openTicket = async (id) => {
     setSelectedId(id);
@@ -6573,24 +6587,24 @@ function TicketsTab({ session, notify }) {
   };
 
   const createTicket = async () => {
-    if (!newSubject.trim() || !newBody.trim()) { notify && notify("Add a subject and a message."); return; }
+    if (!newSubject.trim() || !newBody.trim()) { notify && notify(`Add a ${subjectLabel.toLowerCase()} and a message.`); return; }
     setCreating(true);
-    const id = "TCK" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10);
+    const id = idPrefix + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10);
     const { error } = await supabase.from("tickets").insert({
-      id, seller_email: session.email, seller_name: session.name || session.email, subject: newSubject.trim(), status: "open",
+      id, seller_email: session.email, seller_name: session.name || session.email, subject: newSubject.trim(), status: "open", category,
     });
-    if (error) { setCreating(false); notify && notify("Could not create ticket."); return; }
+    if (error) { setCreating(false); notify && notify("Could not create it — please try again."); return; }
     const { error: msgError } = await supabase.from("ticket_messages").insert({
       ticket_id: id, sender: "seller", sender_name: session.name || session.email, body: newBody.trim(),
     });
     setCreating(false);
-    if (msgError) { notify && notify("Ticket created, but the message failed to send."); }
+    if (msgError) { notify && notify("Sent, but the message failed to attach."); }
     const newTicket = { id, sellerEmail: session.email, sellerName: session.name || session.email, subject: newSubject.trim(), status: "open", createdAt: new Date().toISOString() };
     setTickets((prev) => [newTicket, ...prev]);
     setMessages((prev) => ({ ...prev, [id]: [{ id: "local-" + id, ticketId: id, sender: "seller", senderName: session.name || session.email, body: newBody.trim(), createdAt: new Date().toISOString() }] }));
     setNewSubject(""); setNewBody(""); setShowNewForm(false);
     setSelectedId(id);
-    notify && notify("Ticket created — Customer Support will reply here.");
+    notify && notify(createdMsg);
   };
 
   const sendReply = async () => {
@@ -6648,11 +6662,11 @@ function TicketsTab({ session, notify }) {
           <div className="flex items-center gap-4">
             <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
               <span className="absolute inset-0 rounded-2xl" style={{ boxShadow: "0 0 0 1px rgba(0,224,170,0.35)" }} />
-              <MessageCircle className="w-7 h-7" style={{ color: "#00e0aa" }} />
+              <HeaderIcon className="w-7 h-7" style={{ color: "#00e0aa" }} />
             </div>
             <div>
-              <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tickets</h1>
-              <p className="text-sm text-white/60 mt-1">Raise an issue and chat with Customer Support directly until it's resolved.</p>
+              <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{heading}</h1>
+              <p className="text-sm text-white/60 mt-1">{subheading}</p>
             </div>
           </div>
           <button
@@ -6660,7 +6674,7 @@ function TicketsTab({ session, notify }) {
             className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95"
             style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: "0 8px 22px rgba(0,200,150,0.35)" }}
           >
-            {showNewForm ? "Cancel" : "+ New ticket"}
+            {showNewForm ? "Cancel" : newButtonLabel}
           </button>
         </div>
       </div>
@@ -6672,26 +6686,26 @@ function TicketsTab({ session, notify }) {
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
               <Sparkles className="w-[18px] h-[18px]" style={{ color: "#00a67e" }} />
             </div>
-            <div className="font-bold text-sm" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Raise a new ticket</div>
+            <div className="font-bold text-sm" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{newButtonLabel.replace("+ New ", "Raise a new ").replace(/^./, (c) => c.toUpperCase())}</div>
           </div>
           <div className="space-y-3.5">
             <div>
-              <label className="text-xs font-semibold text-gray-500">Subject</label>
+              <label className="text-xs font-semibold text-gray-500">{subjectLabel}</label>
               <input
                 value={newSubject}
                 onChange={(e) => setNewSubject(e.target.value)}
-                placeholder="e.g. Payout for order ORD123456 is late"
+                placeholder={subjectPlaceholder}
                 className="mt-1.5 w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
                 style={{ border: "1px solid #E5E7EB" }}
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-gray-500">Message</label>
+              <label className="text-xs font-semibold text-gray-500">{bodyLabel}</label>
               <textarea
                 value={newBody}
                 onChange={(e) => setNewBody(e.target.value)}
                 rows={4}
-                placeholder="Describe the issue in detail…"
+                placeholder={bodyPlaceholder}
                 className="mt-1.5 w-full rounded-xl px-4 py-2.5 text-sm outline-none resize-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(0,200,150,0.15)]"
                 style={{ border: "1px solid #E5E7EB" }}
               />
@@ -6702,7 +6716,7 @@ function TicketsTab({ session, notify }) {
               className="text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95 disabled:hover:scale-100"
               style={{ background: "linear-gradient(135deg,#00C896,#00a67e)", opacity: creating ? 0.6 : 1, boxShadow: "0 8px 20px rgba(0,200,150,0.3)" }}
             >
-              {creating ? "Submitting…" : "Submit ticket"}
+              {creating ? "Submitting…" : "Submit"}
             </button>
           </div>
         </div>
@@ -6712,7 +6726,7 @@ function TicketsTab({ session, notify }) {
         {/* Ticket list */}
         <div className="lg:col-span-2 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB", boxShadow: "0 12px 30px rgba(11,31,58,0.05)" }}>
           <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: "1px solid #F3F4F6" }}>
-            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Your tickets</span>
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">{listLabel}</span>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(11,31,58,0.06)", color: "#0B1F3A" }}>{tickets.length}</span>
           </div>
           {ticketsLoading ? (
@@ -6720,9 +6734,9 @@ function TicketsTab({ session, notify }) {
           ) : tickets.length === 0 ? (
             <div className="p-8 text-center">
               <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3" style={{ background: "rgba(11,31,58,0.05)" }}>
-                <MessageCircle className="w-6 h-6" style={{ color: "#9CA3AF" }} />
+                <HeaderIcon className="w-6 h-6" style={{ color: "#9CA3AF" }} />
               </div>
-              <div className="text-sm text-gray-400">No tickets yet — raise one if you need help.</div>
+              <div className="text-sm text-gray-400">{emptyText}</div>
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
@@ -6741,7 +6755,7 @@ function TicketsTab({ session, notify }) {
                       className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                       style={{ background: isOpen ? "linear-gradient(135deg,#F8B400,#e0a200)" : "linear-gradient(135deg,#00C896,#00a67e)" }}
                     >
-                      <MessageCircle className="w-4 h-4 text-white" />
+                      <HeaderIcon className="w-4 h-4 text-white" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
@@ -6820,7 +6834,11 @@ function TicketsTab({ session, notify }) {
   );
 }
 
-function AdminTicketsPanel({ notify }) {
+function AdminTicketsPanel({
+  notify, category = "support", icon: HeaderIcon = MessageCircle, idPrefix = "TCK",
+  heading = "Tickets — all sellers", subheading = (openCount) => `${openCount} open ticket${openCount === 1 ? "" : "s"} waiting on a reply.`,
+  emptyText = "No tickets here.", replyPlaceholder = "Reply as Customer Support…", senderDisplayName = "Customer Support",
+}) {
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(true);
   const [filter, setFilter] = useState("open"); // all | open | resolved
@@ -6835,10 +6853,10 @@ function AdminTicketsPanel({ notify }) {
 
   const loadTickets = async () => {
     setTicketsLoading(true);
-    setTickets(await fetchAllTickets());
+    setTickets(await fetchAllTickets(category));
     setTicketsLoading(false);
   };
-  useEffect(() => { loadTickets(); }, []); // eslint-disable-line
+  useEffect(() => { loadTickets(); }, [category]); // eslint-disable-line
 
   const openTicket = async (id) => {
     setSelectedId(id);
@@ -6854,13 +6872,13 @@ function AdminTicketsPanel({ notify }) {
     if (!reply.trim() || !selectedId) return;
     setSending(true);
     const { error } = await supabase.from("ticket_messages").insert({
-      ticket_id: selectedId, sender: "admin", sender_name: "Customer Support", body: reply.trim(),
+      ticket_id: selectedId, sender: "admin", sender_name: senderDisplayName, body: reply.trim(),
     });
     setSending(false);
     if (error) { notify && notify("Could not send message."); return; }
     setMessages((prev) => ({
       ...prev,
-      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Customer Support", body: reply.trim(), createdAt: new Date().toISOString() }],
+      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: senderDisplayName, body: reply.trim(), createdAt: new Date().toISOString() }],
     }));
     setReply("");
   };
@@ -6871,13 +6889,13 @@ function AdminTicketsPanel({ notify }) {
     const { url, error: upErr } = await uploadTicketImage(file);
     if (upErr) { setUploadingImage(false); notify && notify(upErr); return; }
     const { error } = await supabase.from("ticket_messages").insert({
-      ticket_id: selectedId, sender: "admin", sender_name: "Customer Support", body: "", image_url: url,
+      ticket_id: selectedId, sender: "admin", sender_name: senderDisplayName, body: "", image_url: url,
     });
     setUploadingImage(false);
     if (error) { notify && notify("Could not send the picture."); return; }
     setMessages((prev) => ({
       ...prev,
-      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: "Customer Support", body: "", imageUrl: url, createdAt: new Date().toISOString() }],
+      [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: senderDisplayName, body: "", imageUrl: url, createdAt: new Date().toISOString() }],
     }));
   };
 
@@ -6903,11 +6921,11 @@ function AdminTicketsPanel({ notify }) {
         <div className="absolute -bottom-20 left-1/4 w-52 h-52 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="relative flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.18)" }}>
-            <MessageCircle className="w-7 h-7" style={{ color: "#00e0aa" }} />
+            <HeaderIcon className="w-7 h-7" style={{ color: "#00e0aa" }} />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tickets — all sellers</h1>
-            <p className="text-sm text-white/70 mt-1">{openCount} open ticket{openCount === 1 ? "" : "s"} waiting on a reply.</p>
+            <h1 className="text-2xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{heading}</h1>
+            <p className="text-sm text-white/70 mt-1">{subheading(openCount)}</p>
           </div>
         </div>
       </div>
@@ -6931,7 +6949,7 @@ function AdminTicketsPanel({ notify }) {
           {ticketsLoading ? (
             <div className="p-6 text-center text-sm text-gray-400">Loading tickets…</div>
           ) : filteredTickets.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-400">No tickets here.</div>
+            <div className="p-6 text-center text-sm text-gray-400">{emptyText}</div>
           ) : (
             <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
               {filteredTickets.map((t) => (
@@ -6997,7 +7015,7 @@ function AdminTicketsPanel({ notify }) {
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
-                  placeholder="Reply as Customer Support…"
+                  placeholder={replyPlaceholder}
                   className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
                   style={{ border: "1px solid #E5E7EB" }}
                 />
