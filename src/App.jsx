@@ -82,6 +82,16 @@ async function uploadTicketImage(file) {
   return { url: data?.publicUrl || null, error: null };
 }
 
+// Shortens a product title to its first N words for tight table cells (the
+// full title is still available via a `title` tooltip on the element that
+// uses this, so nothing is actually lost — just not shown inline).
+function truncateWords(text, n = 4) {
+  if (!text) return "—";
+  const words = text.trim().split(/\s+/);
+  if (words.length <= n) return text;
+  return words.slice(0, n).join(" ") + "…";
+}
+
 const FONT_LINK_ID = "emiratefulfil-fonts";
 
 // Some `app_settings` values (like the customer-reviews JSON, which can
@@ -4421,17 +4431,25 @@ function AdminOrdersPanel({ notify }) {
   // account each seller filled in (and can update from Seller Details) shows
   // right here next to their orders, no need to jump to the Sellers table.
   const [sellerBankInfo, setSellerBankInfo] = useState({});
+  // Product picture + emoji per product_id, so each order row can show a
+  // small thumbnail next to the (truncated) product name instead of the
+  // full raw title. Keyed by product id, pulled from the catalog once.
+  const [productMap, setProductMap] = useState({});
 
   const loadAllOrders = async () => {
     setOrdersLoading(true);
-    const [{ data, error }, { data: profiles }] = await Promise.all([
+    const [{ data, error }, { data: profiles }, products] = await Promise.all([
       supabase.from("orders").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("email, bank_name, account_title, account_number, iban"),
+      fetchCatalog(),
     ]);
     if (!error) setAllOrders(data || []);
     const bankMap = {};
     (profiles || []).forEach((p) => { if (p.email) bankMap[p.email] = p; });
     setSellerBankInfo(bankMap);
+    const pMap = {};
+    (products || []).forEach((p) => { pMap[p.id] = p; });
+    setProductMap(pMap);
     setOrdersLoading(false);
   };
   useEffect(() => { loadAllOrders(); }, []); // eslint-disable-line
@@ -4573,7 +4591,22 @@ function AdminOrdersPanel({ notify }) {
                       {group.orders.map((o, i) => (
                         <tr key={o.id} className="admin-order-row transition-colors duration-200 hover:bg-gray-50" style={{ borderBottom: "1px solid #FAFAFA", animationDelay: `${gi * 90 + Math.min(i, 20) * 35}ms` }}>
                           <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
-                          <td className="px-4 py-3">{o.product_name} <span className="text-gray-400">×{o.qty}</span></td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2 min-w-[150px] max-w-[220px]">
+                              <div
+                                className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
+                                style={{ background: "#F8FAFC", border: "1px solid #F3F4F6" }}
+                              >
+                                <ProductThumb product={productMap[o.product_id]} size={18} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="truncate font-medium text-gray-800" title={o.product_name}>
+                                  {truncateWords(o.product_name, 4)}
+                                </div>
+                                <span className="text-gray-400 text-xs">×{o.qty}</span>
+                              </div>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
                           <td className="px-4 py-3 text-gray-500 text-xs">
                             <div>{o.customer_email || "—"}</div>
