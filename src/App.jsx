@@ -2080,7 +2080,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       `}</style>
 
       {/* Main */}
-      <main className="flex-1 px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10">
+      <main className="flex-1 min-w-0 w-full px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10 overflow-x-hidden">
         {/* Top bar — language selector, notifications, and account profile.
             Desktop only; the mobile top bar (logo + menu button) covers small screens. */}
         <div className="hidden md:flex items-center justify-between gap-4 mb-6">
@@ -4313,7 +4313,7 @@ function SellerInvoiceManager({ seller, notify, onClose }) {
                   <div className="text-sm text-gray-400 py-8 text-center">No invoices created for this seller yet.</div>
                 ) : (
                   <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[640px] text-sm">
                       <thead>
                         <tr className="text-left text-xs text-gray-400" style={{ background: "#F8FAFC" }}>
                           <th className="px-4 py-2">Invoice #</th>
@@ -4389,7 +4389,7 @@ function SellerInvoicesPanel({ email, showEmptyState = false }) {
         <FileText className="w-4 h-4" /> Statements from Admin
       </h2>
       <div className="rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
               <th className="px-4 py-3">Invoice #</th>
@@ -4592,8 +4592,8 @@ function AdminOrdersPanel({ notify }) {
                 </div>
 
                 {openSellers?.[group.seller] && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+                  <table className="w-full min-w-[1200px] text-sm">
                     <thead>
                       <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
                         <th className="px-4 py-3">Order</th>
@@ -4755,13 +4755,13 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
         ))}
       </div>
 
-      <div className="mt-4 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+      <div className="mt-4 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB", WebkitOverflowScrolling: "touch" }}>
         {filteredOrders.length === 0 ? (
           <div className="text-sm text-gray-400 py-10 text-center">
             {orders.length === 0 ? "No orders yet — place one from the Products tab." : "No orders with this status."}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
               <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
               <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th>
@@ -5902,81 +5902,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         </div>
       </div>
 
-      {/* Pricing section: edit the headline and the 3 plan cards shown on the
-          public homepage's Pricing section. Saves to Supabase, live instantly. */}
-      <div className="mt-6 rounded-2xl bg-white p-5" style={{ border: "1px solid #E5E7EB" }}>
-        <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Pricing section</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Edit the headline and the three plan cards shown on the homepage's Pricing section.</p>
-
-        <div className="mt-4">
-          <label className="text-xs font-semibold text-gray-500">Headline</label>
-          <input
-            value={pricingForm.headline}
-            onChange={(e) => setPricingForm((f) => ({ ...f, headline: e.target.value }))}
-            className="mt-1 w-full text-sm rounded-lg px-3 py-2"
-            style={{ border: "1px solid #E5E7EB" }}
-          />
-        </div>
-
-        <div className="mt-5 grid md:grid-cols-3 gap-4">
-          {pricingForm.plans.map((p, i) => (
-            <div key={i} className="rounded-xl p-4 space-y-2.5" style={{ border: "1px solid #E5E7EB" }}>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Plan name</label>
-                <input value={p.name} onChange={(e) => updatePricingPlan(i, "name", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Short description</label>
-                <input value={p.desc} onChange={(e) => updatePricingPlan(i, "desc", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="text-xs font-semibold text-gray-500">Price (AED, blank = Custom)</label>
-                  <input
-                    type="number"
-                    value={p.price ?? ""}
-                    onChange={(e) => updatePricingPlan(i, "price", e.target.value === "" ? null : Number(e.target.value))}
-                    className="mt-1 w-full text-sm rounded-lg px-3 py-2"
-                    style={{ border: "1px solid #E5E7EB" }}
-                  />
-                </div>
-                <div className="w-20">
-                  <label className="text-xs font-semibold text-gray-500">Unit</label>
-                  <input value={p.unit || ""} onChange={(e) => updatePricingPlan(i, "unit", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Features (one per line)</label>
-                <textarea
-                  value={(p.features || []).join("\n")}
-                  onChange={(e) => updatePricingPlan(i, "features", e.target.value.split("\n"))}
-                  rows={4}
-                  className="mt-1 w-full text-sm rounded-lg px-3 py-2"
-                  style={{ border: "1px solid #E5E7EB" }}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Button text</label>
-                <input value={p.cta} onChange={(e) => updatePricingPlan(i, "cta", e.target.value)} className="mt-1 w-full text-sm rounded-lg px-3 py-2" style={{ border: "1px solid #E5E7EB" }} />
-              </div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-                <input type="checkbox" checked={!!p.highlighted} onChange={(e) => updatePricingPlan(i, "highlighted", e.target.checked)} />
-                Highlight as "Most popular"
-              </label>
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={savePricing}
-          disabled={pricingSaving}
-          className="mt-5 text-sm font-semibold px-5 py-2.5 rounded-full text-white transition-transform hover:scale-105"
-          style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)", opacity: pricingSaving ? 0.6 : 1 }}
-        >
-          {pricingSaving ? "Saving…" : "Save pricing section"}
-        </button>
-      </div>
-
       {/* Features comparison table: edit the "Our Features" plan-comparison
           table shown on the homepage's Features section. Saves to Supabase,
           live instantly. */}
@@ -6174,8 +6099,8 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         ) : filteredSellers.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-400">No sellers found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+            <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-400 uppercase tracking-wide" style={{ background: "#F8FAFC" }}>
                   <th className="px-5 py-3">Seller</th>
