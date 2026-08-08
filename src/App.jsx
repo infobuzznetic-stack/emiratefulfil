@@ -4431,6 +4431,19 @@ function AdminOrdersPanel({ notify }) {
   // account each seller filled in (and can update from Seller Details) shows
   // right here next to their orders, no need to jump to the Sellers table.
   const [sellerBankInfo, setSellerBankInfo] = useState({});
+  // Which seller groups are expanded — keyed by seller email. Only the very
+  // first (busiest/most-recent) seller starts open so Admin isn't scrolling
+  // past every other seller's full order table just to find one.
+  const [openSellers, setOpenSellers] = useState(null);
+  const toggleSeller = (key) => setOpenSellers((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Default to only the first (busiest/most-recent) seller open, once orders
+  // have loaded — runs a single time, right after the first successful load.
+  useEffect(() => {
+    if (openSellers === null && allOrders.length) {
+      const firstKey = allOrders[0].seller_email || "Unknown seller";
+      setOpenSellers({ [firstKey]: true });
+    }
+  }, [allOrders]); // eslint-disable-line
   // Product picture + emoji per product_id, so each order row can show a
   // small thumbnail next to the (truncated) product name instead of the
   // full raw title. Keyed by product id, pulled from the catalog once.
@@ -4536,12 +4549,20 @@ function AdminOrdersPanel({ notify }) {
                 className="seller-group admin-orders-panel rounded-2xl bg-white overflow-hidden"
                 style={{ border: "1px solid #E5E7EB", animationDelay: `${gi * 90}ms`, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}
               >
-                {/* Seller header — colored, one per seller, sits above their own orders */}
+                {/* Seller header — colored, one per seller, sits above their own orders. Click to expand/collapse. */}
                 <div
-                  className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 transition-all duration-300"
-                  style={{ background: `linear-gradient(90deg, ${color}1A, ${color}05)`, borderBottom: `1px solid ${color}30` }}
+                  onClick={() => toggleSeller(group.seller)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSeller(group.seller); } }}
+                  className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 transition-all duration-300 cursor-pointer select-none"
+                  style={{ background: `linear-gradient(90deg, ${color}1A, ${color}05)`, borderBottom: openSellers?.[group.seller] ? `1px solid ${color}30` : "none" }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
+                    <ChevronRight
+                      className="w-4 h-4 flex-shrink-0 transition-transform duration-200"
+                      style={{ color: "#9CA3AF", transform: openSellers?.[group.seller] ? "rotate(90deg)" : "rotate(0deg)" }}
+                    />
                     <div
                       className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-extrabold"
                       style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 6px 14px ${color}40`, fontFamily: "'Space Grotesk', sans-serif" }}
@@ -4570,6 +4591,7 @@ function AdminOrdersPanel({ notify }) {
                   </span>
                 </div>
 
+                {openSellers?.[group.seller] && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -4672,6 +4694,7 @@ function AdminOrdersPanel({ notify }) {
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
             );
           })}
