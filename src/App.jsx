@@ -5,7 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText, Bell, Crown,
+  Eye, Printer, FileText, Bell, Crown, Download,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -1238,6 +1238,63 @@ function Toast({ message }) {
       style={{ background: "#0B1F3A" }}
     >
       {message}
+    </div>
+  );
+}
+
+/* ============================================================
+   PWA INSTALL PROMPT
+   Shows a small "Install EmirateFulfil" banner (matches the Toast style)
+   once the browser signals the app is installable. Dismissal is
+   remembered in localStorage so it doesn't nag on every visit.
+============================================================ */
+function InstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [show, setShow] = useState(false);
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem("ef_install_dismissed") === "1");
+
+  useEffect(() => {
+    const onBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      if (!dismissed) setShow(true);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+  }, [dismissed]);
+
+  if (!show || !deferredPrompt) return null;
+
+  const install = async () => {
+    setShow(false);
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+  };
+
+  const dismiss = () => {
+    setShow(false);
+    localStorage.setItem("ef_install_dismissed", "1");
+    setDismissed(true);
+  };
+
+  return (
+    <div
+      className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl max-w-[92vw]"
+      style={{ background: "#0B1F3A" }}
+    >
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
+        <Download className="w-5 h-5 text-white" />
+      </div>
+      <div className="text-white text-sm font-medium">Install EmirateFulfil for quick access</div>
+      <button
+        onClick={install}
+        className="px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0"
+        style={{ background: "#00C896", color: "#04140f" }}
+      >
+        Install
+      </button>
+      <button onClick={dismiss} className="text-white/50 text-sm flex-shrink-0 px-1">✕</button>
     </div>
   );
 }
@@ -7105,6 +7162,15 @@ function FloatingWhatsApp() {
 
 export default function EmirateFulfilApp() {
   useGoogleFonts();
+
+  // Register the PWA service worker (public/sw.js) so the app is
+  // installable and the app shell loads instantly on repeat visits.
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
   const initialRoute = pathToRoute(window.location.pathname);
   const [view, setView] = useState(initialRoute.view); // home | signup | login | forgot | reset-password | dashboard
   const [dashboardTab, setDashboardTab] = useState(initialRoute.tab); // synced with /dashboard/<tab> in the URL
@@ -7231,6 +7297,7 @@ export default function EmirateFulfilApp() {
       `}</style>
       <LogoContext.Provider value={{ logoUrl, setLogoUrl }}>
         <Toast message={toastMsg} />
+        <InstallPrompt />
         {view === "home" && <HomePage session={session} onNav={setView} onLogout={handleLogout} />}
         {(view === "signup" || view === "login" || view === "forgot") && (
           <AuthPage mode={view} onAuthed={handleAuthed} onSwitch={setView} notify={notify} />
