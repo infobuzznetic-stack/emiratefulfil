@@ -38,6 +38,18 @@
   <meta name="twitter:image" content="https://www.emiratefulfil.com/images/og-cover.png" />
 
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Capture the PWA install signal as early as possible — before React
+       even mounts — so it's never missed while the app is checking the
+       login session. InstallPrompt in App.jsx reads window.__pwaInstallEvent. -->
+  <script>
+    window.__pwaInstallEvent = null;
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      window.__pwaInstallEvent = e;
+      window.dispatchEvent(new Event("pwaInstallReady"));
+    });
+  </script>
 </head>
 <body style="margin:0;">
   <div id="root"></div>
