@@ -1254,13 +1254,31 @@ function InstallPrompt() {
   const [dismissed, setDismissed] = useState(() => localStorage.getItem("ef_install_dismissed") === "1");
 
   useEffect(() => {
+    // Pick up an install signal that fired before React mounted (captured
+    // early by the inline script in index.html) — this is the common case,
+    // since the signal can fire while we're still checking the login session.
+    if (window.__pwaInstallEvent && !dismissed) {
+      setDeferredPrompt(window.__pwaInstallEvent);
+      setShow(true);
+    }
+    const onReady = () => {
+      if (window.__pwaInstallEvent && !dismissed) {
+        setDeferredPrompt(window.__pwaInstallEvent);
+        setShow(true);
+      }
+    };
+    window.addEventListener("pwaInstallReady", onReady);
+    // Also listen live, in case it fires after mount (e.g. slower connections).
     const onBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
       if (!dismissed) setShow(true);
     };
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+    return () => {
+      window.removeEventListener("pwaInstallReady", onReady);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+    };
   }, [dismissed]);
 
   if (!show || !deferredPrompt) return null;
