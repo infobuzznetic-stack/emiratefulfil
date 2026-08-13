@@ -2190,6 +2190,16 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
         }
+        @keyframes heartPop {
+          0% { transform: scale(1); }
+          35% { transform: scale(1.35); }
+          60% { transform: scale(0.92); }
+          100% { transform: scale(1); }
+        }
+        @keyframes productImgIn {
+          from { opacity: 0.4; transform: scale(1.02); }
+          to { opacity: 1; transform: scale(1); }
+        }
       `}</style>
 
       {/* Main */}
@@ -2984,6 +2994,18 @@ function daysAgoFromDate(iso) {
 function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = [], onOpenProduct }) {
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState("description");
+  // Wishlist heart — a small, purely-for-delight touch (no backend needed).
+  // `justLiked` drives a one-shot pop animation, then clears itself.
+  const [liked, setLiked] = useState(false);
+  const [justLiked, setJustLiked] = useState(false);
+  useEffect(() => { setLiked(false); }, [product.id]);
+  const toggleLiked = () => {
+    setLiked((v) => {
+      const next = !v;
+      if (next) { setJustLiked(true); setTimeout(() => setJustLiked(false), 550); }
+      return next;
+    });
+  };
   // Real reviews come from Supabase (added by Admin). Until a product has at
   // least one, we fall back to sample reviews so the page isn't empty.
   const [dbReviews, setDbReviews] = useState(null); // null = still loading
@@ -3080,9 +3102,28 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
               onMouseEnter={() => setGalleryHover(true)}
               onMouseLeave={() => setGalleryHover(false)}
             >
-              <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)", boxShadow: "0 6px 16px rgba(248,180,0,0.4)" }}>Best Seller</span>
+              <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1.5 rounded-full text-white flex items-center gap-1" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)", boxShadow: "0 6px 16px rgba(248,180,0,0.4)" }}>
+                <Sparkles className="w-3 h-3" style={{ animation: "sparkleTwinkle 1.8s ease-in-out infinite" }} />
+                Best Seller
+              </span>
+              <button
+                onClick={toggleLiked}
+                aria-label={liked ? "Remove from wishlist" : "Save to wishlist"}
+                className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-90 z-10"
+                style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 6px 16px rgba(11,31,58,0.18)", animation: justLiked ? "heartPop 0.5s ease-out" : "none" }}
+              >
+                <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill={liked ? "#EF4444" : "none"} stroke={liked ? "#EF4444" : "#0B1F3A"} strokeWidth="2">
+                  <path d="M12 21s-6.7-4.35-9.3-8.28C1 10.1 1.6 6.6 4.6 5.1c2.4-1.2 4.9-.3 6.4 1.9.6.9.9 1.4 1 1.6.1-.2.4-.7 1-1.6 1.5-2.2 4-3.1 6.4-1.9 3 1.5 3.6 5 1.9 7.62C18.7 16.65 12 21 12 21z"/>
+                </svg>
+              </button>
               {galleryImages.length > 0 ? (
-                <img src={galleryImages[activeImg] || galleryImages[0]} alt={product.name} className="w-full h-full object-cover" style={{ minHeight: 360 }} />
+                <img
+                  key={activeImg}
+                  src={galleryImages[activeImg] || galleryImages[0]}
+                  alt={product.name}
+                  className="w-full h-full object-cover transition-transform duration-700 ease-out hover:scale-[1.04]"
+                  style={{ minHeight: 360, animation: "productImgIn 0.45s ease-out both" }}
+                />
               ) : (
                 <span style={{ fontSize: 150 }}>{product.emoji}</span>
               )}
@@ -3124,9 +3165,15 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
               <button
                 disabled={!inStock}
                 onClick={() => onBuyNow(qty)}
-                className="w-full text-lg font-extrabold py-5 rounded-2xl text-white transition-transform duration-200 hover:scale-[1.015] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-                style={{ background: inStock ? "linear-gradient(135deg,#00C896,#00a67e)" : "#D1D5DB", boxShadow: inStock ? "0 14px 34px rgba(0,200,150,0.45)" : "none" }}
+                className="w-full text-lg font-extrabold py-5 rounded-2xl text-white transition-transform duration-200 hover:scale-[1.015] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 relative overflow-hidden"
+                style={{ background: inStock ? "linear-gradient(135deg,#00C896,#00a67e)" : "#D1D5DB", boxShadow: inStock ? "0 14px 34px rgba(0,200,150,0.45)" : "none", animation: inStock ? "livePulse 2.6s ease-out infinite" : "none" }}
               >
+                {inStock && (
+                  <span
+                    className="pointer-events-none absolute inset-y-0 w-1/3"
+                    style={{ background: "linear-gradient(115deg, transparent, rgba(255,255,255,0.35), transparent)", animation: "goldShimmer 3.2s ease-in-out infinite" }}
+                  />
+                )}
                 <Zap className="w-5 h-5" />
                 {inStock ? "Buy Now" : "Out of Stock"}
               </button>
@@ -3163,7 +3210,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
           <div className="mt-3 flex items-baseline gap-2 flex-wrap">
             <span className="text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</span>
             <span className="text-sm text-gray-300 line-through" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {Math.round(product.sell * 1.35)}</span>
-            <span className="text-xs font-bold px-2 py-1 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)" }}>Save 26%</span>
+            <span className="text-xs font-bold px-2 py-1 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)", animation: "goldPulseRing 2.4s ease-out infinite" }}>Save 26%</span>
             <span
               className="text-xs font-semibold px-2.5 py-1 rounded-full"
               style={inStock ? { background: "rgba(0,200,150,0.12)", color: "#00a67e" } : { background: "rgba(239,68,68,0.1)", color: "#EF4444" }}
@@ -3183,12 +3230,18 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
             ))}
           </ul>
 
+          {/* A little warmth — reassures without being salesy */}
+          <div className="mt-3 flex items-center gap-2 text-xs font-medium" style={{ color: "#B8890C" }}>
+            <span style={{ display: "inline-block", animation: "sparkleTwinkle 2.2s ease-in-out infinite" }}>💛</span>
+            Hand-checked and packed with care before it leaves our warehouse
+          </div>
+
           {/* Trust badges */}
           <div className="mt-5 grid grid-cols-2 gap-2">
             {trustBadges.map((b, i) => {
               const badgeColor = ["#00C896", "#F8B400", "#3B82F6", "#8B5CF6"][i % 4];
               return (
-                <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: `${badgeColor}0D`, border: `1px solid ${badgeColor}30` }}>
+                <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2 transition-transform duration-200 hover:-translate-y-0.5" style={{ background: `${badgeColor}0D`, border: `1px solid ${badgeColor}30` }}>
                   <b.icon className="w-4 h-4 flex-shrink-0" style={{ color: badgeColor }} />
                   <span className="text-xs font-medium" style={{ color: "#0B1F3A" }}>{b.label}</span>
                 </div>
@@ -3244,8 +3297,9 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
             {/* WhatsApp quick-help card */}
             <div className="mt-4 rounded-xl p-3.5 relative overflow-hidden" style={{ background: "rgba(37,211,102,0.06)", border: "1px solid rgba(37,211,102,0.25)" }}>
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,211,102,0.15)" }}>
+                <div className="relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,211,102,0.15)" }}>
                   <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.7.44 3.35 1.29 4.81L2 22l5.4-1.41a9.9 9.9 0 0 0 4.64 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.36c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.25.86 5.8 2.4a8.14 8.14 0 0 1 2.4 5.8c0 4.52-3.68 8.2-8.16 8.2zm4.5-6.13c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08 0 1.22.89 2.4 1.02 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full" style={{ background: "#25D366", border: "2px solid #fff", animation: "livePulse 2s ease-out infinite" }} />
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-bold truncate" style={{ color: "#111827" }}>Need help deciding?</div>
