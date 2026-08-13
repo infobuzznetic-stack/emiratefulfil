@@ -92,7 +92,23 @@ function truncateWords(text, n = 4) {
   return words.slice(0, n).join(" ") + "…";
 }
 
-const FONT_LINK_ID = "emiratefulfil-fonts";
+// Cleans up how a raw seller-entered product title *displays* — collapses
+// double spaces, straightens stray punctuation, and normalizes unit casing
+// (e.g. "60Ml" / "60ML" -> "60ml", "500Gm" -> "500g") so listings look tidy
+// even when the underlying title was typed inconsistently. Purely cosmetic:
+// the stored product.name is never modified.
+function formatTitle(name) {
+  if (!name) return "";
+  let t = name.trim().replace(/\s+/g, " ");
+  t = t.replace(/\s+([,.])/g, "$1");
+  t = t.replace(/(\d+)\s*(ml|l|kg|g|gm|mg|pcs|pc|oz)\b/gi, (_, num, unit) => {
+    const map = { ml: "ml", l: "L", kg: "kg", g: "g", gm: "g", mg: "mg", pcs: "pcs", pc: "pc", oz: "oz" };
+    return `${num}${map[unit.toLowerCase()] || unit}`;
+  });
+  return t;
+}
+
+
 
 // Some `app_settings` values (like the customer-reviews JSON, which can
 // include long Arabic quotes) can be bigger than a single row's `value`
@@ -3006,6 +3022,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
       return next;
     });
   };
+  const [descExpanded, setDescExpanded] = useState(false);
   // Real reviews come from Supabase (added by Admin). Until a product has at
   // least one, we fall back to sample reviews so the page isn't empty.
   const [dbReviews, setDbReviews] = useState(null); // null = still loading
@@ -3076,7 +3093,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
       <div className="relative flex items-center gap-1.5 text-xs text-gray-400 mb-4">
         <button onClick={onBack} className="hover:text-gray-700 font-medium">Products</button>
         <ChevronRight className="w-3.5 h-3.5" />
-        <span className="font-semibold" style={{ color: "#0B1F3A" }}>{product.name}</span>
+        <span className="font-semibold" style={{ color: "#0B1F3A" }}>{formatTitle(product.name)}</span>
       </div>
 
       <button onClick={onBack} className="relative text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
@@ -3193,7 +3210,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold uppercase tracking-widest" style={{ color: "#00a67e" }}>{category}</div>
           </div>
-          <h1 className="mt-2 text-2xl md:text-3xl font-extrabold leading-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{product.name}</h1>
+          <h1 className="mt-2 text-2xl md:text-3xl font-extrabold leading-tight tracking-tight" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{formatTitle(product.name)}</h1>
 
           <div className="mt-2 flex items-center gap-2">
             {count > 0 ? (
@@ -3219,7 +3236,24 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
             </span>
           </div>
 
-          <p className="mt-4 text-sm text-gray-600 leading-relaxed">{description}</p>
+          <div className="mt-4">
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "#9CA3AF" }}>About this product</div>
+            <p
+              className="text-sm text-gray-600 leading-7"
+              style={!descExpanded ? { display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" } : {}}
+            >
+              {description}
+            </p>
+            {description.length > 220 && (
+              <button
+                onClick={() => setDescExpanded((v) => !v)}
+                className="mt-1.5 text-xs font-bold"
+                style={{ color: "#00a67e" }}
+              >
+                {descExpanded ? "Show less" : "Read more"}
+              </button>
+            )}
+          </div>
 
           <ul className="mt-4 space-y-2">
             {highlights.map((h, i) => (
