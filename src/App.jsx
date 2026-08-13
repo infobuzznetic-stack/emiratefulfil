@@ -108,6 +108,7 @@ function formatTitle(name) {
   return t;
 }
 
+const FONT_LINK_ID = "emiratefulfil-fonts";
 
 
 // Some `app_settings` values (like the customer-reviews JSON, which can
