@@ -1779,6 +1779,34 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   const [orders, setOrders] = useState([]);
   const [sellerCount, setSellerCount] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // "Install App" button in the mobile menu — reads the install signal
+  // captured early in index.html (window.__pwaInstallEvent) so it works
+  // even if the auto-popup banner was missed or dismissed. On iOS, where
+  // Safari never fires an install signal, tapping it just shows the
+  // manual "Add to Home Screen" instructions instead.
+  const [canInstall, setCanInstall] = useState(() => !!window.__pwaInstallEvent);
+  useEffect(() => {
+    const onReady = () => setCanInstall(!!window.__pwaInstallEvent);
+    window.addEventListener("pwaInstallReady", onReady);
+    return () => window.removeEventListener("pwaInstallReady", onReady);
+  }, []);
+  const isStandaloneApp = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const handleInstallClick = async () => {
+    setMobileNavOpen(false);
+    if (window.__pwaInstallEvent) {
+      window.__pwaInstallEvent.prompt();
+      await window.__pwaInstallEvent.userChoice;
+      window.__pwaInstallEvent = null;
+      setCanInstall(false);
+    } else if (isIOSDevice) {
+      notify('Tap the Share icon, then "Add to Home Screen" to install the app.');
+    } else {
+      notify('Open your browser menu and choose "Add to Home Screen" or "Install app".');
+    }
+  };
+
   // Remember which sidebar tab the seller was on, so refreshing the page doesn't bounce them back to Dashboard.
   useEffect(() => { writeLocal("ef_tab", tab); }, [tab]);
 
@@ -2106,6 +2134,16 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               )}
             </button>
           ))}
+          {!isStandaloneApp && (
+            <button
+              onClick={handleInstallClick}
+              className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/80 transition-all duration-300 ease-out hover:scale-[1.02] hover:translate-x-1 active:scale-95"
+              style={{ animation: `dashFadeIn 0.35s ease-out ${NAV.length * 60}ms both` }}
+            >
+              <Download className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110" style={{ color: "#00C896" }} />
+              <span className="flex-1 text-left">{canInstall ? "Install App" : "Add to Home Screen"}</span>
+            </button>
+          )}
           <button onClick={onLogout} className="w-full text-left px-3 py-2.5 text-sm font-semibold text-red-300 transition-transform duration-300 hover:translate-x-1 active:scale-95">Log out</button>
         </div>
       )}
