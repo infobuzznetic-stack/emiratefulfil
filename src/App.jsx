@@ -4635,6 +4635,9 @@ function AdminOrdersPanel({ notify }) {
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [trackingDrafts, setTrackingDrafts] = useState({});
+  // Order id -> true while its WhatsApp-proof screenshot is uploading, so we
+  // can disable that row's upload control and show "Uploading…" briefly.
+  const [proofUploading, setProofUploading] = useState({});
   // Seller bank details, keyed by email — pulled from profiles so the payout
   // account each seller filled in (and can update from Seller Details) shows
   // right here next to their orders, no need to jump to the Sellers table.
@@ -4689,6 +4692,33 @@ function AdminOrdersPanel({ notify }) {
     await supabase.from("orders").update({ tracking_number: value }).eq("id", id);
     setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, tracking_number: value } : o)));
     notify && notify("Tracking number saved.");
+  };
+
+  // Upload a WhatsApp-chat screenshot (proof the customer confirmed the
+  // order) and save its public URL on the order. Same public-assets bucket
+  // as product/logo/ticket images, just under its own prefix.
+  const uploadWhatsappProof = async (id, file) => {
+    if (!file) return;
+    setProofUploading((prev) => ({ ...prev, [id]: true }));
+    if (!file.type.startsWith("image/")) {
+      notify && notify("Please choose an image file.");
+      setProofUploading((prev) => ({ ...prev, [id]: false }));
+      return;
+    }
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `whatsapp-proof/${id}-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("public-assets").upload(path, file, { upsert: true, cacheControl: "3600" });
+    if (upErr) {
+      notify && notify("Could not upload the screenshot.");
+      setProofUploading((prev) => ({ ...prev, [id]: false }));
+      return;
+    }
+    const { data } = supabase.storage.from("public-assets").getPublicUrl(path);
+    const url = data?.publicUrl || null;
+    await supabase.from("orders").update({ whatsapp_proof_url: url }).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, whatsapp_proof_url: url } : o)));
+    setProofUploading((prev) => ({ ...prev, [id]: false }));
+    notify && notify("WhatsApp proof uploaded.");
   };
 
   // Group every order by seller, in the order each seller's most recent order appeared —
@@ -4801,7 +4831,7 @@ function AdminOrdersPanel({ notify }) {
 
                 {openSellers?.[group.seller] && (
                 <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
-                  <table className="w-full min-w-[1200px] text-sm">
+                  <table className="w-full min-w-[1350px] text-sm">
                     <thead>
                       <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
                         <th className="px-4 py-3">Order</th>
@@ -4815,6 +4845,7 @@ function AdminOrdersPanel({ notify }) {
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Payment</th>
                         <th className="px-4 py-3">Tracking #</th>
+                        <th className="px-4 py-3">WhatsApp Proof</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4898,6 +4929,40 @@ function AdminOrdersPanel({ notify }) {
                                 style={{ border: "1px solid #E5E7EB" }}
                               />
                               <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {o.whatsapp_proof_url && (
+                                <a href={o.whatsapp_proof_url} target="_blank" rel="noreferrer" title="View WhatsApp proof">
+                                  <img
+                                    src={o.whatsapp_proof_url}
+                                    alt="WhatsApp proof"
+                                    className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+                                    style={{ border: "1px solid #E5E7EB" }}
+                                  />
+                                </a>
+                              )}
+                              <label
+                                className={`rounded-lg cursor-pointer flex-shrink-0 flex items-center justify-center ${o.whatsapp_proof_url ? "text-xs font-semibold px-2 py-1.5" : "w-7 h-7"}`}
+                                title={o.whatsapp_proof_url ? "Replace WhatsApp proof" : "Upload WhatsApp proof"}
+                                style={{ border: "1px solid #E5E7EB", color: "#6B7280", opacity: proofUploading[o.id] ? 0.6 : 1 }}
+                              >
+                                {proofUploading[o.id] ? (
+                                  o.whatsapp_proof_url ? "Uploading…" : <span className="text-[9px]">…</span>
+                                ) : o.whatsapp_proof_url ? (
+                                  "Replace"
+                                ) : (
+                                  <ImagePlus className="w-3.5 h-3.5" />
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={!!proofUploading[o.id]}
+                                  onChange={(e) => { uploadWhatsappProof(o.id, e.target.files?.[0]); e.target.value = ""; }}
+                                />
+                              </label>
                             </div>
                           </td>
                         </tr>
