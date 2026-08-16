@@ -1196,6 +1196,7 @@ async function fetchOrders(email) {
     customerEmail: o.customer_email, customerPhone: o.customer_phone, customerAddress: o.customer_address, notes: o.notes,
     trackingNumber: o.tracking_number, paymentStatus: o.payment_status || "unpaid",
     deliveryCharge: o.delivery_charge != null ? Number(o.delivery_charge) : DELIVERY_CHARGE,
+    whatsappProofUrl: o.whatsapp_proof_url || null,
     createdAt: o.created_at,
   }));
 }
@@ -5037,10 +5038,10 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
             {orders.length === 0 ? "No orders yet — place one from the Products tab." : "No orders with this status."}
           </div>
         ) : (
-          <table className="w-full min-w-[820px] text-sm">
+          <table className="w-full min-w-[950px] text-sm">
             <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
               <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
-              <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th>
+              <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th><th className="px-4 py-3">WhatsApp Proof</th>
             </tr></thead>
             <tbody>
               {filteredOrders.map((o, i) => (
@@ -5057,6 +5058,20 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
                   <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{o.trackingNumber || <span className="text-gray-300">Not assigned yet</span>}</td>
+                  <td className="px-4 py-3">
+                    {o.whatsappProofUrl ? (
+                      <a href={o.whatsappProofUrl} target="_blank" rel="noreferrer" title="View WhatsApp proof">
+                        <img
+                          src={o.whatsappProofUrl}
+                          alt="WhatsApp proof"
+                          className="w-9 h-9 rounded-lg object-cover"
+                          style={{ border: "1px solid #E5E7EB" }}
+                        />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
