@@ -1197,6 +1197,7 @@ async function fetchOrders(email) {
     trackingNumber: o.tracking_number, paymentStatus: o.payment_status || "unpaid",
     deliveryCharge: o.delivery_charge != null ? Number(o.delivery_charge) : DELIVERY_CHARGE,
     whatsappProofUrl: o.whatsapp_proof_url || null,
+    courier: o.courier || null, trackingUrl: o.tracking_url || null,
     createdAt: o.created_at,
   }));
 }
@@ -2924,6 +2925,38 @@ const ORDER_STATUS_LABELS = {
   cancelled: "Cancelled",
 };
 
+// Known couriers used across UAE/KSA COD deliveries — each maps a tracking
+// number straight to that courier's public tracking page. "Other" lets Admin
+// paste a full tracking link instead (used for couriers not in this list,
+// or when a courier changes its URL format).
+const COURIER_OPTIONS = [
+  { value: "", label: "Select courier…" },
+  { value: "aramex", label: "Aramex" },
+  { value: "smsa", label: "SMSA Express" },
+  { value: "dhl", label: "DHL" },
+  { value: "fedex", label: "FedEx" },
+  { value: "naqel", label: "Naqel Express" },
+  { value: "other", label: "Other (paste link)" },
+];
+const COURIER_TRACKING_URL = {
+  aramex: (t) => `https://www.aramex.com/track/results?ShipmentNumber=${encodeURIComponent(t)}`,
+  smsa: (t) => `https://www.smsaexpress.com/trackingdetails?TrackNo=${encodeURIComponent(t)}`,
+  dhl: (t) => `https://www.dhl.com/global-en/home/tracking.html?tracking-id=${encodeURIComponent(t)}`,
+  fedex: (t) => `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(t)}`,
+  naqel: (t) => `https://www.naqelexpress.com/en/tracking?awb=${encodeURIComponent(t)}`,
+};
+// Builds the clickable tracking link for an order, or null if there's not
+// enough info yet (no tracking #, no courier picked, or "other" with no
+// custom link pasted in).
+function buildTrackingLink(o) {
+  if (!o) return null;
+  if (o.courier === "other") return o.tracking_url || o.trackingUrl || null;
+  if (o.courier && COURIER_TRACKING_URL[o.courier] && (o.tracking_number || o.trackingNumber)) {
+    return COURIER_TRACKING_URL[o.courier](o.tracking_number || o.trackingNumber);
+  }
+  return null;
+}
+
 function StatusPill({ status }) {
   return <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={ORDER_STATUS_STYLES[status] || ORDER_STATUS_STYLES.pending}>{ORDER_STATUS_LABELS[status] || status}</span>;
 }
@@ -4636,6 +4669,11 @@ function AdminOrdersPanel({ notify }) {
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [trackingDrafts, setTrackingDrafts] = useState({});
+  // Courier picked per order (before Save) — defaults to whatever's already
+  // saved on the order once orders load, via the select's defaultValue.
+  const [courierDrafts, setCourierDrafts] = useState({});
+  // Only used when courierDrafts[id] === "other" — the pasted custom link.
+  const [customUrlDrafts, setCustomUrlDrafts] = useState({});
   // Order id -> true while its WhatsApp-proof screenshot is uploading, so we
   // can disable that row's upload control and show "Uploading…" briefly.
   const [proofUploading, setProofUploading] = useState({});
@@ -4690,9 +4728,17 @@ function AdminOrdersPanel({ notify }) {
   };
   const saveTracking = async (id) => {
     const value = trackingDrafts[id] ?? "";
-    await supabase.from("orders").update({ tracking_number: value }).eq("id", id);
-    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, tracking_number: value } : o)));
-    notify && notify("Tracking number saved.");
+    const courier = courierDrafts[id];
+    const patch = { tracking_number: value };
+    // Only touch courier/tracking_url if Admin actually picked something for
+    // this row — so rows nobody's touched yet keep whatever was there before.
+    if (courier !== undefined) {
+      patch.courier = courier || null;
+      patch.tracking_url = courier === "other" ? (customUrlDrafts[id] ?? "") : null;
+    }
+    await supabase.from("orders").update(patch).eq("id", id);
+    setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    notify && notify("Tracking info saved.");
   };
 
   // Upload a WhatsApp-chat screenshot (proof the customer confirmed the
@@ -4832,7 +4878,7 @@ function AdminOrdersPanel({ notify }) {
 
                 {openSellers?.[group.seller] && (
                 <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
-                  <table className="w-full min-w-[1350px] text-sm">
+                  <table className="w-full min-w-[1420px] text-sm">
                     <thead>
                       <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
                         <th className="px-4 py-3">Order</th>
@@ -4921,15 +4967,41 @@ function AdminOrdersPanel({ notify }) {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                defaultValue={o.tracking_number || ""}
-                                onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
-                                placeholder="e.g. AWB123456"
-                                className="w-28 rounded-lg px-2 py-1.5 text-xs"
-                                style={{ border: "1px solid #E5E7EB" }}
-                              />
-                              <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                            <div className="flex flex-col gap-1.5 min-w-[170px]">
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  defaultValue={o.courier || ""}
+                                  onChange={(e) => setCourierDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
+                                  className="rounded-lg px-1.5 py-1.5 text-xs"
+                                  style={{ border: "1px solid #E5E7EB" }}
+                                >
+                                  {COURIER_OPTIONS.map((c) => (
+                                    <option key={c.value} value={c.value}>{c.label}</option>
+                                  ))}
+                                </select>
+                                <input
+                                  defaultValue={o.tracking_number || ""}
+                                  onChange={(e) => setTrackingDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
+                                  placeholder="e.g. AWB123456"
+                                  className="w-24 rounded-lg px-2 py-1.5 text-xs"
+                                  style={{ border: "1px solid #E5E7EB" }}
+                                />
+                              </div>
+                              {(courierDrafts[o.id] ?? o.courier) === "other" && (
+                                <input
+                                  defaultValue={o.tracking_url || ""}
+                                  onChange={(e) => setCustomUrlDrafts((prev) => ({ ...prev, [o.id]: e.target.value }))}
+                                  placeholder="Paste tracking link"
+                                  className="rounded-lg px-2 py-1.5 text-xs"
+                                  style={{ border: "1px solid #E5E7EB" }}
+                                />
+                              )}
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                                {buildTrackingLink(o) && (
+                                  <a href={buildTrackingLink(o)} target="_blank" rel="noreferrer" className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#0284c7" }}>Track ↗</a>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -5057,7 +5129,19 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
                   <td className="px-4 py-3 text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</td>
                   <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
                   <td className="px-4 py-3"><StatusPill status={o.status} /></td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{o.trackingNumber || <span className="text-gray-300">Not assigned yet</span>}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {o.trackingNumber ? (
+                      buildTrackingLink(o) ? (
+                        <a href={buildTrackingLink(o)} target="_blank" rel="noreferrer" className="font-semibold" style={{ color: "#0284c7" }}>
+                          {o.trackingNumber} ↗
+                        </a>
+                      ) : (
+                        <span className="text-gray-500">{o.trackingNumber}</span>
+                      )
+                    ) : (
+                      <span className="text-gray-300">Not assigned yet</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {o.whatsappProofUrl ? (
                       <a href={o.whatsappProofUrl} target="_blank" rel="noreferrer" title="View WhatsApp proof">
