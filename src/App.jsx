@@ -2017,6 +2017,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     { id: "invoices", label: "Invoices", icon: Receipt },
     { id: "settings", label: "Seller Details", icon: Sparkles },
     { id: "requests", label: "Product Requests", icon: Package },
+    { id: "plans", label: "Plans", icon: Crown },
     { id: "support", label: "Customer Support", icon: LifeBuoy },
     { id: "tickets", label: "Tickets", icon: MessageCircle },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
@@ -2126,7 +2127,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
 
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-5 py-4" style={{ background: "#0B1F3A" }}>
-        <span className="font-bold text-white text-base" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Emirate<span style={{ color: "#00C896" }}>Fulfil</span></span>
+        <div className="flex items-center gap-2">
+          <Logo box="w-8 h-8" icon="w-4 h-4" />
+          <span className="font-bold text-white text-base" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Emirate<span style={{ color: "#00C896" }}>Fulfil</span></span>
+        </div>
         <button onClick={() => setMobileNavOpen((v) => !v)} className="text-white">{mobileNavOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}</button>
       </div>
       {mobileNavOpen && (
@@ -2383,10 +2387,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           )}
           {/* Settings, Product Requests, Support, Tickets, and Admin aren't country-specific, so they stay open regardless of the region switch.
               Every other tab is UAE-only for now — switching to KSA/Qatar shows Coming Soon everywhere. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "support" && tab !== "tickets" && tab !== "admin" && region !== "UAE" && (
+          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && region !== "UAE" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "requests" || tab === "support" || tab === "tickets" || region === "UAE") && (
+          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || region === "UAE") && (
             <>
               {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
@@ -2401,6 +2405,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                   ? <AdminTicketsPanel notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests — all sellers" subheading={(openCount) => `${openCount} open request${openCount === 1 ? "" : "s"} waiting on a reply.`} emptyText="No product requests here." replyPlaceholder="Reply as Admin…" senderDisplayName="Admin" />
                   : <TicketsTab session={session} notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests" subheading="Can't find a product in the catalog? Tell Admin what you're after and they'll source it." newButtonLabel="+ New request" listLabel="Your requests" emptyText="No product requests yet — ask for something not in the catalog." subjectLabel="Product name" subjectPlaceholder="e.g. Wireless earbuds with charging case" bodyLabel="Details" bodyPlaceholder="Quantity, budget, a reference link or photo, target price…" createdMsg="Request sent — Admin will reply here." adminDisplayName="Admin" />
               )}
+              {tab === "plans" && <PlansTab session={session} isPremiumSeller={isPremiumSeller} notify={notify} />}
               {tab === "support" && <SupportTab session={session} />}
               {tab === "tickets" && (
                 isAdmin
@@ -6799,6 +6804,130 @@ function SupportChannelCard({ icon, iconBg, title, subtitle, action, delay = 0 }
         </div>
       </div>
       {action}
+    </div>
+  );
+}
+
+// Seller-facing subscription plans page. Feature lists below are placeholders —
+// update PLAN_DATA once the seller confirms exactly which features are Free vs Gold.
+const PLAN_DATA = [
+  {
+    id: "free",
+    name: "Free Plan",
+    price: "AED 0",
+    period: "/month",
+    tagline: "Everything you need to get started",
+    color: "#3B82F6",
+    features: [
+      { label: "List products from the catalog", on: true },
+      { label: "Track COD orders", on: true },
+      { label: "Standard order confirmation", on: true },
+      { label: "Priority Customer Support", on: false },
+      { label: "Early access to new products", on: false },
+      { label: "Lower COD confirmation fees", on: false },
+    ],
+  },
+  {
+    id: "gold",
+    name: "Gold Plan",
+    price: "AED 99",
+    period: "/month",
+    tagline: "For sellers scaling up their store",
+    color: "#F8B400",
+    highlight: true,
+    features: [
+      { label: "List products from the catalog", on: true },
+      { label: "Track COD orders", on: true },
+      { label: "Standard order confirmation", on: true },
+      { label: "Priority Customer Support", on: true },
+      { label: "Early access to new products", on: true },
+      { label: "Lower COD confirmation fees", on: true },
+    ],
+  },
+];
+
+function PlansTab({ session, isPremiumSeller, notify }) {
+  const currentPlanId = isPremiumSeller ? "gold" : "free";
+
+  return (
+    <div>
+      <div
+        className="relative overflow-hidden rounded-3xl px-6 py-8 mb-7 text-white"
+        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#7a5a0a 150%)", boxShadow: "0 30px 60px -22px rgba(11,31,58,0.55)" }}
+      >
+        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#F8B400" }} />
+        <Crown className="w-7 h-7 relative" style={{ color: "#F8B400" }} />
+        <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold relative" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          Plans &amp; upgrades
+        </h1>
+        <p className="text-sm text-white/60 mt-1.5 max-w-md relative">
+          Compare what's included in each plan and upgrade whenever you're ready.
+        </p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-5">
+        {PLAN_DATA.map((plan) => {
+          const isCurrent = plan.id === currentPlanId;
+          return (
+            <div
+              key={plan.id}
+              className="relative rounded-2xl p-6 overflow-hidden"
+              style={{
+                background: plan.highlight ? "linear-gradient(160deg,#1a1405,#3a2a0b 55%,#2a1f08)" : "#ffffff",
+                border: `1px solid ${plan.highlight ? "rgba(248,180,0,0.45)" : "#E5E7EB"}`,
+                boxShadow: plan.highlight ? "0 24px 50px -18px rgba(248,180,0,0.35)" : "0 14px 34px -18px rgba(16,24,40,0.14)",
+              }}
+            >
+              {plan.highlight && (
+                <span
+                  className="absolute top-4 right-4 flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                  style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b" }}
+                >
+                  <Crown className="w-3 h-3" /> Recommended
+                </span>
+              )}
+              <div className="font-bold text-lg" style={{ color: plan.highlight ? "#FFE29A" : "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {plan.name}
+              </div>
+              <div className="text-xs mt-1" style={{ color: plan.highlight ? "rgba(255,255,255,0.5)" : "#9CA3AF" }}>{plan.tagline}</div>
+              <div className="mt-4 flex items-end gap-1">
+                <span className="text-3xl font-extrabold" style={{ color: plan.highlight ? "#fff" : "#111827", fontFamily: "'Space Grotesk', sans-serif" }}>{plan.price}</span>
+                <span className="text-sm mb-1" style={{ color: plan.highlight ? "rgba(255,255,255,0.5)" : "#9CA3AF" }}>{plan.period}</span>
+              </div>
+
+              <div className="mt-5 space-y-2.5">
+                {plan.features.map((f) => (
+                  <div key={f.label} className="flex items-center gap-2.5 text-sm">
+                    {f.on ? (
+                      <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: plan.highlight ? "#F8B400" : "#00C896" }} />
+                    ) : (
+                      <X className="w-4 h-4 flex-shrink-0" style={{ color: plan.highlight ? "rgba(255,255,255,0.25)" : "#D1D5DB" }} />
+                    )}
+                    <span style={{ color: f.on ? (plan.highlight ? "#fff" : "#111827") : (plan.highlight ? "rgba(255,255,255,0.35)" : "#9CA3AF") }}>
+                      {f.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                disabled={isCurrent}
+                onClick={() => notify(isCurrent ? "You're already on this plan." : `${plan.name} checkout coming soon.`)}
+                className="mt-6 w-full py-2.5 rounded-xl text-sm font-bold transition-all duration-300 active:scale-95"
+                style={
+                  isCurrent
+                    ? { background: plan.highlight ? "rgba(255,255,255,0.1)" : "#F3F4F6", color: plan.highlight ? "rgba(255,255,255,0.5)" : "#9CA3AF", cursor: "default" }
+                    : plan.highlight
+                      ? { background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b" }
+                      : { background: "#0B1F3A", color: "#fff" }
+                }
+              >
+                {isCurrent ? "Current plan" : `Upgrade to ${plan.name}`}
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
