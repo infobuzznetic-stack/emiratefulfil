@@ -6828,8 +6828,8 @@ const PLAN_DATA = [
   {
     id: "gold",
     name: "Gold Plan",
-    price: "AED 99",
-    period: "/month",
+    price: "AED 249",
+    period: "one-time payment",
     tagline: "For sellers scaling up their store",
     color: "#F8B400",
     highlight: true,
@@ -6844,6 +6844,7 @@ const PLAN_DATA = [
 
 function PlansTab({ session, isPremiumSeller, notify }) {
   const currentPlanId = isPremiumSeller ? "gold" : "free";
+  const currentPlan = PLAN_DATA.find((p) => p.id === currentPlanId);
 
   return (
     <div>
@@ -6852,13 +6853,31 @@ function PlansTab({ session, isPremiumSeller, notify }) {
         style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#7a5a0a 150%)", boxShadow: "0 30px 60px -22px rgba(11,31,58,0.55)" }}
       >
         <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#F8B400" }} />
-        <Crown className="w-7 h-7 relative" style={{ color: "#F8B400" }} />
-        <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold relative" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-          Plans &amp; upgrades
-        </h1>
-        <p className="text-sm text-white/60 mt-1.5 max-w-md relative">
-          Compare what's included in each plan and upgrade whenever you're ready.
-        </p>
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <Crown className="w-7 h-7" style={{ color: "#F8B400" }} />
+            <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              Plans &amp; upgrades
+            </h1>
+            <p className="text-sm text-white/60 mt-1.5 max-w-md">
+              Compare what's included in each plan and upgrade whenever you're ready.
+            </p>
+          </div>
+          <div
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl flex-shrink-0"
+            style={{
+              background: isPremiumSeller ? "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)" : "rgba(255,255,255,0.08)",
+              border: isPremiumSeller ? "none" : "1px solid rgba(255,255,255,0.16)",
+              boxShadow: isPremiumSeller ? "0 8px 20px -4px rgba(248,180,0,0.5)" : "none",
+            }}
+          >
+            {isPremiumSeller && <Crown className="w-4 h-4" style={{ color: "#3a2a0b" }} />}
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: isPremiumSeller ? "rgba(58,42,11,0.65)" : "rgba(255,255,255,0.5)" }}>Your current plan</div>
+              <div className="text-sm font-extrabold" style={{ color: isPremiumSeller ? "#3a2a0b" : "#fff" }}>{currentPlan.name}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-5">
@@ -6886,9 +6905,9 @@ function PlansTab({ session, isPremiumSeller, notify }) {
                 {plan.name}
               </div>
               <div className="text-xs mt-1" style={{ color: plan.highlight ? "rgba(255,255,255,0.5)" : "#9CA3AF" }}>{plan.tagline}</div>
-              <div className="mt-4 flex items-end gap-1">
+              <div className="mt-4 flex items-end gap-1.5 flex-wrap">
                 <span className="text-3xl font-extrabold" style={{ color: plan.highlight ? "#fff" : "#111827", fontFamily: "'Space Grotesk', sans-serif" }}>{plan.price}</span>
-                <span className="text-sm mb-1" style={{ color: plan.highlight ? "rgba(255,255,255,0.5)" : "#9CA3AF" }}>{plan.period}</span>
+                <span className="text-xs mb-1.5" style={{ color: plan.highlight ? "rgba(255,255,255,0.5)" : "#9CA3AF" }}>{plan.period}</span>
               </div>
 
               <div className="mt-5 space-y-2.5">
