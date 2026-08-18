@@ -21,6 +21,53 @@ import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 // box, so nothing looks broken on a fresh install.
 const LogoContext = createContext({ logoUrl: null, setLogoUrl: () => {} });
 
+// --- Language / translation system -------------------------------------
+// Small dictionary-based i18n: LanguageContext holds the active language
+// code + a t(key) lookup function. Arabic and Urdu also flip the whole app
+// to RTL. New strings can be added to TRANSLATIONS incrementally — any key
+// missing for a language falls back to English so nothing ever renders blank.
+const LANGUAGES = [
+  { code: "en", label: "English", native: "English" },
+  { code: "ar", label: "Arabic", native: "العربية" },
+  { code: "ur", label: "Urdu", native: "اردو" },
+  { code: "hi", label: "Hindi", native: "हिन्दी" },
+];
+const RTL_LANGS = ["ar", "ur"];
+
+const TRANSLATIONS = {
+  en: {
+    nav_dashboard: "Dashboard", nav_products: "Products", nav_orders: "Orders", nav_invoices: "Invoices",
+    nav_settings: "Seller Details", nav_requests: "Product Requests", nav_plans: "Plans", nav_support: "Customer Support",
+    nav_tickets: "Tickets", nav_admin: "Admin",
+    greeting_morning: "Good Morning", greeting_afternoon: "Good Afternoon", greeting_evening: "Good Evening",
+    language: "Language",
+  },
+  ar: {
+    nav_dashboard: "لوحة التحكم", nav_products: "المنتجات", nav_orders: "الطلبات", nav_invoices: "الفواتير",
+    nav_settings: "بيانات البائع", nav_requests: "طلبات المنتجات", nav_plans: "الباقات", nav_support: "دعم العملاء",
+    nav_tickets: "التذاكر", nav_admin: "الإدارة",
+    greeting_morning: "صباح الخير", greeting_afternoon: "مساء الخير", greeting_evening: "مساء الخير",
+    language: "اللغة",
+  },
+  ur: {
+    nav_dashboard: "ڈیش بورڈ", nav_products: "پروڈکٹس", nav_orders: "آرڈرز", nav_invoices: "انوائسز",
+    nav_settings: "سیلر تفصیلات", nav_requests: "پروڈکٹ ریکویسٹس", nav_plans: "پلانز", nav_support: "کسٹمر سپورٹ",
+    nav_tickets: "ٹکٹس", nav_admin: "ایڈمن",
+    greeting_morning: "صبح بخیر", greeting_afternoon: "دن بخیر", greeting_evening: "شام بخیر",
+    language: "زبان",
+  },
+  hi: {
+    nav_dashboard: "डैशबोर्ड", nav_products: "प्रोडक्ट्स", nav_orders: "ऑर्डर्स", nav_invoices: "इनवॉइस",
+    nav_settings: "सेलर विवरण", nav_requests: "प्रोडक्ट रिक्वेस्ट", nav_plans: "प्लान्स", nav_support: "कस्टमर सपोर्ट",
+    nav_tickets: "टिकट", nav_admin: "एडमिन",
+    greeting_morning: "सुप्रभात", greeting_afternoon: "शुभ दोपहर", greeting_evening: "शुभ संध्या",
+    language: "भाषा",
+  },
+};
+
+const LanguageContext = createContext({ lang: "en", setLang: () => {}, t: (k) => k, dir: "ltr" });
+function useLang() { return useContext(LanguageContext); }
+
 function Logo({ box = "w-9 h-9", icon = "w-5 h-5" }) {
   const { logoUrl } = useContext(LogoContext);
   if (logoUrl) {
@@ -1829,11 +1876,13 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   // Remember which sidebar tab the seller was on, so refreshing the page doesn't bounce them back to Dashboard.
   useEffect(() => { writeLocal("ef_tab", tab); }, [tab]);
 
-  // Language switcher — only English is available today, so the dropdown
-  // just opens and shows that (with more languages coming soon), rather
-  // than doing nothing when clicked.
+  // Language switcher — reads/writes the app-wide LanguageContext (see top
+  // of file). English/Arabic/Urdu/Hindi are live; Arabic & Urdu also flip
+  // the app to RTL via the provider in the root component.
+  const { lang, setLang, t } = useLang();
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef(null);
+  const activeLang = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
 
   // Notification bell — tracks order status changes (shipped / delivered /
   // returned) for this seller. Persisted per-seller in localStorage so the
@@ -2011,16 +2060,16 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
 
 
   const NAV = [
-    { id: "overview", label: "Dashboard", icon: Boxes },
-    { id: "products", label: "Products", icon: Package },
-    { id: "orders", label: "Orders", icon: Truck, count: orders.length },
-    { id: "invoices", label: "Invoices", icon: Receipt },
-    { id: "settings", label: "Seller Details", icon: Sparkles },
-    { id: "requests", label: "Product Requests", icon: Package },
-    { id: "plans", label: "Plans", icon: Crown },
-    { id: "support", label: "Customer Support", icon: LifeBuoy },
-    { id: "tickets", label: "Tickets", icon: MessageCircle },
-    ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Globe2 }] : []),
+    { id: "overview", label: t("nav_dashboard"), icon: Boxes },
+    { id: "products", label: t("nav_products"), icon: Package },
+    { id: "orders", label: t("nav_orders"), icon: Truck, count: orders.length },
+    { id: "invoices", label: t("nav_invoices"), icon: Receipt },
+    { id: "settings", label: t("nav_settings"), icon: Sparkles },
+    { id: "requests", label: t("nav_requests"), icon: Package },
+    { id: "plans", label: t("nav_plans"), icon: Crown },
+    { id: "support", label: t("nav_support"), icon: LifeBuoy },
+    { id: "tickets", label: t("nav_tickets"), icon: MessageCircle },
+    ...(isAdmin ? [{ id: "admin", label: t("nav_admin"), icon: Globe2 }] : []),
   ];
 
   return (
@@ -2252,22 +2301,21 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full bg-white"
               style={{ border: "1px solid #E5E7EB", color: "#111827" }}
             >
-              <Globe2 className="w-4 h-4" style={{ color: "#0B1F3A" }} /> English <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+              <Globe2 className="w-4 h-4" style={{ color: "#0B1F3A" }} /> {activeLang.native} <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
             </button>
             {langOpen && (
               <div className="absolute right-0 top-12 w-56 rounded-2xl bg-white shadow-xl z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
-                <button
-                  onClick={() => setLangOpen(false)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-left"
-                  style={{ color: "#0B1F3A", background: "rgba(0,200,150,0.08)" }}
-                >
-                  English
-                  <CheckCircle2 className="w-4 h-4" style={{ color: "#00C896" }} />
-                </button>
-                <div className="px-4 py-3 text-xs text-gray-400 flex items-center justify-between border-t" style={{ borderColor: "#F1F1F1" }}>
-                  <span>العربية (Arabic)</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#F3F4F6", color: "#9CA3AF" }}>Soon</span>
-                </div>
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => { setLang(l.code); setLangOpen(false); }}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-left border-t first:border-t-0"
+                    style={{ color: l.code === lang ? "#0B1F3A" : "#111827", background: l.code === lang ? "rgba(0,200,150,0.08)" : "transparent", borderColor: "#F1F1F1" }}
+                  >
+                    <span>{l.native} {l.code !== "en" && <span className="text-gray-400 font-normal">({l.label})</span>}</span>
+                    {l.code === lang && <CheckCircle2 className="w-4 h-4" style={{ color: "#00C896" }} />}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -2550,15 +2598,16 @@ function MiniFlag({ id, className = "w-5 h-3.5" }) {
 }
 
 function LiveClock() {
+  const { t } = useLang();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
   const dateLabel = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   const timeLabel = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const hour = now.getHours();
-  const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+  const greeting = hour < 12 ? t("greeting_morning") : hour < 17 ? t("greeting_afternoon") : t("greeting_evening");
   return { dateLabel, timeLabel, greeting };
 }
 
@@ -7733,6 +7782,13 @@ export default function EmirateFulfilApp() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [logoUrl, setLogoUrl] = useState(null);
 
+  // Selected UI language — persisted so it survives a refresh. Arabic and
+  // Urdu flip the document direction to RTL.
+  const [lang, setLang] = useState(() => readLocal("ef_lang", "en"));
+  useEffect(() => { writeLocal("ef_lang", lang); }, [lang]);
+  const dir = RTL_LANGS.includes(lang) ? "rtl" : "ltr";
+  const t = (key) => (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS.en[key] || key;
+
   const notify = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), msg.length > 60 ? 5000 : 2600);
@@ -7841,11 +7897,12 @@ export default function EmirateFulfilApp() {
   if (checkingAuth) return <SplashLoader />;
 
   return (
-    <div style={{ maxWidth: "none", width: "100%", margin: 0, padding: 0, textAlign: "left", overflowX: "hidden" }}>
+    <div dir={dir} style={{ maxWidth: "none", width: "100%", margin: 0, padding: 0, textAlign: dir === "rtl" ? "right" : "left", overflowX: "hidden" }}>
       <style>{`
         html, body { margin: 0; padding: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
-        #root { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; text-align: left !important; overflow-x: hidden !important; }
+        #root { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; text-align: ${dir === "rtl" ? "right" : "left"} !important; overflow-x: hidden !important; }
       `}</style>
+      <LanguageContext.Provider value={{ lang, setLang, t, dir }}>
       <LogoContext.Provider value={{ logoUrl, setLogoUrl }}>
         <Toast message={toastMsg} />
         <InstallPrompt />
@@ -7861,6 +7918,7 @@ export default function EmirateFulfilApp() {
         )}
         <FloatingWhatsApp />
       </LogoContext.Provider>
+      </LanguageContext.Provider>
     </div>
   );
 }
