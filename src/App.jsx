@@ -2449,36 +2449,43 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = 
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
-      className={`relative rounded-2xl p-5 transition-all duration-500 overflow-hidden ${onClick ? "cursor-pointer" : "cursor-default"}`}
+      className={`relative rounded-[22px] p-5 transition-all duration-500 overflow-hidden ${onClick ? "cursor-pointer" : "cursor-default"}`}
       style={{
         background: hover
-          ? `linear-gradient(160deg, ${color}10, #ffffff 55%)`
-          : "#ffffff",
-        border: `1px solid ${hover ? color + "55" : (goldRing ? "rgba(248,180,0,0.35)" : "#E5E7EB")}`,
+          ? `linear-gradient(160deg, ${color}14, #ffffff 60%)`
+          : `linear-gradient(160deg, ${color}08, #ffffff 65%)`,
+        border: `1px solid ${hover ? color + "60" : (goldRing ? "rgba(248,180,0,0.35)" : color + "22")}`,
         opacity: shown ? 1 : 0,
-        transform: shown ? (hover ? "translateY(-6px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
-        boxShadow: hover ? `0 22px 40px -12px ${color}55` : (goldRing ? "0 2px 10px -2px rgba(248,180,0,0.25)" : "0 1px 2px rgba(16,24,40,0.04)"),
+        transform: shown ? (hover ? "translateY(-7px) scale(1.02)" : "translateY(0px) scale(1)") : "translateY(14px) scale(0.97)",
+        boxShadow: hover
+          ? `0 26px 48px -14px ${color}60, 0 2px 6px -1px rgba(16,24,40,0.06)`
+          : (goldRing ? "0 10px 26px -12px rgba(248,180,0,0.35), 0 1px 2px rgba(16,24,40,0.05)" : `0 10px 24px -14px ${color}45, 0 1px 2px rgba(16,24,40,0.05)`),
       }}
     >
+      {/* soft glow blob permanently visible, brighter on hover, for a richer "premium" feel */}
       <div
-        className="absolute top-0 left-0 right-0 h-[3px] rounded-full transition-all duration-500"
+        className="absolute -top-8 -right-8 w-28 h-28 rounded-full transition-opacity duration-500 pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${color}35, transparent 70%)`, opacity: hover ? 1 : 0.55 }}
+      />
+      <div
+        className="absolute -bottom-10 -left-6 w-24 h-24 rounded-full transition-opacity duration-500 pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${color}20, transparent 70%)`, opacity: hover ? 0.8 : 0.3 }}
+      />
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px] transition-all duration-500"
         style={{
           background: `linear-gradient(90deg, ${color}, ${color}00)`,
-          boxShadow: hover ? `0 0 12px 1px ${color}90` : "none",
+          boxShadow: hover ? `0 0 14px 1px ${color}90` : "none",
         }}
       />
-      <div
-        className="absolute -top-6 -right-6 w-24 h-24 rounded-full transition-opacity duration-500"
-        style={{ background: `radial-gradient(circle, ${color}25, transparent 70%)`, opacity: hover ? 1 : 0.5 }}
-      />
       <div className="relative flex items-center justify-between">
-        <div className="text-xs font-medium text-gray-500">{label}</div>
+        <div className="text-xs font-semibold text-gray-500 tracking-wide">{label}</div>
         {Icon && (
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500"
+            className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-500 flex-shrink-0"
             style={{
-              background: hover ? `linear-gradient(135deg, ${color}, ${color}CC)` : color + "1A",
-              boxShadow: hover ? `0 8px 18px -4px ${color}80` : "none",
+              background: hover ? `linear-gradient(135deg, ${color}, ${color}CC)` : `linear-gradient(135deg, ${color}22, ${color}0D)`,
+              boxShadow: hover ? `0 10px 22px -4px ${color}80` : `0 2px 8px -2px ${color}30`,
               transform: hover ? "rotate(-8deg) scale(1.1)" : "rotate(0deg) scale(1)",
             }}
           >
@@ -2486,10 +2493,17 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = 
           </div>
         )}
       </div>
-      <div className="relative text-[26px] leading-tight font-extrabold mt-2.5 tracking-tight" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
+      <div className="relative text-[28px] leading-tight font-extrabold mt-3 tracking-tight" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
         {prefix}{display.toLocaleString()}{suffix}
       </div>
       {sub && <div className="relative text-xs text-gray-400 mt-1">{sub}</div>}
+      {/* thin decorative progress-style underline for extra visual weight */}
+      <div className="relative mt-3.5 h-[3px] w-full rounded-full overflow-hidden" style={{ background: `${color}14` }}>
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: shown ? "100%" : "0%", background: `linear-gradient(90deg, ${color}, ${color}80)` }}
+        />
+      </div>
     </div>
   );
 }
@@ -2658,7 +2672,7 @@ function OverviewTab({
         style={
           isPremiumSeller
             ? { background: "linear-gradient(120deg,#1a1405 0%,#3a2a0b 45%,#7a5a0a 90%,#F8B400 145%)", border: "1px solid rgba(248,180,0,0.45)", boxShadow: "0 0 0 1px rgba(248,180,0,0.12), 0 20px 50px -20px rgba(248,180,0,0.35)" }
-            : { background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)" }
+            : { background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)", boxShadow: "0 0 0 1px rgba(0,200,150,0.10), 0 30px 60px -22px rgba(11,31,58,0.55)" }
         }
       >
         {/* subtle dot-grid texture */}
@@ -2785,7 +2799,7 @@ function OverviewTab({
           </div>
 
           {/* Quick actions */}
-          <div className="rounded-2xl p-5 bg-white mt-6 transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+          <div className="rounded-2xl p-5 bg-white mt-6 transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB", boxShadow: "0 14px 34px -18px rgba(16,24,40,0.16), 0 2px 6px -2px rgba(16,24,40,0.05)" }}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(139,92,246,0.14)" }}>
                 <Zap className="w-4 h-4" style={{ color: "#8B5CF6" }} />
@@ -2812,7 +2826,7 @@ function OverviewTab({
           </div>
 
           <div className="grid lg:grid-cols-3 gap-5 mt-6">
-            <div className="lg:col-span-2 rounded-2xl p-6 bg-white transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="lg:col-span-2 rounded-2xl p-6 bg-white transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB", boxShadow: "0 14px 34px -18px rgba(16,24,40,0.16), 0 2px 6px -2px rgba(16,24,40,0.05)" }}>
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
                   <Truck className="w-4 h-4" style={{ color: "#00C896" }} />
@@ -2834,7 +2848,7 @@ function OverviewTab({
               )}
             </div>
             <div className="space-y-5">
-              <div className="rounded-2xl p-6 bg-white transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+              <div className="rounded-2xl p-6 bg-white transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB", boxShadow: "0 14px 34px -18px rgba(16,24,40,0.16), 0 2px 6px -2px rgba(16,24,40,0.05)" }}>
                 <div className="flex items-center gap-2.5 mb-4">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(248,180,0,0.14)" }}>
                     <Star className="w-4 h-4" style={{ color: "#F8B400" }} />
@@ -2853,7 +2867,7 @@ function OverviewTab({
                   <div className="text-sm text-gray-400">Add a listing to see it here.</div>
                 )}
               </div>
-              <div className="relative rounded-2xl p-6 overflow-hidden transition-all duration-300 hover:shadow-lg" style={{ background: "linear-gradient(155deg, rgba(0,200,150,0.08), #ffffff 60%)", border: "1px solid #E5E7EB" }}>
+              <div className="relative rounded-2xl p-6 overflow-hidden transition-all duration-300 hover:shadow-lg" style={{ background: "linear-gradient(155deg, rgba(0,200,150,0.08), #ffffff 60%)", border: "1px solid #E5E7EB", boxShadow: "0 14px 34px -18px rgba(0,200,150,0.28), 0 2px 6px -2px rgba(16,24,40,0.05)" }}>
                 <div className="pointer-events-none absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-40 blur-2xl" style={{ background: "#00C896" }} />
                 <div className="relative flex items-center gap-2.5 mb-1">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.14)" }}>
@@ -2867,7 +2881,7 @@ function OverviewTab({
             </div>
           </div>
 
-          <div className="rounded-2xl p-6 bg-white mt-5 transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB" }}>
+          <div className="rounded-2xl p-6 bg-white mt-5 transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB", boxShadow: "0 14px 34px -18px rgba(16,24,40,0.16), 0 2px 6px -2px rgba(16,24,40,0.05)" }}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(59,130,246,0.14)" }}>
                 <ClipboardCheck className="w-4 h-4" style={{ color: "#3B82F6" }} />
