@@ -6863,17 +6863,17 @@ function PlansTab({ session, isPremiumSeller, notify, setTab }) {
   return (
     <div>
       <div
-        className="relative overflow-hidden rounded-3xl px-6 py-8 mb-7 text-white"
+        className="relative overflow-hidden rounded-3xl px-5 py-6 sm:px-6 sm:py-8 mb-4 text-white"
         style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#7a5a0a 150%)", boxShadow: "0 30px 60px -22px rgba(11,31,58,0.55)" }}
       >
         <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#F8B400" }} />
-        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+        <div className="relative flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <Crown className="w-7 h-7" style={{ color: "#F8B400" }} />
-            <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <Crown className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: "#F8B400" }} />
+            <h1 className="mt-2 sm:mt-3 text-xl sm:text-3xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               Plans &amp; upgrades
             </h1>
-            <p className="text-sm text-white/60 mt-1.5 max-w-md">
+            <p className="text-xs sm:text-sm text-white/60 mt-1 sm:mt-1.5 max-w-md">
               Compare what's included in each plan and upgrade whenever you're ready.
             </p>
           </div>
