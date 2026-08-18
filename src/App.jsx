@@ -2449,7 +2449,7 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = 
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
-      className={`relative rounded-[22px] p-5 transition-all duration-500 overflow-hidden ${onClick ? "cursor-pointer" : "cursor-default"}`}
+      className={`relative rounded-[18px] sm:rounded-[22px] p-3.5 sm:p-5 transition-all duration-500 overflow-hidden ${onClick ? "cursor-pointer" : "cursor-default"}`}
       style={{
         background: hover
           ? `linear-gradient(160deg, ${color}14, #ffffff 60%)`
@@ -2479,21 +2479,21 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = 
         }}
       />
       <div className="relative flex items-center justify-between">
-        <div className="text-xs font-semibold text-gray-500 tracking-wide">{label}</div>
+        <div className="text-[10px] sm:text-xs font-semibold text-gray-500 tracking-wide truncate pr-1">{label}</div>
         {Icon && (
           <div
-            className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-500 flex-shrink-0"
+            className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all duration-500 flex-shrink-0"
             style={{
               background: hover ? `linear-gradient(135deg, ${color}, ${color}CC)` : `linear-gradient(135deg, ${color}22, ${color}0D)`,
               boxShadow: hover ? `0 10px 22px -4px ${color}80` : `0 2px 8px -2px ${color}30`,
               transform: hover ? "rotate(-8deg) scale(1.1)" : "rotate(0deg) scale(1)",
             }}
           >
-            <Icon className="w-5 h-5 transition-colors duration-500" style={{ color: hover ? "#fff" : color }} />
+            <Icon className="w-4 h-4 sm:w-5 sm:h-5 transition-colors duration-500" style={{ color: hover ? "#fff" : color }} />
           </div>
         )}
       </div>
-      <div className="relative text-[28px] leading-tight font-extrabold mt-3 tracking-tight" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
+      <div className="relative text-xl sm:text-[28px] leading-tight font-extrabold mt-2 sm:mt-3 tracking-tight truncate" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
         {prefix}{display.toLocaleString()}{suffix}
       </div>
       {sub && <div className="relative text-xs text-gray-400 mt-1">{sub}</div>}
@@ -2810,7 +2810,7 @@ function OverviewTab({
               <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, rgba(248,180,0,0.4), transparent)" }} />
             </div>
           )}
-          <div key={region} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
+          <div key={region} className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
             {cards.map((c, i) => (
               <StatCard
                 key={c.label} label={c.label} value={c.value} prefix={c.prefix} suffix={c.suffix} color={c.color} icon={c.icon} delay={i * 60}
@@ -2828,7 +2828,7 @@ function OverviewTab({
               </div>
               <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Quick actions</div>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {quickActions.map((q) => (
                 <button
                   key={q.label}
@@ -3531,7 +3531,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
       {relatedFallback.length > 0 && (
         <div className="mt-8">
           <h2 className="text-lg font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>You may also like</h2>
-          <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
             {relatedFallback.map((p) => (
               <button
                 key={p.id}
@@ -3962,7 +3962,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
           >✕</button>
         )}
       </div>
-      <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.category || "").toLowerCase().includes(searchQuery.toLowerCase())).map((p, i) => {
           const color = catColor(p.category);
           const qty = getQty(p.id);
@@ -5115,7 +5115,7 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
         <p className="text-sm text-white/70 mt-1 relative">Track your COD orders and their status as they move.</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" icon={ShieldCheck} delay={0} />
         <StatCard label="Paid COD" value={deliveredRevenue} prefix="AED " color="#3B82F6" icon={CreditCard} delay={100} />
         <StatCard label="Delivery rate" value={deliveryRate} suffix="%" color="#00C896" icon={TrendingUp} delay={150} />
@@ -6280,7 +6280,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         )}
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Total sellers signed up" value={sellers.length || sellerCount} color="#00C896" />
         <StatCard label="Pending seller approvals" value={sellers.filter((s) => s.approval_status !== "approved" && s.approval_status !== "deactivated").length} color="#F8B400" />
         <StatCard label="Products in catalog" value={catalog.length} />
@@ -6621,7 +6621,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
       )}
 
-      <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-5">
         {catalog.map((p) => (
           <div key={p.id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
             {editingId === p.id ? (
