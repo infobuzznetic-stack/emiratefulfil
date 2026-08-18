@@ -6821,6 +6821,7 @@ const PLAN_DATA = [
     features: [
       { label: "Dropshipping products", on: true },
       { label: "Product Requests", on: false },
+      { label: "Hunt Temu, Noon & Amazon Products", on: false },
       { label: "Free Order Confirmation", on: false },
       { label: "Free Inventory Cost", on: false },
       { label: "Exclusive Winning Products", on: false },
@@ -6842,6 +6843,7 @@ const PLAN_DATA = [
     features: [
       { label: "Dropshipping products", on: true },
       { label: "Product Requests", on: true },
+      { label: "Hunt Temu, Noon & Amazon Products", on: true },
       { label: "Free Order Confirmation", on: true },
       { label: "Free Inventory Cost", on: true },
       { label: "Exclusive Winning Products", on: true },
