@@ -2405,7 +2405,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                   ? <AdminTicketsPanel notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests — all sellers" subheading={(openCount) => `${openCount} open request${openCount === 1 ? "" : "s"} waiting on a reply.`} emptyText="No product requests here." replyPlaceholder="Reply as Admin…" senderDisplayName="Admin" />
                   : <TicketsTab session={session} notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests" subheading="Can't find a product in the catalog? Tell Admin what you're after and they'll source it." newButtonLabel="+ New request" listLabel="Your requests" emptyText="No product requests yet — ask for something not in the catalog." subjectLabel="Product name" subjectPlaceholder="e.g. Wireless earbuds with charging case" bodyLabel="Details" bodyPlaceholder="Quantity, budget, a reference link or photo, target price…" createdMsg="Request sent — Admin will reply here." adminDisplayName="Admin" />
               )}
-              {tab === "plans" && <PlansTab session={session} isPremiumSeller={isPremiumSeller} notify={notify} />}
+              {tab === "plans" && <PlansTab session={session} isPremiumSeller={isPremiumSeller} notify={notify} setTab={setTab} />}
               {tab === "support" && <SupportTab session={session} />}
               {tab === "tickets" && (
                 isAdmin
@@ -6856,7 +6856,7 @@ const PLAN_DATA = [
   },
 ];
 
-function PlansTab({ session, isPremiumSeller, notify }) {
+function PlansTab({ session, isPremiumSeller, notify, setTab }) {
   const currentPlanId = isPremiumSeller ? "gold" : "free";
   const currentPlan = PLAN_DATA.find((p) => p.id === currentPlanId);
 
@@ -6941,7 +6941,11 @@ function PlansTab({ session, isPremiumSeller, notify }) {
 
               <button
                 disabled={isCurrent}
-                onClick={() => notify(isCurrent ? "You're already on this plan." : `${plan.name} checkout coming soon.`)}
+                onClick={() => {
+                  if (isCurrent) { notify("You're already on this plan."); return; }
+                  notify(`To upgrade to ${plan.name}, message Customer Support and we'll get you set up.`);
+                  setTab("support");
+                }}
                 className="mt-6 w-full py-2.5 rounded-xl text-sm font-bold transition-all duration-300 active:scale-95"
                 style={
                   isCurrent
@@ -6957,6 +6961,41 @@ function PlansTab({ session, isPremiumSeller, notify }) {
           );
         })}
       </div>
+
+      {/* Urgency banner: Gold plan price is going up soon — nudges Free-plan sellers to upgrade before the increase */}
+      <div
+        className="relative overflow-hidden rounded-full mt-6"
+        style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", boxShadow: "0 10px 26px -10px rgba(248,180,0,0.5)" }}
+      >
+        <div className="flex py-3" style={{ width: "max-content", animation: "marqueeScroll 18s linear infinite" }}>
+          {Array.from({ length: 2 }).map((_, g) => (
+            <div key={g} className="flex items-center flex-shrink-0">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="flex items-center gap-2 px-6 text-xs sm:text-sm font-extrabold whitespace-nowrap"
+                  style={{ color: "#3a2a0b", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  <Crown className="w-3.5 h-3.5 flex-shrink-0" />
+                  From Monday, the Gold Plan rate will be AED 350
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {!isPremiumSeller && (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => { notify("To buy the Gold Plan, message Customer Support and we'll get you set up."); setTab("support"); }}
+            className="px-8 py-3 rounded-full text-sm font-extrabold transition-all duration-300 active:scale-95 hover:-translate-y-0.5"
+            style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#3a2a0b", boxShadow: "0 12px 28px -8px rgba(248,180,0,0.55)" }}
+          >
+            Buy Gold Plan
+          </button>
+        </div>
+      )}
     </div>
   );
 }
