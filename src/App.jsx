@@ -6819,12 +6819,10 @@ const PLAN_DATA = [
     tagline: "Everything you need to get started",
     color: "#3B82F6",
     features: [
-      { label: "List products from the catalog", on: true },
-      { label: "Track COD orders", on: true },
-      { label: "Standard order confirmation", on: true },
-      { label: "Priority Customer Support", on: false },
-      { label: "Early access to new products", on: false },
-      { label: "Lower COD confirmation fees", on: false },
+      { label: "Dropshipping products", on: true },
+      { label: "Product Requests", on: false },
+      { label: "Free Order Confirmation", on: false },
+      { label: "Free Inventory Cost", on: false },
     ],
   },
   {
@@ -6836,12 +6834,10 @@ const PLAN_DATA = [
     color: "#F8B400",
     highlight: true,
     features: [
-      { label: "List products from the catalog", on: true },
-      { label: "Track COD orders", on: true },
-      { label: "Standard order confirmation", on: true },
-      { label: "Priority Customer Support", on: true },
-      { label: "Early access to new products", on: true },
-      { label: "Lower COD confirmation fees", on: true },
+      { label: "Dropshipping products", on: true },
+      { label: "Product Requests", on: true },
+      { label: "Free Order Confirmation", on: true },
+      { label: "Free Inventory Cost", on: true },
     ],
   },
 ];
