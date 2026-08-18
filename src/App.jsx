@@ -6894,6 +6894,29 @@ function PlansTab({ session, isPremiumSeller, notify, setTab }) {
         </div>
       </div>
 
+      {/* Urgency banner: Gold plan price is going up soon — nudges Free-plan sellers to upgrade before the increase */}
+      <div
+        className="relative overflow-hidden rounded-full mb-5"
+        style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", boxShadow: "0 10px 26px -10px rgba(248,180,0,0.5)" }}
+      >
+        <div className="flex py-3" style={{ width: "max-content", animation: "marqueeScroll 18s linear infinite" }}>
+          {Array.from({ length: 2 }).map((_, g) => (
+            <div key={g} className="flex items-center flex-shrink-0">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="flex items-center gap-2 px-6 text-xs sm:text-sm font-extrabold whitespace-nowrap"
+                  style={{ color: "#3a2a0b", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  <Crown className="w-3.5 h-3.5 flex-shrink-0" />
+                  From Monday, the Gold Plan rate will be AED 350
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-5">
         {PLAN_DATA.map((plan) => {
           const isCurrent = plan.id === currentPlanId;
@@ -6960,29 +6983,6 @@ function PlansTab({ session, isPremiumSeller, notify, setTab }) {
             </div>
           );
         })}
-      </div>
-
-      {/* Urgency banner: Gold plan price is going up soon — nudges Free-plan sellers to upgrade before the increase */}
-      <div
-        className="relative overflow-hidden rounded-full mt-6"
-        style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", boxShadow: "0 10px 26px -10px rgba(248,180,0,0.5)" }}
-      >
-        <div className="flex py-3" style={{ width: "max-content", animation: "marqueeScroll 18s linear infinite" }}>
-          {Array.from({ length: 2 }).map((_, g) => (
-            <div key={g} className="flex items-center flex-shrink-0">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <span
-                  key={i}
-                  className="flex items-center gap-2 px-6 text-xs sm:text-sm font-extrabold whitespace-nowrap"
-                  style={{ color: "#3a2a0b", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                >
-                  <Crown className="w-3.5 h-3.5 flex-shrink-0" />
-                  From Monday, the Gold Plan rate will be AED 350
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
       </div>
 
       {!isPremiumSeller && (
