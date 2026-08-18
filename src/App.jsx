@@ -154,7 +154,7 @@ function useGoogleFonts() {
     link.id = FONT_LINK_ID;
     link.rel = "stylesheet";
     link.href =
-      "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap";
+      "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Noto+Kufi+Arabic:wght@500;600;700;800&display=swap";
     document.head.appendChild(link);
   }, []);
 }
@@ -2675,11 +2675,24 @@ function OverviewTab({
             : { background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)", boxShadow: "0 0 0 1px rgba(0,200,150,0.10), 0 30px 60px -22px rgba(11,31,58,0.55)" }
         }
       >
-        {/* subtle dot-grid texture */}
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
-        />
+        {/* subtle dot-grid texture (KSA/Qatar) or Islamic geometric star pattern (UAE) */}
+        {region === "UAE" ? (
+          <svg className="absolute inset-0 w-full h-full opacity-[0.10] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="arabesqueStar" width="46" height="46" patternUnits="userSpaceOnUse">
+                <g fill="none" stroke="#ffffff" strokeWidth="1">
+                  <path d="M23 2 L28 18 L44 18 L31 28 L36 44 L23 34 L10 44 L15 28 L2 18 L18 18 Z" />
+                </g>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#arabesqueStar)" />
+          </svg>
+        ) : (
+          <div
+            className="absolute inset-0 opacity-[0.07]"
+            style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+          />
+        )}
         {isPremiumSeller && (
           <div
             className="absolute inset-y-0 w-1/3 pointer-events-none"
@@ -2720,6 +2733,15 @@ function OverviewTab({
             <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {greeting}, <span style={{ color: isPremiumSeller ? "#F8B400" : "#00C896" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
             </h1>
+            {region === "UAE" && (
+              <div
+                className="mt-1 text-xl sm:text-2xl font-bold"
+                dir="rtl"
+                style={{ color: isPremiumSeller ? "#FFE29A" : "#7FE8C9", fontFamily: "'Noto Kufi Arabic', sans-serif", opacity: 0.85 }}
+              >
+                أهلاً وسهلاً · الإمارات العربية المتحدة
+              </div>
+            )}
             <p className="mt-1.5 text-sm text-white/60 max-w-md">
               {region === "UAE"
                 ? <>Your UAE fulfillment partner is working smoothly. {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>
