@@ -5334,26 +5334,14 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
   const [fileError, setFileError] = useState("");
   const [importedCount, setImportedCount] = useState(0);
 
-  // Lock the background page from scrolling while this modal is open — on
-  // some phones, opening the native file picker and returning to the page
-  // auto-scrolls the underlying content, which made the modal look like it
-  // "jumped" further down instead of staying put in the center of the screen.
+  // Prevent the page behind the modal from scrolling while it's open. Kept
+  // deliberately simple (just overflow:hidden) — an earlier version also
+  // toggled body position to fixed, which pushed the modal itself off
+  // screen in this app's layout. This version can't do that.
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
-    const prevPosition = document.body.style.position;
-    const prevTop = document.body.style.top;
-    const scrollY = window.scrollY;
     document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      document.body.style.position = prevPosition;
-      document.body.style.top = prevTop;
-      document.body.style.width = "";
-      window.scrollTo(0, scrollY);
-    };
+    return () => { document.body.style.overflow = prevOverflow; };
   }, []);
 
   const alreadyImportedKeys = new Set(
@@ -5403,7 +5391,7 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto" style={{ background: "rgba(11,31,58,0.55)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto" style={{ background: "rgba(11,31,58,0.55)" }}>
       <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden my-auto" style={{ border: "1px solid #E5E7EB" }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #F3F4F6" }}>
           <h2 className="text-lg font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
