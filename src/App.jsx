@@ -155,6 +155,119 @@ function formatTitle(name) {
   return t;
 }
 
+// --- Shopify order CSV import --------------------------------------------
+// Parses a Shopify "Export orders" CSV client-side (no backend/API needed).
+// Handles quoted fields (commas/newlines inside quotes) the way a real CSV
+// parser does — a naive split(",") breaks on addresses like "Dubai, UAE".
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i], next = text[i + 1];
+    if (inQuotes) {
+      if (c === '"' && next === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\r") { /* skip */ }
+      else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const headers = rows[0].map((h) => h.trim());
+  return rows.slice(1)
+    .filter((r) => r.some((cell) => cell.trim() !== ""))
+    .map((r) => {
+      const obj = {};
+      headers.forEach((h, idx) => { obj[h] = (r[idx] ?? "").trim(); });
+      return obj;
+    });
+}
+
+// Strips a string down to just letters/numbers for loose matching (e.g. so
+// "60Ml Hydrating Serum" and "hydrating serum 60ml" are recognized as the
+// same product regardless of word order/casing/spacing).
+function normalizeForMatch(str) {
+  return (str || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+// Best-guess catalog match for a Shopify line-item name: exact normalized
+// match first, then "does one contain the other", then a shared-word score.
+// Always returns a match (falls back to the closest score) so every row has
+// a starting suggestion — the seller can still change it in the preview.
+function guessProductMatch(lineItemName, catalog) {
+  const target = normalizeForMatch(lineItemName);
+  if (!target || !catalog.length) return null;
+  let best = null, bestScore = -1;
+  for (const p of catalog) {
+    const name = normalizeForMatch(p.name);
+    let score = 0;
+    if (name === target) score = 1000;
+    else if (name.includes(target) || target.includes(name)) score = 500;
+    else {
+      const targetWords = new Set(target.split(" ").filter(Boolean));
+      const nameWords = name.split(" ").filter(Boolean);
+      score = nameWords.filter((w) => targetWords.has(w)).length;
+    }
+    if (score > bestScore) { bestScore = score; best = p; }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+// Shopify repeats the order "Name" on every line-item row of a multi-item
+// order but only fills billing/shipping/customer columns on some exports —
+// forward-fill blank Name cells so every row still groups to its order.
+function groupShopifyRows(rows) {
+  let lastName = "";
+  const byOrder = new Map();
+  for (const r of rows) {
+    const name = r["Name"]?.trim() || lastName;
+    lastName = name;
+    if (!name) continue;
+    if (!byOrder.has(name)) byOrder.set(name, []);
+    byOrder.get(name).push(r);
+  }
+  return byOrder;
+}
+
+// Turns parsed Shopify CSV rows into import-preview line items: one entry
+// per line item (so a 2-product order becomes 2 EmirateFulfil orders, since
+// this platform's orders table is one product per row). Customer/address
+// fields fall back across whichever columns Shopify actually filled in.
+function buildImportRows(csvRows, catalog) {
+  const groups = groupShopifyRows(csvRows);
+  const out = [];
+  for (const [orderName, lineRows] of groups) {
+    for (const r of lineRows) {
+      const lineItemName = r["Lineitem name"] || "";
+      if (!lineItemName) continue;
+      const qty = Number(r["Lineitem quantity"] || 1) || 1;
+      const price = Number(r["Lineitem price"] || 0) || 0;
+      const buyer = r["Shipping Name"] || r["Billing Name"] || "";
+      const phone = r["Shipping Phone"] || r["Billing Phone"] || r["Phone"] || "";
+      const city = r["Shipping City"] || r["Billing City"] || "";
+      const addressParts = [r["Shipping Address1"], r["Shipping Address2"], r["Shipping City"], r["Shipping Province"], r["Shipping Country"]].filter(Boolean);
+      const match = guessProductMatch(lineItemName, catalog);
+      out.push({
+        key: `${orderName}::${lineItemName}`,
+        shopifyOrder: orderName,
+        lineItemName,
+        qty, price,
+        buyer, phone, city,
+        address: addressParts.join(", "),
+        email: r["Email"] || "",
+        productId: match?.id || "",
+        include: true,
+      });
+    }
+  }
+  return out;
+}
+
 const FONT_LINK_ID = "emiratefulfil-fonts";
 
 
@@ -2031,6 +2144,60 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     setOrders(orders.map((o) => (o.id === id ? { ...o, status } : o)));
   };
 
+  // Bulk-creates orders from a Shopify CSV import (see ShopifyImportModal).
+  // Same shape/behaviour as addOrder above (stock deduction, "pending"
+  // status) but does it for a whole batch in one round trip instead of one
+  // network call per row. Returns how many actually saved, for the toast.
+  const importOrders = async (rows) => {
+    const stockDelta = {};
+    const inserted = [];
+    for (const row of rows) {
+      const product = catalog.find((p) => p.id === row.productId);
+      if (!product) continue;
+      const newOrder = {
+        id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10) + inserted.length,
+        productId: product.id, productName: product.name, qty: row.qty,
+        sellPrice: row.price || product.sell, costPrice: product.cost, listPrice: product.sell,
+        buyer: row.buyer, city: row.city,
+        customerEmail: row.email || null, customerPhone: row.phone || null, customerAddress: row.address || null,
+        notes: `Imported from Shopify order ${row.shopifyOrder}`,
+        deliveryCharge: DELIVERY_CHARGE,
+      };
+      inserted.push(newOrder);
+      stockDelta[product.id] = (stockDelta[product.id] || 0) + Number(row.qty || 0);
+    }
+    if (!inserted.length) return 0;
+
+    const { error } = await supabase.from("orders").insert(
+      inserted.map((o) => ({
+        id: o.id, seller_email: session.email, product_id: o.productId, product_name: o.productName,
+        qty: o.qty, sell_price: o.sellPrice, cost_price: o.costPrice, list_price: o.listPrice,
+        buyer: o.buyer, city: o.city, customer_email: o.customerEmail, customer_phone: o.customerPhone,
+        customer_address: o.customerAddress, notes: o.notes,
+        status: "pending", payment_status: "unpaid", delivery_charge: o.deliveryCharge,
+      }))
+    );
+    if (error) { notify("Could not save imported orders."); return 0; }
+
+    setOrders((prev) => [...inserted.map((o) => ({ ...o, status: "pending", paymentStatus: "unpaid" })), ...prev]);
+
+    const updatedCatalog = catalog.map((p) =>
+      stockDelta[p.id] ? { ...p, stock: Math.max(0, (Number(p.stock) || 0) - stockDelta[p.id]) } : p
+    );
+    setCatalog(updatedCatalog);
+    await Promise.all(
+      Object.entries(stockDelta).map(([productId, qty]) => {
+        const p = catalog.find((x) => x.id === productId);
+        if (!p) return null;
+        const newStock = Math.max(0, (Number(p.stock) || 0) - qty);
+        return supabase.from("products").update({ stock: newStock }).eq("id", productId);
+      })
+    );
+
+    notify(`Imported ${inserted.length} order${inserted.length === 1 ? "" : "s"} from Shopify.`);
+    return inserted.length;
+  };
+
   const delivered = orders.filter((o) => o.status === "delivered");
   const pending = orders.filter((o) => o.status === "pending");
   const shipped = orders.filter((o) => o.status === "shipped");
@@ -2444,7 +2611,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               {tab === "orders" && (
                 isAdmin
                   ? <AdminOrdersPanel notify={notify} />
-                  : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} initialStatusFilter={ordersStatusFilter} />
+                  : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} initialStatusFilter={ordersStatusFilter} catalog={catalog} onImportOrders={importOrders} />
               )}
               {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
@@ -5143,11 +5310,191 @@ function AdminOrdersPanel({ notify }) {
   );
 }
 
-function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, initialStatusFilter = "all" }) {
+// Lets a seller upload the CSV Shopify exports under Orders → Export, maps
+// each line item to a catalog product (best guess, editable), skips rows
+// that were already imported before (matched on Shopify order # + product
+// name), and hands the confirmed rows to Dashboard's importOrders().
+function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
+  const [stage, setStage] = useState("upload"); // upload | preview | importing | done
+  const [rows, setRows] = useState([]);
+  const [fileError, setFileError] = useState("");
+  const [importedCount, setImportedCount] = useState(0);
+
+  const alreadyImportedKeys = new Set(
+    (existingOrders || [])
+      .map((o) => {
+        const m = /^Imported from Shopify order (.+)$/.exec(o.notes || "");
+        return m ? `${m[1]}::${o.productName}` : null;
+      })
+      .filter(Boolean)
+  );
+
+  const handleFile = (file) => {
+    setFileError("");
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const csvRows = parseCSV(String(e.target.result || ""));
+        const built = buildImportRows(csvRows, catalog).map((r) => ({
+          ...r,
+          duplicate: alreadyImportedKeys.has(r.key),
+          include: !alreadyImportedKeys.has(r.key),
+        }));
+        if (!built.length) { setFileError("No line items found in this file — make sure it's a Shopify orders export CSV."); return; }
+        setRows(built);
+        setStage("preview");
+      } catch {
+        setFileError("Could not read that file. Please upload the CSV exported from Shopify (Orders → Export).");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const updateRow = (key, patch) => {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  };
+
+  const includedRows = rows.filter((r) => r.include);
+  const readyCount = includedRows.filter((r) => r.productId).length;
+
+  const handleImport = async () => {
+    setStage("importing");
+    const toImport = rows.filter((r) => r.include && r.productId);
+    const count = await onImport(toImport);
+    setImportedCount(count || 0);
+    setStage("done");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(11,31,58,0.55)" }}>
+      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #F3F4F6" }}>
+          <h2 className="text-lg font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            Import orders from Shopify
+          </h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="w-5 h-5 text-gray-400" /></button>
+        </div>
+
+        <div className="px-6 py-5 overflow-y-auto" style={{ flex: 1 }}>
+          {stage === "upload" && (
+            <div>
+              <p className="text-sm text-gray-500 mb-4">
+                In Shopify, go to <b>Orders</b> → select the orders → <b>Export</b> → CSV for selected orders. Then upload that file here.
+              </p>
+              <label
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl p-10 cursor-pointer transition-colors duration-150 hover:bg-gray-50"
+                style={{ border: "2px dashed #E5E7EB" }}
+              >
+                <Download className="w-8 h-8" style={{ color: "#00C896", transform: "rotate(180deg)" }} />
+                <span className="text-sm font-semibold" style={{ color: "#0B1F3A" }}>Click to choose a CSV file</span>
+                <span className="text-xs text-gray-400">Shopify orders export (.csv)</span>
+                <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+              </label>
+              {fileError && <p className="text-sm mt-3" style={{ color: "#EF4444" }}>{fileError}</p>}
+            </div>
+          )}
+
+          {stage === "preview" && (
+            <div>
+              <p className="text-sm text-gray-500 mb-4">
+                Found <b>{rows.length}</b> line item{rows.length === 1 ? "" : "s"}. Check the matched product for each row — unmatched rows are unchecked automatically.
+                {alreadyImportedKeys.size > 0 && " Rows already imported before are pre-unchecked."}
+              </p>
+              <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid #E5E7EB" }}>
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                      <th className="px-3 py-2 w-8"></th>
+                      <th className="px-3 py-2">Shopify #</th>
+                      <th className="px-3 py-2">Line item</th>
+                      <th className="px-3 py-2">Match to product</th>
+                      <th className="px-3 py-2">Qty</th>
+                      <th className="px-3 py-2">Price</th>
+                      <th className="px-3 py-2">Buyer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.key} style={{ borderBottom: "1px solid #FAFAFA", opacity: r.include ? 1 : 0.45 }}>
+                        <td className="px-3 py-2">
+                          <input type="checkbox" checked={r.include} onChange={(e) => updateRow(r.key, { include: e.target.checked })} />
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-500">{r.shopifyOrder}{r.duplicate && <div className="text-[10px]" style={{ color: "#F59E0B" }}>already imported</div>}</td>
+                        <td className="px-3 py-2 text-gray-600">{truncateWords(r.lineItemName, 6)}</td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={r.productId}
+                            onChange={(e) => updateRow(r.key, { productId: e.target.value })}
+                            className="text-xs rounded-lg px-2 py-1.5"
+                            style={{ border: r.productId ? "1px solid #E5E7EB" : "1px solid #EF4444", maxWidth: 180 }}
+                          >
+                            <option value="">— no match, pick one —</option>
+                            {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{r.qty}</td>
+                        <td className="px-3 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{r.price}</td>
+                        <td className="px-3 py-2 text-gray-500">{r.buyer || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {(stage === "importing" || stage === "done") && (
+            <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
+              {stage === "importing" ? (
+                <>
+                  <div className="w-10 h-10 rounded-full animate-spin" style={{ border: "3px solid #E5E7EB", borderTopColor: "#00C896" }} />
+                  <p className="text-sm text-gray-500">Importing orders…</p>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-10 h-10" style={{ color: "#00C896" }} />
+                  <p className="text-sm font-semibold" style={{ color: "#0B1F3A" }}>
+                    {importedCount > 0 ? `Imported ${importedCount} order${importedCount === 1 ? "" : "s"}.` : "Nothing new to import."}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {stage === "preview" && (
+          <div className="px-6 py-4 flex items-center justify-between" style={{ borderTop: "1px solid #F3F4F6" }}>
+            <span className="text-xs text-gray-400">{readyCount} of {rows.length} selected &amp; matched</span>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ color: "#6B7280" }}>Cancel</button>
+              <button
+                onClick={handleImport}
+                disabled={readyCount === 0}
+                className="px-5 py-2 rounded-xl text-sm font-bold"
+                style={{ background: readyCount ? "#00C896" : "#E5E7EB", color: readyCount ? "#0B1F3A" : "#9CA3AF" }}
+              >
+                Import {readyCount} order{readyCount === 1 ? "" : "s"}
+              </button>
+            </div>
+          </div>
+        )}
+        {stage === "done" && (
+          <div className="px-6 py-4 flex justify-end" style={{ borderTop: "1px solid #F3F4F6" }}>
+            <button onClick={onClose} className="px-5 py-2 rounded-xl text-sm font-bold" style={{ background: "#0B1F3A", color: "#fff" }}>Close</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, initialStatusFilter = "all", catalog = [], onImportOrders }) {
   // Seeded from the dashboard card that was clicked (e.g. "Delivered" opens
   // here pre-filtered to delivered). Local state after that so the pills
   // below can change it without needing to talk back to the Dashboard.
   const [filter, setFilter] = useState(initialStatusFilter);
+  const [importOpen, setImportOpen] = useState(false);
   const deliveredCount = orders.filter((o) => o.status === "delivered").length;
   const deliveryRate = orders.length ? Math.round((deliveredCount / orders.length) * 100) : 0;
   const FILTER_OPTIONS = ["all", "pending", "confirmation_pending", "confirmed", "customer_not_replying", "customer_not_picking_call", "wrong_number", "customer_cancelled_confirmation", "dispatched", "shipped", "delivered", "returned", "cancelled"];
@@ -5163,11 +5510,34 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
           className="absolute -right-10 -top-10 w-40 h-40 rounded-full"
           style={{ background: "radial-gradient(circle, rgba(0,200,150,0.35), transparent 70%)" }}
         />
-        <h1 className="text-2xl font-extrabold relative" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-          Orders &amp; COD tracking
-        </h1>
-        <p className="text-sm text-white/70 mt-1 relative">Track your COD orders and their status as they move.</p>
+        <div className="flex items-start justify-between gap-4 relative flex-wrap">
+          <div>
+            <h1 className="text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              Orders &amp; COD tracking
+            </h1>
+            <p className="text-sm text-white/70 mt-1">Track your COD orders and their status as they move.</p>
+          </div>
+          {onImportOrders && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-transform duration-150 hover:scale-[1.03]"
+              style={{ background: "#00C896", color: "#0B1F3A" }}
+            >
+              <Download className="w-4 h-4" style={{ transform: "rotate(180deg)" }} />
+              Import from Shopify
+            </button>
+          )}
+        </div>
       </div>
+
+      {importOpen && (
+        <ShopifyImportModal
+          catalog={catalog}
+          existingOrders={orders}
+          onClose={() => setImportOpen(false)}
+          onImport={onImportOrders}
+        />
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard label="Confirmed profit" value={confirmedProfit} prefix="AED " color="#00C896" icon={ShieldCheck} delay={0} />
