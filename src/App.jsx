@@ -5334,16 +5334,6 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
   const [fileError, setFileError] = useState("");
   const [importedCount, setImportedCount] = useState(0);
 
-  // Prevent the page behind the modal from scrolling while it's open. Kept
-  // deliberately simple (just overflow:hidden) — an earlier version also
-  // toggled body position to fixed, which pushed the modal itself off
-  // screen in this app's layout. This version can't do that.
-  useEffect(() => {
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prevOverflow; };
-  }, []);
-
   const alreadyImportedKeys = new Set(
     (existingOrders || [])
       .map((o) => {
@@ -5391,8 +5381,8 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto" style={{ background: "rgba(11,31,58,0.55)" }}>
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden my-auto" style={{ border: "1px solid #E5E7EB" }}>
+    <div className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto py-8 px-3" style={{ background: "rgba(11,31,58,0.6)" }}>
+      <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #F3F4F6" }}>
           <h2 className="text-lg font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Import orders from Shopify
