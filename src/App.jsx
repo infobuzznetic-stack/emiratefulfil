@@ -129,6 +129,22 @@ async function uploadTicketImage(file) {
   return { url: data?.publicUrl || null, error: null };
 }
 
+// Sends a transactional email via the Supabase Edge Function "notify-seller"
+// (which calls Resend under the hood — see supabase/functions/notify-seller).
+// Used for two events: seller portal approval, and Gold Plan upgrade.
+// Failures here are swallowed on purpose — email delivery should never block
+// the actual approve/upgrade action; the seller just won't get the email.
+async function sendSellerEmail(type, seller) {
+  if (!seller?.email) return;
+  try {
+    await supabase.functions.invoke("notify-seller", {
+      body: { type, email: seller.email, name: seller.name || seller.email },
+    });
+  } catch (e) {
+    // non-fatal
+  }
+}
+
 // Shortens a product title to its first N words for tight table cells (the
 // full title is still available via a `title` tooltip on the element that
 // uses this, so nothing is actually lost — just not shown inline).
@@ -6005,6 +6021,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
     if (error) { notify("Could not update premium status."); return; }
     setPremiumSellerEmails(next);
     notify(isPremium ? "Premium badge removed for this seller." : "Seller marked as Premium.");
+    // Only email when turning Premium ON, not when removing it.
+    if (!isPremium) {
+      const seller = sellers.find((s) => s.email === email);
+      sendSellerEmail("gold", seller || { email, name: email });
+    }
   };
 
   // Bulk visibility manager — pick a target once (All sellers / Premium /
@@ -6167,6 +6188,12 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
       approval_status === "deactivated" ? "Seller deactivated — they can no longer log in." :
       "Seller status updated."
     );
+    // Email the seller the moment their portal gets approved (not on
+    // deactivate/reactivate — only the initial "you're in" moment).
+    if (approval_status === "approved") {
+      const seller = sellers.find((s) => s.id === id);
+      if (seller) sendSellerEmail("approved", seller);
+    }
   };
 
   const addProduct = async (e) => {
