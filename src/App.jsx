@@ -2164,7 +2164,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         // actually charged their own customer — so here listPrice is set to
         // (cost + delivery) instead, making profit = sell − cost − delivery,
         // matching what the seller actually pockets.
-        sellPrice: row.price || product.sell, costPrice: product.cost, listPrice: product.cost + DELIVERY_CHARGE,
+        // Simplified per seller's request: import profit ignores the
+        // catalog "cost" field entirely (many products have it blank/0),
+        // and is just the Shopify price minus the delivery charge.
+        // profit = (price actually charged on Shopify) − (EmirateFulfil's
+        // catalog Sell price, i.e. what this product costs the seller) −
+        // delivery. This is the seller-facing "cost" — not Admin's internal
+        // wholesale Cost field, which stays untouched in cost_price below.
+        sellPrice: row.price || product.sell, costPrice: product.cost, listPrice: product.sell + DELIVERY_CHARGE,
         buyer: row.buyer, city: row.city,
         customerEmail: row.email || null, customerPhone: row.phone || null, customerAddress: row.address || null,
         notes: `Imported from Shopify order ${row.shopifyOrder}`,
