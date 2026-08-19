@@ -2157,7 +2157,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       const newOrder = {
         id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10) + inserted.length,
         productId: product.id, productName: product.name, qty: row.qty,
-        sellPrice: row.price || product.sell, costPrice: product.cost, listPrice: product.sell,
+        // Profit shown in the Orders table is always (sellPrice - listPrice).
+        // For a manually placed order, listPrice is the platform's suggested
+        // sell price, so profit = markup over that. A Shopify-imported order
+        // has no such "suggested price" — the CSV price is what the seller
+        // actually charged their own customer — so here listPrice is set to
+        // (cost + delivery) instead, making profit = sell − cost − delivery,
+        // matching what the seller actually pockets.
+        sellPrice: row.price || product.sell, costPrice: product.cost, listPrice: product.cost + DELIVERY_CHARGE,
         buyer: row.buyer, city: row.city,
         customerEmail: row.email || null, customerPhone: row.phone || null, customerAddress: row.address || null,
         notes: `Imported from Shopify order ${row.shopifyOrder}`,
