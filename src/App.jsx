@@ -6109,7 +6109,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
   // visible before anything is written), then insert only the valid rows one
   // at a time into `products` — sequential (not Promise.all) so a big file
   // doesn't fire hundreds of requests at Supabase simultaneously.
-  const CSV_PRODUCT_HEADERS = ["name", "category", "cost", "sell", "stock", "description", "emoji", "country", "images"];
+  const CSV_PRODUCT_HEADERS = ["name", "cost", "sell", "stock", "description", "emoji", "country", "images"];
   const [csvFileName, setCsvFileName] = useState("");
   const [csvRows, setCsvRows] = useState([]); // parsed rows, each with a `valid` flag
   const [csvErrors, setCsvErrors] = useState([]); // [{ row, message }]
@@ -6119,7 +6119,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
   const downloadCsvTemplate = () => {
     const sample = [
       CSV_PRODUCT_HEADERS.join(","),
-      `"Wireless Earbuds","Electronics",25,49.99,100,"Bluetooth 5.3 earbuds with charging case","🎧","UAE",""`,
+      `"Wireless Earbuds",25,49.99,100,"Bluetooth 5.3 earbuds with charging case","🎧","KSA",""`,
     ].join("\n");
     const blob = new Blob([sample], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -6191,6 +6191,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
     if (!validRows.length) { notify("No valid rows to import — fix the errors above first."); return; }
     setCsvImporting(true);
     let added = 0, failed = 0;
+    let firstError = null;
     for (const r of validRows) {
       const id = "p" + Date.now().toString().slice(-8) + Math.random().toString(36).slice(2, 5);
       const { error } = await supabase.from("products").insert({
@@ -6200,10 +6201,14 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         assigned_seller_emails: [], is_premium: false, source_url: null,
         country: r.country,
       });
-      if (error) failed++; else added++;
+      if (error) {
+        failed++;
+        if (!firstError) firstError = error;
+        console.error("CSV product import failed for row:", r, error);
+      } else added++;
     }
     setCsvImporting(false);
-    setCsvSummary({ added, failed });
+    setCsvSummary({ added, failed, errorMessage: firstError?.message || null });
     setCsvRows([]); setCsvErrors([]); setCsvFileName("");
     if (added) onCatalogChanged();
     notify(failed ? `Imported ${added} product(s) — ${failed} failed.` : `Imported ${added} product(s) into the catalog.`);
@@ -6725,7 +6730,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
           <h3 className="font-bold text-sm" style={{ color: "#0B1F3A" }}>Bulk import products from CSV</h3>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          Upload a .csv with columns <code className="text-[11px]">name, category, cost, sell, stock, description, emoji, country, images</code> — only name and sell are required (cost defaults to 0 if left blank), everything else falls back to a sensible default. For <code className="text-[11px]">images</code>, separate multiple picture URLs with a <code className="text-[11px]">|</code>. Products are added to the <b>{adminCountry}</b> catalog unless a row sets its own country.
+          Upload a .csv with columns <code className="text-[11px]">name, cost, sell, stock, description, emoji, country, images</code> — only name and sell are required (cost defaults to 0 if left blank), everything else falls back to a sensible default. For <code className="text-[11px]">images</code>, separate multiple picture URLs with a <code className="text-[11px]">|</code>. Products are added to the <b>{adminCountry}</b> catalog unless a row sets its own country — switch the country tab above before importing if these are for a different country.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <label className="text-sm font-semibold py-2.5 px-4 rounded-full text-white cursor-pointer" style={{ background: "#0B1F3A" }}>
@@ -6758,7 +6763,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
                   <tr className="text-left text-gray-400" style={{ background: "#F9FAFB" }}>
                     <th className="px-3 py-2">Row</th>
                     <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">Category</th>
                     <th className="px-3 py-2">Cost</th>
                     <th className="px-3 py-2">Sell</th>
                     <th className="px-3 py-2">Stock</th>
@@ -6771,7 +6775,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
                     <tr key={r.rowNum} style={{ borderTop: "1px solid #F3F4F6" }}>
                       <td className="px-3 py-2 text-gray-400">{r.rowNum}</td>
                       <td className="px-3 py-2 font-medium" style={{ color: "#0B1F3A" }}>{r.name || "—"}</td>
-                      <td className="px-3 py-2">{r.category}</td>
                       <td className="px-3 py-2">{isNaN(r.cost) ? "—" : r.cost}</td>
                       <td className="px-3 py-2">{isNaN(r.sell) ? "—" : r.sell}</td>
                       <td className="px-3 py-2">{r.stock}</td>
@@ -6806,11 +6809,16 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         )}
 
         {csvSummary && (
-          <p className="mt-3 text-xs font-medium" style={{ color: csvSummary.failed ? "#B91C1C" : "#00A67D" }}>
-            {csvSummary.failed
-              ? `Imported ${csvSummary.added} product(s) — ${csvSummary.failed} failed to save, try those rows again.`
-              : `Imported ${csvSummary.added} product(s) into the catalog.`}
-          </p>
+          <div className="mt-3">
+            <p className="text-xs font-medium" style={{ color: csvSummary.failed ? "#B91C1C" : "#00A67D" }}>
+              {csvSummary.failed
+                ? `Imported ${csvSummary.added} product(s) — ${csvSummary.failed} failed to save, try those rows again.`
+                : `Imported ${csvSummary.added} product(s) into the catalog.`}
+            </p>
+            {csvSummary.errorMessage && (
+              <p className="mt-1 text-[11px] text-gray-500">Reason from the database: {csvSummary.errorMessage}</p>
+            )}
+          </div>
         )}
       </div>
 
