@@ -2654,12 +2654,11 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           )}
           {/* Settings, Product Requests, Support, Tickets, Admin, and Products aren't
               gated by region — Products shows each country's own catalog instead.
-              Every other tab (Orders, Invoices) is still UAE-only for now —
-              switching to KSA/Qatar shows Coming Soon there until they're built out. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && tab !== "products" && region !== "UAE" && (
+              KSA is now live alongside UAE; only Qatar still shows Coming Soon. */}
+          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && tab !== "products" && region === "QATAR" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || region === "UAE") && (
+          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || region !== "QATAR") && (
             <>
               {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
@@ -2904,6 +2903,9 @@ function OverviewTab({
   // rounded to a whole percent; 0 orders shows 0% rather than dividing by zero.
   const regionDeliveryRate = regionOrders.length ? Math.round((regionDelivered.length / regionOrders.length) * 100) : 0;
 
+  // KSA is now live with the same dashboard as UAE — just priced in SAR
+  // instead of AED. Qatar is still the only region left on "Coming soon".
+  const currency = region === "KSA" ? "SAR" : "AED";
   const cards = [
     { label: "Total orders", value: regionOrders.length, color: "#0B1F3A", icon: Boxes, nav: { tab: "orders", status: "all" } },
     { label: "Pending", value: regionPending.length, color: "#F8B400", icon: ClipboardCheck, nav: { tab: "orders", status: "pending" } },
@@ -2912,11 +2914,11 @@ function OverviewTab({
     { label: "Delivery rate", value: regionDeliveryRate, suffix: "%", color: "#00C896", icon: TrendingUp, nav: { tab: "orders", status: "delivered" } },
     { label: "Cancelled", value: regionCancelled.length, color: "#9CA3AF", icon: X, nav: { tab: "orders", status: "cancelled" } },
     { label: "Returned", value: regionReturned.length, color: "#EF4444", icon: RotateCcw, nav: { tab: "orders", status: "returned" } },
-    { label: "Confirmed profit", value: regionConfirmedProfit, prefix: "AED ", color: "#00C896", icon: ShieldCheck, nav: { tab: "orders", status: "delivered" } },
-    { label: "Unpaid invoice", value: regionUnpaidInvoice, prefix: "AED ", color: "#F8B400", icon: Receipt, nav: { tab: "invoices" } },
-    { label: "Paid invoice", value: regionPaidInvoice, prefix: "AED ", color: "#00C896", icon: CheckCircle2, nav: { tab: "invoices" } },
+    { label: "Confirmed profit", value: regionConfirmedProfit, prefix: `${currency} `, color: "#00C896", icon: ShieldCheck, nav: { tab: "orders", status: "delivered" } },
+    { label: "Unpaid invoice", value: regionUnpaidInvoice, prefix: `${currency} `, color: "#F8B400", icon: Receipt, nav: { tab: "invoices" } },
+    { label: "Paid invoice", value: regionPaidInvoice, prefix: `${currency} `, color: "#00C896", icon: CheckCircle2, nav: { tab: "invoices" } },
     { label: "Orders this week", value: regionOrdersThisWeek, color: "#3B82F6", icon: Clock, nav: { tab: "orders", status: "all" } },
-    { label: "Avg. order value", value: avgOrderValue, prefix: "AED ", color: "#8B5CF6", icon: CreditCard, nav: { tab: "orders", status: "delivered" } },
+    { label: "Avg. order value", value: avgOrderValue, prefix: `${currency} `, color: "#8B5CF6", icon: CreditCard, nav: { tab: "orders", status: "delivered" } },
   ];
   const breakdown = [
     { label: "Pending", count: regionPending.length, color: "#F8B400", status: "pending" },
@@ -2928,7 +2930,7 @@ function OverviewTab({
   const totalForBar = regionOrders.length || 1;
   const regions = [
     { id: "UAE", flag: "🇦🇪", live: true },
-    { id: "KSA", flag: "🇸🇦", live: false },
+    { id: "KSA", flag: "🇸🇦", live: true },
     { id: "QATAR", flag: "🇶🇦", live: false },
   ];
 
@@ -2941,7 +2943,15 @@ function OverviewTab({
 
   return (
     <div>
-      <MarqueeTicker text="🇦🇪 UAE Dropshipping is Live  ·  Returns & Order Confirmation are FREE" />
+      <MarqueeTicker
+        text={
+          region === "KSA"
+            ? "🇸🇦 KSA Dropshipping is Live  ·  Returns & Order Confirmation are FREE"
+            : region === "QATAR"
+            ? "🇶🇦 Qatar dashboard — Coming soon"
+            : "🇦🇪 UAE Dropshipping is Live  ·  Returns & Order Confirmation are FREE"
+        }
+      />
       <div
         className="relative overflow-hidden rounded-3xl px-4 py-6 sm:px-7 sm:py-8 mb-7"
         style={
@@ -3032,19 +3042,19 @@ function OverviewTab({
               <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {greeting}, <span style={{ color: isPremiumSeller ? "#F8B400" : "#00C896" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
               </h1>
-              {region === "UAE" && (
+              {(region === "UAE" || region === "KSA") && (
                 <div
                   className="mt-1 text-xl sm:text-2xl font-bold"
                   dir="rtl"
                   style={{ color: isPremiumSeller ? "#FFE29A" : "#7FE8C9", fontFamily: "'Noto Kufi Arabic', sans-serif", opacity: 0.85 }}
                 >
-                  أهلاً وسهلاً · الإمارات العربية المتحدة
+                  {region === "UAE" ? "أهلاً وسهلاً · الإمارات العربية المتحدة" : "أهلاً وسهلاً · المملكة العربية السعودية"}
                 </div>
               )}
               <p className="mt-1.5 text-sm text-white/60 max-w-md">
-                {region === "UAE"
-                  ? <>Your UAE fulfillment partner is working smoothly. {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>
-                  : <>Preview your future {region === "KSA" ? "Saudi" : "Qatar"} storefront below.</>}
+                {region === "QATAR"
+                  ? <>Preview your future Qatar storefront below.</>
+                  : <>Your {region === "KSA" ? "Saudi" : "UAE"} fulfillment partner is working smoothly. {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>}
               </p>
             </div>
           </div>
@@ -3068,7 +3078,7 @@ function OverviewTab({
                 </button>
               ))}
             </div>
-            {region === "UAE" && (
+            {region !== "QATAR" && (
               <div
                 className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto"
                 style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", backdropFilter: "blur(6px)" }}
@@ -3080,13 +3090,13 @@ function OverviewTab({
                 </div>
                 <div className="text-right flex-1 sm:flex-initial">
                   <div className="text-[11px] font-medium text-white/50 uppercase tracking-wide">Confirmed profit</div>
-                  <div className="text-2xl font-extrabold" style={{ color: isPremiumSeller ? "#FFE29A" : "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>AED {regionConfirmedProfit.toLocaleString()}</div>
+                  <div className="text-2xl font-extrabold" style={{ color: isPremiumSeller ? "#FFE29A" : "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {regionConfirmedProfit.toLocaleString()}</div>
                 </div>
               </div>
             )}
           </div>
         </div>
-        {/* UAE flag-colored accent strip along the bottom for a distinctly local touch */}
+        {/* UAE/KSA flag-colored accent strip along the bottom for a distinctly local touch */}
         {region === "UAE" && (
           <div className="relative mt-6 h-[3px] w-full rounded-full overflow-hidden flex opacity-70">
             <div className="flex-[7]" style={{ background: "#FF0000" }} />
@@ -3097,9 +3107,12 @@ function OverviewTab({
             </div>
           </div>
         )}
+        {region === "KSA" && (
+          <div className="relative mt-6 h-[3px] w-full rounded-full overflow-hidden" style={{ background: "#006C35" }} />
+        )}
       </div>
 
-      {region !== "UAE" ? (
+      {region === "QATAR" ? (
         <ComingSoonPanel region={region} />
       ) : (
         <>
@@ -3195,10 +3208,10 @@ function OverviewTab({
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
                   <Truck className="w-4 h-4" style={{ color: "#00C896" }} />
                 </div>
-                <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent UAE orders</div>
+                <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Recent {region} orders</div>
               </div>
               {regionOrders.length === 0 ? (
-                <div className="text-sm text-gray-400">No UAE orders yet — log one from Orders with a buyer city in Dubai, Abu Dhabi, Sharjah…</div>
+                <div className="text-sm text-gray-400">No {region} orders yet — log one from Orders with a buyer city in {region === "KSA" ? "Riyadh, Jeddah, Dammam…" : "Dubai, Abu Dhabi, Sharjah…"}</div>
               ) : (
                 regionOrders.slice(0, 5).map((o) => (
                   <div key={o.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
@@ -3225,7 +3238,7 @@ function OverviewTab({
                       <ProductThumb product={topListing} size={30} />
                     </div>
                     <div className="mt-2 font-semibold text-sm">{topListing.name}</div>
-                    <div className="text-xs mt-1 font-semibold" style={{ color: "#F8B400" }}>Profit/unit: AED {topListing.sell - topListing.cost}</div>
+                    <div className="text-xs mt-1 font-semibold" style={{ color: "#F8B400" }}>Profit/unit: {currency} {topListing.sell - topListing.cost}</div>
                   </>
                 ) : (
                   <div className="text-sm text-gray-400">Add a listing to see it here.</div>
@@ -3250,7 +3263,7 @@ function OverviewTab({
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(59,130,246,0.14)" }}>
                 <ClipboardCheck className="w-4 h-4" style={{ color: "#3B82F6" }} />
               </div>
-              <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>UAE order status breakdown</div>
+              <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{region} order status breakdown</div>
             </div>
             <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
               {breakdown.map((b) => (
