@@ -6147,10 +6147,12 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         setCsvErrors([{ row: 0, message: "Couldn't find any rows — check the file against the template." }]);
         return;
       }
-      const hasRequiredCols = ["name", "cost", "sell"].every((c) => Object.prototype.hasOwnProperty.call(raw[0], c));
+      // Only name + sell are required — cost is optional (defaults to 0 when
+      // the column is missing or blank, since some source sheets don't track it).
+      const hasRequiredCols = ["name", "sell"].every((c) => Object.prototype.hasOwnProperty.call(raw[0], c));
       if (!hasRequiredCols) {
         setCsvRows([]);
-        setCsvErrors([{ row: 0, message: "CSV needs at least name, cost and sell columns — download the template below." }]);
+        setCsvErrors([{ row: 0, message: "CSV needs at least name and sell columns — download the template below." }]);
         return;
       }
       const errors = [];
@@ -6158,21 +6160,22 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
       const parsed = raw.map((r, idx) => {
         const rowNum = idx + 2; // header is row 1
         const name = (r.name || "").trim();
-        const cost = parseFloat(r.cost);
+        const hasCost = (r.cost || "").trim() !== "";
+        const cost = hasCost ? parseFloat(r.cost) : 0;
         const sell = parseFloat(r.sell);
         if (!name) errors.push({ row: rowNum, message: "Missing product name." });
-        if (isNaN(cost)) errors.push({ row: rowNum, message: `Invalid cost "${r.cost || ""}".` });
+        if (hasCost && isNaN(cost)) errors.push({ row: rowNum, message: `Invalid cost "${r.cost}".` });
         if (isNaN(sell)) errors.push({ row: rowNum, message: `Invalid sell price "${r.sell || ""}".` });
         const countryRaw = (r.country || "").trim().toUpperCase();
         const country = VALID_COUNTRIES.includes(countryRaw) ? countryRaw : adminCountry;
         const images = (r.images || "").split("|").map((s) => s.trim()).filter(Boolean).slice(0, 4);
         return {
           rowNum, name, category: (r.category || "").trim() || "General",
-          cost, sell, stock: Math.max(0, parseInt(r.stock, 10) || 0),
+          cost: hasCost && !isNaN(cost) ? cost : 0, sell, stock: Math.max(0, parseInt(r.stock, 10) || 0),
           description: (r.description || "").trim() || null,
           emoji: (r.emoji || "").trim() || "📦",
           country, images,
-          valid: !!name && !isNaN(cost) && !isNaN(sell),
+          valid: !!name && !isNaN(sell) && !(hasCost && isNaN(cost)),
         };
       });
       setCsvRows(parsed);
@@ -6722,7 +6725,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
           <h3 className="font-bold text-sm" style={{ color: "#0B1F3A" }}>Bulk import products from CSV</h3>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          Upload a .csv with columns <code className="text-[11px]">name, category, cost, sell, stock, description, emoji, country, images</code> — only name, cost and sell are required, everything else falls back to a sensible default. For <code className="text-[11px]">images</code>, separate multiple picture URLs with a <code className="text-[11px]">|</code>. Products are added to the <b>{adminCountry}</b> catalog unless a row sets its own country.
+          Upload a .csv with columns <code className="text-[11px]">name, category, cost, sell, stock, description, emoji, country, images</code> — only name and sell are required (cost defaults to 0 if left blank), everything else falls back to a sensible default. For <code className="text-[11px]">images</code>, separate multiple picture URLs with a <code className="text-[11px]">|</code>. Products are added to the <b>{adminCountry}</b> catalog unless a row sets its own country.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <label className="text-sm font-semibold py-2.5 px-4 rounded-full text-white cursor-pointer" style={{ background: "#0B1F3A" }}>
