@@ -6192,15 +6192,27 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
     setCsvImporting(true);
     let added = 0, failed = 0;
     let firstError = null;
+    // Some live databases don't have a `country` column yet (PostgREST
+    // reports this as "Could not find the 'country' column ... schema
+    // cache" rather than a normal insert error). Once we hit that, stop
+    // sending `country` for the rest of the batch instead of failing every
+    // remaining row the same way.
+    let skipCountryColumn = false;
     for (const r of validRows) {
       const id = "p" + Date.now().toString().slice(-8) + Math.random().toString(36).slice(2, 5);
-      const { error } = await supabase.from("products").insert({
+      const payload = {
         id, name: r.name, category: r.category, cost: r.cost, sell: r.sell,
         emoji: r.emoji, description: r.description, images: r.images,
         image_url: r.images[0] || null, stock: r.stock,
         assigned_seller_emails: [], is_premium: false, source_url: null,
-        country: r.country,
-      });
+      };
+      if (!skipCountryColumn) payload.country = r.country;
+      let { error } = await supabase.from("products").insert(payload);
+      if (error && /country.*schema cache|country.*column/i.test(error.message || "")) {
+        skipCountryColumn = true;
+        delete payload.country;
+        ({ error } = await supabase.from("products").insert(payload));
+      }
       if (error) {
         failed++;
         if (!firstError) firstError = error;
@@ -6208,7 +6220,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
       } else added++;
     }
     setCsvImporting(false);
-    setCsvSummary({ added, failed, errorMessage: firstError?.message || null });
+    setCsvSummary({
+      added, failed,
+      errorMessage: firstError?.message || null,
+      countrySkipped: skipCountryColumn,
+    });
     setCsvRows([]); setCsvErrors([]); setCsvFileName("");
     if (added) onCatalogChanged();
     notify(failed ? `Imported ${added} product(s) — ${failed} failed.` : `Imported ${added} product(s) into the catalog.`);
@@ -6817,6 +6833,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
             </p>
             {csvSummary.errorMessage && (
               <p className="mt-1 text-[11px] text-gray-500">Reason from the database: {csvSummary.errorMessage}</p>
+            )}
+            {csvSummary.countrySkipped && (
+              <p className="mt-1 text-[11px]" style={{ color: "#B45309" }}>
+                Note: this database doesn't have a "country" column yet, so imported products were saved without one (they'll show up regardless of the country tab). Ask your developer to add a `country` column to the `products` table if you need per-country catalogs.
+              </p>
             )}
           </div>
         )}
