@@ -1303,7 +1303,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [], isPremium: !!p.is_premium, sourceUrl: p.source_url || null }));
+  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [], isPremium: !!p.is_premium, sourceUrl: p.source_url || null, country: p.country || "UAE" }));
 }
 // Which sellers Admin has marked as "Premium" — just a list of emails, stored
 // as JSON in app_settings (same chunked mechanism as the homepage content).
@@ -2089,9 +2089,13 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   // exactly like before. On top of that, a product Admin has marked
   // "Premium" only shows up for sellers Admin has separately marked as
   // Premium (isPremiumSeller) — everyone else never sees it in their catalog.
+  // Products are kept separate per country — a product Admin tagged "KSA"
+  // only shows up when the seller has KSA selected in the region switch,
+  // same idea as the assigned-sellers / Premium filtering below.
+  const regionCatalog = catalog.filter((p) => (p.country || "UAE") === region);
   const visibleCatalog = isAdmin
-    ? catalog
-    : catalog
+    ? regionCatalog
+    : regionCatalog
         .filter((p) => !(p.assignedSellerEmails || []).length || p.assignedSellerEmails.includes(session.email));
 
   // Live-updates: when Admin changes an order's status (ship / deliver /
@@ -2648,12 +2652,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               regionCancelled={regionCancelled} regionReturned={regionReturned}
             />
           )}
-          {/* Settings, Product Requests, Support, Tickets, and Admin aren't country-specific, so they stay open regardless of the region switch.
-              Every other tab is UAE-only for now — switching to KSA/Qatar shows Coming Soon everywhere. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && region !== "UAE" && (
+          {/* Settings, Product Requests, Support, Tickets, Admin, and Products aren't
+              gated by region — Products shows each country's own catalog instead.
+              Every other tab (Orders, Invoices) is still UAE-only for now —
+              switching to KSA/Qatar shows Coming Soon there until they're built out. */}
+          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && tab !== "products" && region !== "UAE" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || region === "UAE") && (
+          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || region === "UAE") && (
             <>
               {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
@@ -6000,7 +6006,17 @@ function LightField({ label, type = "text", value, onChange, placeholder }) {
 }
 
 function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder }) {
-  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false });
+  const [form, setForm] = useState({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false, country: "UAE" });
+  // Which country's catalog Admin is currently viewing/managing — products are
+  // kept separate per country. Values must match the seller-side region
+  // switch exactly (region uses "QATAR" in caps, not "Qatar").
+  const PRODUCT_COUNTRIES = [
+    { value: "UAE", label: "UAE" },
+    { value: "KSA", label: "KSA" },
+    { value: "QATAR", label: "Qatar" },
+  ];
+  const [adminCountry, setAdminCountry] = useState("UAE");
+  const countryFilteredCatalog = catalog.filter((p) => (p.country || "UAE") === adminCountry);
   // "Import from link" — Admin pastes a product URL from Temu / Noon / Amazon /
   // Wavebit / a dropshipping site, we fetch the page server-side (Edge
   // Function "fetch-product") and pull out title/price/pictures/description
@@ -6294,9 +6310,10 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
       assigned_seller_emails: form.assignedSellers,
       is_premium: form.isPremium,
       source_url: form.sourceUrl || null,
+      country: form.country || "UAE",
     });
     if (error) { notify("Could not add product."); return; }
-    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false });
+    setForm({ name: "", category: "", cost: "", sell: "", emoji: "📦", description: "", images: [], stock: "", assignedSellers: [], isPremium: false, country: adminCountry });
     setImportUrl(""); setImportError("");
     notify(form.isPremium ? "Premium product added — only visible to Premium sellers." : (form.assignedSellers.length ? `Product added — only visible to ${form.assignedSellers.length} seller(s).` : "Product added to catalog."));
     onCatalogChanged();
@@ -6316,7 +6333,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
   const startEdit = (p) => {
     setEditingId(p.id);
     const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
-    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0, assignedSellers: p.assignedSellerEmails || [], isPremium: !!p.isPremium, sourceUrl: p.sourceUrl || "" });
+    setEditForm({ name: p.name || "", category: p.category || "", cost: p.cost, sell: p.sell, emoji: p.emoji || "📦", description: p.description || "", images, stock: p.stock ?? 0, assignedSellers: p.assignedSellerEmails || [], isPremium: !!p.isPremium, sourceUrl: p.sourceUrl || "", country: p.country || "UAE" });
   };
   const toggleEditSeller = (email) => setEditForm((f) => ({ ...f, assignedSellers: f.assignedSellers.includes(email) ? f.assignedSellers.filter((e) => e !== email) : [...f.assignedSellers, email] }));
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
@@ -6358,6 +6375,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
       assigned_seller_emails: editForm.assignedSellers || [],
       is_premium: !!editForm.isPremium,
       source_url: editForm.sourceUrl || null,
+      country: editForm.country || "UAE",
     }).eq("id", id);
     if (error) { console.error("Product save failed:", error); notify(`Could not save: ${error.message || "unknown error"}`); return; }
     notify("Product updated.");
@@ -6601,6 +6619,12 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         <div><label className="text-xs text-gray-500">Sell (AED)</label><input type="number" value={form.sell} onChange={(e) => setForm({ ...form, sell: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Stock quantity</label><input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
         <div><label className="text-xs text-gray-500">Emoji (fallback)</label><input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }} /></div>
+        <div>
+          <label className="text-xs text-gray-500">Country</label>
+          <select value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid #E5E7EB" }}>
+            {PRODUCT_COUNTRIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
         <div className="sm:col-span-6 flex items-center gap-3 flex-wrap">
           {(form.images || []).map((url, idx) => (
             <div
@@ -7171,8 +7195,21 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
       )}
 
-      <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-5">
-        {catalog.map((p) => (
+      <div className="mt-8 flex items-center gap-2 flex-wrap">
+        {PRODUCT_COUNTRIES.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => { setAdminCountry(c.value); setForm((f) => ({ ...f, country: c.value })); }}
+            className="text-xs font-semibold px-3.5 py-1.5 rounded-full transition-colors"
+            style={adminCountry === c.value ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}
+          >
+            {c.label} <span className="opacity-70">({catalog.filter((p) => (p.country || "UAE") === c.value).length})</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-5">
+        {countryFilteredCatalog.map((p) => (
           <div key={p.id} className="rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
             {editingId === p.id ? (
               <div className="space-y-2">
@@ -7211,6 +7248,12 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
                 </div>
                 <input type="number" min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} placeholder="Stock quantity" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                 <div>
+                  <label className="text-[11px] text-gray-400">Country</label>
+                  <select value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} className="mt-1 w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }}>
+                    {PRODUCT_COUNTRIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="text-[11px] text-gray-400">Visible to</label>
                   <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                     <label className="text-[11px] font-semibold flex items-center gap-1 px-2.5 py-1 rounded-full cursor-pointer" style={editForm.assignedSellers.length === 0 ? { background: "#0B1F3A", color: "#fff" } : { border: "1px solid #E5E7EB", color: "#6B7280" }}>
@@ -7242,6 +7285,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
                 </div>
                 <div className="mt-3 font-semibold text-sm">{p.name}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>
+                <div className="mt-1 text-[11px] font-semibold" style={{ color: "#0B1F3A" }}>🌍 {p.country === "QATAR" ? "Qatar" : (p.country || "UAE")}</div>
                 <div className="mt-1 text-xs text-gray-500">Cost AED {p.cost} · Sell AED {p.sell}</div>
                 <div className="mt-1 text-xs font-semibold" style={{ color: (p.stock ?? 0) > 0 ? "#00a67e" : "#EF4444" }}>
                   Stock: {p.stock ?? 0} {(p.stock ?? 0) > 0 ? "" : "(Out of Stock)"}
