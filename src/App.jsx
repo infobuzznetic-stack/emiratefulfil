@@ -6102,6 +6102,110 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
     imgs.splice(toIdx, 0, moved);
     return { ...f, images: imgs };
   });
+
+  // --- Bulk product import from CSV ---------------------------------------
+  // Reuses the same parseCSV() helper the Shopify order importer uses. Admin
+  // picks a .csv, we parse + validate every row client-side (so problems are
+  // visible before anything is written), then insert only the valid rows one
+  // at a time into `products` — sequential (not Promise.all) so a big file
+  // doesn't fire hundreds of requests at Supabase simultaneously.
+  const CSV_PRODUCT_HEADERS = ["name", "category", "cost", "sell", "stock", "description", "emoji", "country", "images"];
+  const [csvFileName, setCsvFileName] = useState("");
+  const [csvRows, setCsvRows] = useState([]); // parsed rows, each with a `valid` flag
+  const [csvErrors, setCsvErrors] = useState([]); // [{ row, message }]
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvSummary, setCsvSummary] = useState(null); // { added, failed } after import finishes
+
+  const downloadCsvTemplate = () => {
+    const sample = [
+      CSV_PRODUCT_HEADERS.join(","),
+      `"Wireless Earbuds","Electronics",25,49.99,100,"Bluetooth 5.3 earbuds with charging case","🎧","UAE",""`,
+    ].join("\n");
+    const blob = new Blob([sample], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "product-import-template.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCsvFile = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file after fixing it
+    if (!file) return;
+    setCsvSummary(null);
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Normalize headers to lowercase so "Name" / "NAME" / "name" all work.
+      const raw = parseCSV(String(reader.result || "")).map((r) => {
+        const obj = {};
+        Object.keys(r).forEach((k) => { obj[k.trim().toLowerCase()] = r[k]; });
+        return obj;
+      });
+      if (!raw.length) {
+        setCsvRows([]);
+        setCsvErrors([{ row: 0, message: "Couldn't find any rows — check the file against the template." }]);
+        return;
+      }
+      const hasRequiredCols = ["name", "cost", "sell"].every((c) => Object.prototype.hasOwnProperty.call(raw[0], c));
+      if (!hasRequiredCols) {
+        setCsvRows([]);
+        setCsvErrors([{ row: 0, message: "CSV needs at least name, cost and sell columns — download the template below." }]);
+        return;
+      }
+      const errors = [];
+      const VALID_COUNTRIES = ["UAE", "KSA", "QATAR"];
+      const parsed = raw.map((r, idx) => {
+        const rowNum = idx + 2; // header is row 1
+        const name = (r.name || "").trim();
+        const cost = parseFloat(r.cost);
+        const sell = parseFloat(r.sell);
+        if (!name) errors.push({ row: rowNum, message: "Missing product name." });
+        if (isNaN(cost)) errors.push({ row: rowNum, message: `Invalid cost "${r.cost || ""}".` });
+        if (isNaN(sell)) errors.push({ row: rowNum, message: `Invalid sell price "${r.sell || ""}".` });
+        const countryRaw = (r.country || "").trim().toUpperCase();
+        const country = VALID_COUNTRIES.includes(countryRaw) ? countryRaw : adminCountry;
+        const images = (r.images || "").split("|").map((s) => s.trim()).filter(Boolean).slice(0, 4);
+        return {
+          rowNum, name, category: (r.category || "").trim() || "General",
+          cost, sell, stock: Math.max(0, parseInt(r.stock, 10) || 0),
+          description: (r.description || "").trim() || null,
+          emoji: (r.emoji || "").trim() || "📦",
+          country, images,
+          valid: !!name && !isNaN(cost) && !isNaN(sell),
+        };
+      });
+      setCsvRows(parsed);
+      setCsvErrors(errors);
+    };
+    reader.readAsText(file);
+  };
+
+  const clearCsvImport = () => { setCsvFileName(""); setCsvRows([]); setCsvErrors([]); setCsvSummary(null); };
+
+  const importCsvProducts = async () => {
+    const validRows = csvRows.filter((r) => r.valid);
+    if (!validRows.length) { notify("No valid rows to import — fix the errors above first."); return; }
+    setCsvImporting(true);
+    let added = 0, failed = 0;
+    for (const r of validRows) {
+      const id = "p" + Date.now().toString().slice(-8) + Math.random().toString(36).slice(2, 5);
+      const { error } = await supabase.from("products").insert({
+        id, name: r.name, category: r.category, cost: r.cost, sell: r.sell,
+        emoji: r.emoji, description: r.description, images: r.images,
+        image_url: r.images[0] || null, stock: r.stock,
+        assigned_seller_emails: [], is_premium: false, source_url: null,
+        country: r.country,
+      });
+      if (error) failed++; else added++;
+    }
+    setCsvImporting(false);
+    setCsvSummary({ added, failed });
+    setCsvRows([]); setCsvErrors([]); setCsvFileName("");
+    if (added) onCatalogChanged();
+    notify(failed ? `Imported ${added} product(s) — ${failed} failed.` : `Imported ${added} product(s) into the catalog.`);
+  };
+
   const [allOrders, setAllOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [sellers, setSellers] = useState([]);
@@ -6610,6 +6714,101 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         </div>
         {importError && <p className="mt-2 text-xs font-medium" style={{ color: "#EF4444" }}>{importError} — no problem, just fill the form below in by hand.</p>}
         <p className="mt-2 text-[11px] text-gray-400">Some sites (especially Amazon and Temu) block automatic access — if fetching fails, add the details manually in the form below. Either way, always double-check Cost, Category and price before saving.</p>
+      </div>
+
+      <div className="mt-6 rounded-2xl p-6" style={{ border: "1px solid #E5E7EB", background: "linear-gradient(135deg,#0B1F3A08,#00C89608)" }}>
+        <div className="flex items-center gap-2">
+          <Boxes className="w-4 h-4" style={{ color: "#00C896" }} />
+          <h3 className="font-bold text-sm" style={{ color: "#0B1F3A" }}>Bulk import products from CSV</h3>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Upload a .csv with columns <code className="text-[11px]">name, category, cost, sell, stock, description, emoji, country, images</code> — only name, cost and sell are required, everything else falls back to a sensible default. For <code className="text-[11px]">images</code>, separate multiple picture URLs with a <code className="text-[11px]">|</code>. Products are added to the <b>{adminCountry}</b> catalog unless a row sets its own country.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="text-sm font-semibold py-2.5 px-4 rounded-full text-white cursor-pointer" style={{ background: "#0B1F3A" }}>
+            {csvFileName ? "Choose a different file" : "Choose CSV file"}
+            <input type="file" accept=".csv,text/csv" onChange={handleCsvFile} className="hidden" />
+          </label>
+          <button type="button" onClick={downloadCsvTemplate} className="text-sm font-semibold py-2.5 px-4 rounded-full" style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}>
+            <Download className="w-4 h-4 inline -mt-0.5 mr-1" />Download template
+          </button>
+          {csvFileName && <span className="text-xs text-gray-500">{csvFileName}</span>}
+        </div>
+
+        {csvErrors.length > 0 && (
+          <div className="mt-3 rounded-xl p-3 text-xs" style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", color: "#B91C1C" }}>
+            <p className="font-semibold mb-1">{csvErrors.length} problem{csvErrors.length === 1 ? "" : "s"} found — rows with errors will be skipped:</p>
+            <ul className="space-y-0.5">
+              {csvErrors.slice(0, 8).map((er, i) => (
+                <li key={i}>{er.row ? `Row ${er.row}: ` : ""}{er.message}</li>
+              ))}
+              {csvErrors.length > 8 && <li>…and {csvErrors.length - 8} more.</li>}
+            </ul>
+          </div>
+        )}
+
+        {csvRows.length > 0 && (
+          <div className="mt-3">
+            <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid #E5E7EB" }}>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-gray-400" style={{ background: "#F9FAFB" }}>
+                    <th className="px-3 py-2">Row</th>
+                    <th className="px-3 py-2">Name</th>
+                    <th className="px-3 py-2">Category</th>
+                    <th className="px-3 py-2">Cost</th>
+                    <th className="px-3 py-2">Sell</th>
+                    <th className="px-3 py-2">Stock</th>
+                    <th className="px-3 py-2">Country</th>
+                    <th className="px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvRows.slice(0, 25).map((r) => (
+                    <tr key={r.rowNum} style={{ borderTop: "1px solid #F3F4F6" }}>
+                      <td className="px-3 py-2 text-gray-400">{r.rowNum}</td>
+                      <td className="px-3 py-2 font-medium" style={{ color: "#0B1F3A" }}>{r.name || "—"}</td>
+                      <td className="px-3 py-2">{r.category}</td>
+                      <td className="px-3 py-2">{isNaN(r.cost) ? "—" : r.cost}</td>
+                      <td className="px-3 py-2">{isNaN(r.sell) ? "—" : r.sell}</td>
+                      <td className="px-3 py-2">{r.stock}</td>
+                      <td className="px-3 py-2">{r.country}</td>
+                      <td className="px-3 py-2">
+                        {r.valid
+                          ? <span className="font-semibold" style={{ color: "#00A67D" }}>Ready</span>
+                          : <span className="font-semibold" style={{ color: "#EF4444" }}>Skipped</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {csvRows.length > 25 && <p className="mt-1 text-[11px] text-gray-400">Showing the first 25 of {csvRows.length} rows.</p>}
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={importCsvProducts}
+                disabled={csvImporting || !csvRows.some((r) => r.valid)}
+                className="text-sm font-semibold py-2.5 px-5 rounded-full text-white disabled:opacity-60"
+                style={{ background: "#00C896" }}
+              >
+                {csvImporting ? "Importing…" : `Import ${csvRows.filter((r) => r.valid).length} product${csvRows.filter((r) => r.valid).length === 1 ? "" : "s"}`}
+              </button>
+              <button type="button" onClick={clearCsvImport} disabled={csvImporting} className="text-sm font-semibold py-2.5 px-4 rounded-full disabled:opacity-60" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {csvSummary && (
+          <p className="mt-3 text-xs font-medium" style={{ color: csvSummary.failed ? "#B91C1C" : "#00A67D" }}>
+            {csvSummary.failed
+              ? `Imported ${csvSummary.added} product(s) — ${csvSummary.failed} failed to save, try those rows again.`
+              : `Imported ${csvSummary.added} product(s) into the catalog.`}
+          </p>
+        )}
       </div>
 
       <form onSubmit={addProduct} className="mt-6 rounded-2xl p-6 bg-white grid sm:grid-cols-6 gap-3 items-end" style={{ border: "1px solid #E5E7EB" }}>
