@@ -6168,7 +6168,11 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         if (isNaN(sell)) errors.push({ row: rowNum, message: `Invalid sell price "${r.sell || ""}".` });
         const countryRaw = (r.country || "").trim().toUpperCase();
         const country = VALID_COUNTRIES.includes(countryRaw) ? countryRaw : adminCountry;
-        const images = (r.images || "").split("|").map((s) => s.trim()).filter(Boolean).slice(0, 4);
+        // Accept either an "images" column (pipe-separated, up to 4) or a
+        // single "image" column (one URL) — different export tools use
+        // either name, so support both instead of silently dropping pictures.
+        const imagesSource = r.images || r.image || "";
+        const images = imagesSource.split("|").map((s) => s.trim()).filter(Boolean).slice(0, 4);
         return {
           rowNum, name, category: (r.category || "").trim() || "General",
           cost: hasCost && !isNaN(cost) ? cost : 0, sell, stock: Math.max(0, parseInt(r.stock, 10) || 0),
@@ -6746,7 +6750,7 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
           <h3 className="font-bold text-sm" style={{ color: "#0B1F3A" }}>Bulk import products from CSV</h3>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          Upload a .csv with columns <code className="text-[11px]">name, cost, sell, stock, description, emoji, country, images</code> — only name and sell are required (cost defaults to 0 if left blank), everything else falls back to a sensible default. For <code className="text-[11px]">images</code>, separate multiple picture URLs with a <code className="text-[11px]">|</code>. Products are added to the <b>{adminCountry}</b> catalog unless a row sets its own country — switch the country tab above before importing if these are for a different country.
+          Upload a .csv with columns <code className="text-[11px]">name, cost, sell, stock, description, emoji, country, images</code> — only name and sell are required (cost defaults to 0 if left blank), everything else falls back to a sensible default. For pictures, use an <code className="text-[11px]">image</code> column (one URL) or an <code className="text-[11px]">images</code> column (multiple URLs separated by <code className="text-[11px]">|</code>). Products are added to the <b>{adminCountry}</b> catalog unless a row sets its own country — switch the country tab above before importing if these are for a different country.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <label className="text-sm font-semibold py-2.5 px-4 rounded-full text-white cursor-pointer" style={{ background: "#0B1F3A" }}>
