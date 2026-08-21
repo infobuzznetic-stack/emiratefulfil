@@ -2357,9 +2357,27 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           </div>
         </div>
         <div className="relative mt-6 pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-          <div className="text-white text-base font-semibold">{session.name}</div>
-          <div className="text-white/40 text-sm">{session.company || "Seller account"}</div>
-          <button onClick={onLogout} className="mt-3 text-white/60 text-sm font-semibold hover:text-white">Log out</button>
+          <div
+            className="flex items-center gap-3 p-2.5 rounded-2xl transition-colors duration-300 hover:bg-white/5"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-extrabold flex-shrink-0"
+              style={{
+                background: isPremiumSeller ? "linear-gradient(135deg,#F8B400,#c98f00)" : "linear-gradient(135deg,#00C896,#0B7A5E)",
+                color: isPremiumSeller ? "#3a2a0b" : "#fff",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+              }}
+            >
+              {session.name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "S"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-white text-sm font-semibold truncate">{session.name}</div>
+              <div className="text-white/40 text-xs truncate">{session.company || "Seller account"}</div>
+            </div>
+            {isPremiumSeller && <Crown className="w-4 h-4 flex-shrink-0" style={{ color: "#F8B400" }} />}
+          </div>
+          <button onClick={onLogout} className="mt-3 text-white/60 text-sm font-semibold hover:text-white transition-colors">Log out</button>
           <div className="mt-5 h-[3px] w-full rounded-full overflow-hidden flex opacity-60">
             <div className="flex-[7]" style={{ background: "#FF0000" }} />
             <div className="flex-[24] flex flex-col">
@@ -2974,30 +2992,55 @@ function OverviewTab({
         )}
 
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
-              <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#7FE8C9" }}>{dateLabel}</span>
-              <span className="text-white/30">·</span>
-              <span className="text-xs font-semibold tracking-widest" style={{ color: "#7FE8C9", fontFamily: "'Space Grotesk', sans-serif" }}>{timeLabel}</span>
-            </div>
-            <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {greeting}, <span style={{ color: isPremiumSeller ? "#F8B400" : "#00C896" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
-            </h1>
-            {region === "UAE" && (
+          <div className="flex items-start sm:items-center gap-4">
+            {/* Initials avatar — a small "who's logged in" touch that reads as a proper
+                premium dashboard rather than a plain admin panel. Ring color follows
+                Premium status, same as everywhere else. */}
+            <div className="relative hidden sm:flex flex-shrink-0">
               <div
-                className="mt-1 text-xl sm:text-2xl font-bold"
-                dir="rtl"
-                style={{ color: isPremiumSeller ? "#FFE29A" : "#7FE8C9", fontFamily: "'Noto Kufi Arabic', sans-serif", opacity: 0.85 }}
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-extrabold"
+                style={{
+                  background: isPremiumSeller ? "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)" : "linear-gradient(135deg,#00C896,#0B7A5E)",
+                  color: isPremiumSeller ? "#3a2a0b" : "#fff",
+                  boxShadow: isPremiumSeller ? "0 10px 26px -6px rgba(248,180,0,0.55)" : "0 10px 26px -6px rgba(0,200,150,0.5)",
+                  border: "1px solid rgba(255,255,255,0.35)",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
               >
-                أهلاً وسهلاً · الإمارات العربية المتحدة
+                {session.name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "S"}
               </div>
-            )}
-            <p className="mt-1.5 text-sm text-white/60 max-w-md">
-              {region === "UAE"
-                ? <>Your UAE fulfillment partner is working smoothly. {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>
-                : <>Preview your future {region === "KSA" ? "Saudi" : "Qatar"} storefront below.</>}
-            </p>
+              <span
+                className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
+                style={{ background: "#0B1F3A", border: "2px solid rgba(255,255,255,0.9)" }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
+              </span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="w-2 h-2 rounded-full sm:hidden" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
+                <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#7FE8C9" }}>{dateLabel}</span>
+                <span className="text-white/30">·</span>
+                <span className="text-xs font-semibold tracking-widest" style={{ color: "#7FE8C9", fontFamily: "'Space Grotesk', sans-serif" }}>{timeLabel}</span>
+              </div>
+              <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {greeting}, <span style={{ color: isPremiumSeller ? "#F8B400" : "#00C896" }}>{session.name.split(" ")[0]}</span>! <span style={{ display: "inline-block", animation: "waveHand 2.2s ease-in-out infinite" }}>👋</span>
+              </h1>
+              {region === "UAE" && (
+                <div
+                  className="mt-1 text-xl sm:text-2xl font-bold"
+                  dir="rtl"
+                  style={{ color: isPremiumSeller ? "#FFE29A" : "#7FE8C9", fontFamily: "'Noto Kufi Arabic', sans-serif", opacity: 0.85 }}
+                >
+                  أهلاً وسهلاً · الإمارات العربية المتحدة
+                </div>
+              )}
+              <p className="mt-1.5 text-sm text-white/60 max-w-md">
+                {region === "UAE"
+                  ? <>Your UAE fulfillment partner is working smoothly. {regionOrders.length} order{regionOrders.length === 1 ? "" : "s"} logged so far.</>
+                  : <>Preview your future {region === "KSA" ? "Saudi" : "Qatar"} storefront below.</>}
+              </p>
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             {/* UAE / KSA / Qatar region switch */}
