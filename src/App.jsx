@@ -3141,6 +3141,48 @@ function OverviewTab({
             </div>
           </div>
 
+          {/* Milestone badges — a small gamified touch: the more orders a seller
+              logs, the more badges light up. Keeps the dashboard feeling alive
+              even for a brand-new seller (first badge is just "signed up"). */}
+          <div className="rounded-2xl p-5 bg-white mt-6 transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB", boxShadow: "0 14px 34px -18px rgba(16,24,40,0.16), 0 2px 6px -2px rgba(16,24,40,0.05)" }}>
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(248,180,0,0.14)" }}>
+                <Sparkles className="w-4 h-4" style={{ color: "#F8B400" }} />
+              </div>
+              <div className="font-bold text-sm" style={{ color: "#111827", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Milestones</div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { label: "Getting started", threshold: 0, icon: Sparkles },
+                { label: "First order", threshold: 1, icon: Package },
+                { label: "10 orders", threshold: 10, icon: Boxes },
+                { label: "50 orders", threshold: 50, icon: TrendingUp },
+                { label: "100 orders", threshold: 100, icon: Crown },
+              ].map((m) => {
+                const unlocked = regionOrders.length >= m.threshold;
+                return (
+                  <div
+                    key={m.label}
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all duration-300"
+                    style={
+                      unlocked
+                        ? { background: "linear-gradient(135deg, rgba(0,200,150,0.10), rgba(248,180,0,0.08))", border: "1px solid rgba(0,200,150,0.35)" }
+                        : { background: "#F9FAFB", border: "1px solid #F0F1F3", opacity: 0.55 }
+                    }
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={unlocked ? { background: "linear-gradient(135deg,#00C896,#0B7A5E)", boxShadow: "0 6px 14px -4px rgba(0,200,150,0.5)" } : { background: "#E5E7EB" }}
+                    >
+                      <m.icon className="w-4 h-4" style={{ color: unlocked ? "#fff" : "#9CA3AF" }} />
+                    </div>
+                    <span className="text-xs font-semibold" style={{ color: unlocked ? "#111827" : "#9CA3AF" }}>{m.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid lg:grid-cols-3 gap-5 mt-6">
             <div className="lg:col-span-2 rounded-2xl p-6 bg-white transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid #E5E7EB", boxShadow: "0 14px 34px -18px rgba(16,24,40,0.16), 0 2px 6px -2px rgba(16,24,40,0.05)" }}>
               <div className="flex items-center gap-2.5 mb-4">
