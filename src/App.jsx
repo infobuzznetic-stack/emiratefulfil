@@ -2962,7 +2962,7 @@ function OverviewTab({
             : { background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)", boxShadow: "0 0 0 1px rgba(0,200,150,0.10), 0 30px 60px -22px rgba(11,31,58,0.55)" }
         }
       >
-        {/* subtle dot-grid texture (KSA/Qatar) or Islamic geometric star pattern (UAE) */}
+        {/* Background texture — Islamic geometric star (UAE), Najdi sadu-weave diamonds (KSA), or a plain dot-grid (Qatar) */}
         {region === "UAE" ? (
           <svg className="absolute inset-0 w-full h-full opacity-[0.10] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -2974,11 +2974,34 @@ function OverviewTab({
             </defs>
             <rect width="100%" height="100%" fill="url(#arabesqueStar)" />
           </svg>
+        ) : region === "KSA" ? (
+          <svg className="absolute inset-0 w-full h-full opacity-[0.11] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="sadouWeave" width="40" height="40" patternUnits="userSpaceOnUse">
+                <g fill="none" stroke="#ffffff" strokeWidth="1">
+                  <path d="M0 20 L20 0 L40 20 L20 40 Z" />
+                  <path d="M20 0 L20 40 M0 20 L40 20" strokeWidth="0.6" opacity="0.6" />
+                </g>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#sadouWeave)" />
+          </svg>
         ) : (
           <div
             className="absolute inset-0 opacity-[0.07]"
             style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "18px 18px" }}
           />
+        )}
+        {/* Large faint palm + sword watermark — the Saudi emblem, echoed softly in the corner */}
+        {region === "KSA" && (
+          <svg viewBox="0 0 200 200" className="absolute -top-6 right-4 sm:right-10 w-40 h-40 sm:w-56 sm:h-56 opacity-[0.10] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+            <g fill="#ffffff">
+              <path d="M100 30c-3 14-14 22-28 24 12 4 22 14 24 28 2-14 12-24 24-28-14-2-25-10-28-24 3-1 5-1 8-2-1 2-1 4 0 6" />
+              <path d="M60 70c14-6 30-6 40 4 10-10 26-10 40-4-10 10-14 24-12 38-8-10-20-16-28-14-8-2-20 4-28 14 2-14-2-28-12-38z" />
+              <rect x="96" y="95" width="8" height="70" rx="2" />
+              <path d="M78 172c8-10 20-15 22-15s14 5 22 15c-14-6-30-6-44 0z" />
+            </g>
+          </svg>
         )}
         {isPremiumSeller && (
           <div
@@ -2998,14 +3021,14 @@ function OverviewTab({
         <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 11s ease-in-out infinite reverse" }} />
         <div className="absolute top-1/2 left-10 w-40 h-40 rounded-full opacity-10 blur-3xl -translate-y-1/2" style={{ background: isPremiumSeller ? "#FFD98A" : "#3B82F6", animation: "floatY 7s ease-in-out infinite" }} />
 
-        {/* soft gold desert-dune wave along the very bottom edge of the card */}
-        {region === "UAE" && (
+        {/* soft desert-dune wave along the very bottom edge of the card — gold for UAE, green for KSA */}
+        {(region === "UAE" || region === "KSA") && (
           <svg
             viewBox="0 0 500 40"
             preserveAspectRatio="none"
             className="absolute bottom-0 left-0 w-full h-8 opacity-[0.12] pointer-events-none"
           >
-            <path d="M0 30 Q60 10 130 24 T260 20 T390 26 T500 16 L500 40 L0 40 Z" fill="#F8B400" />
+            <path d="M0 30 Q60 10 130 24 T260 20 T390 26 T500 16 L500 40 L0 40 Z" fill={region === "KSA" ? "#00A651" : "#F8B400"} />
           </svg>
         )}
 
@@ -3110,7 +3133,17 @@ function OverviewTab({
           </div>
         )}
         {region === "KSA" && (
-          <div className="relative mt-6 h-[3px] w-full rounded-full overflow-hidden" style={{ background: "#006C35" }} />
+          <div
+            className="relative mt-6 h-9 w-full rounded-xl overflow-hidden flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(90deg, #006C35, #00A651, #006C35)", boxShadow: "0 6px 18px rgba(0,108,53,0.35)" }}
+          >
+            <span dir="rtl" className="text-sm sm:text-base font-bold text-white" style={{ fontFamily: "'Noto Kufi Arabic', sans-serif", letterSpacing: "0.5px" }}>
+              لا إله إلا الله محمد رسول الله
+            </span>
+            <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="#ffffff">
+              <path d="M12 2c-.4 2-2 3.2-4 3.6 1.8.6 3.4 2 4 4 .6-2 2.2-3.4 4-4-2-.4-3.6-1.6-4-3.6zM6 9c2 0 3.7 1 5 2.4C12.3 10 14 9 16 9c-1 1.6-1.4 3.5-1 5.4-1.3-1.4-3-2.2-3.6-2C10.8 12.2 9.1 13 7.8 14.4 8.2 12.5 7.8 10.6 6 9zM11.1 15h1.8v6.2c0 1-.6 1.7-1.4 2.1-.4-1 .2-2 .2-2.1v-6.2z" />
+            </svg>
+          </div>
         )}
       </div>
 
