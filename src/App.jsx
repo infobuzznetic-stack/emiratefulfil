@@ -7727,6 +7727,7 @@ const PLAN_DATA = [
     features: [
       { label: "Dropshipping products", on: true },
       { label: "Product Requests", on: false },
+      { label: "Product Sourcing — No Inventory Cost", on: false },
       { label: "Hunt Temu, Noon & Amazon Products", on: false },
       { label: "Free Order Confirmation", on: false },
       { label: "Free Inventory Cost", on: false },
@@ -7735,6 +7736,7 @@ const PLAN_DATA = [
       { label: "Product Financing", on: false },
       { label: "Discounted Product Prices", on: false },
       { label: "Priority Response Time", on: false },
+      { label: "KSA Products Access", on: false },
       { label: "Return charges — AED 5", on: false },
     ],
   },
@@ -7749,6 +7751,7 @@ const PLAN_DATA = [
     features: [
       { label: "Dropshipping products", on: true },
       { label: "Product Requests", on: true },
+      { label: "Product Sourcing — No Inventory Cost", on: true },
       { label: "Hunt Temu, Noon & Amazon Products", on: true },
       { label: "Free Order Confirmation", on: true },
       { label: "Free Inventory Cost", on: true },
@@ -7757,6 +7760,7 @@ const PLAN_DATA = [
       { label: "Product Financing", on: true },
       { label: "Discounted Product Prices", on: true },
       { label: "Priority Response Time", on: true },
+      { label: "KSA Products Access", on: true },
       { label: "Return charges — Free", on: true },
     ],
   },
