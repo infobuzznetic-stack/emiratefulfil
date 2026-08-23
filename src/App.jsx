@@ -4305,11 +4305,16 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   }
 
   if (view === "detail" && activeProduct) {
+    const openRelated = (prod) => {
+      const locked = (prod.isPremium || prod.country === "KSA") && !isPremiumSeller && !isAdmin;
+      if (locked) { setShowGoldModal(true); return; }
+      openProduct(prod);
+    };
     return (
       <ProductLandingPage
         product={activeProduct}
         catalog={catalog}
-        onOpenProduct={openProduct}
+        onOpenProduct={openRelated}
         onBack={() => setView("list")}
         onAddToCart={(qty) => addToCart(activeProduct, qty)}
         onBuyNow={(qty) => buyNow(activeProduct, qty)}
@@ -4435,7 +4440,9 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             );
           }
           const inStock = (p.stock ?? 0) > 0;
-          const isLocked = p.isPremium && !isPremiumSeller && !isAdmin;
+          // KSA's whole catalog is Gold-Plan only — locked for every seller until
+          // they're Premium, same overlay/treatment as a per-product Premium lock.
+          const isLocked = (p.isPremium || p.country === "KSA") && !isPremiumSeller && !isAdmin;
           return (
             <div
               key={p.id}
@@ -4456,7 +4463,9 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                     <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white"><path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6zm9 14H6V10h12v10zm-6-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
                   </div>
                   <div className="text-white font-bold text-xs text-center px-3" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Gold Plan Only</div>
-                  <div className="mt-1.5 text-[10px] text-white/60 text-center px-4">Tap to unlock this premium product</div>
+                  <div className="mt-1.5 text-[10px] text-white/60 text-center px-4">
+                    {p.country === "KSA" && !p.isPremium ? "KSA products are Gold Plan only" : "Tap to unlock this premium product"}
+                  </div>
                 </div>
               )}
               {/* Gradient accent bar, same touch used across the dashboard's cards */}
