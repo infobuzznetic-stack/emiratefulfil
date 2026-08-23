@@ -2500,7 +2500,9 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         <div className="hidden md:flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4" style={{ color: "#0B1F3A" }} />
-            <span className="text-sm font-bold" style={{ color: "#111827" }}>Dubai, UAE</span>
+            <span className="text-sm font-bold" style={{ color: "#111827" }}>
+              {region === "KSA" ? "Riyadh, Saudi Arabia" : region === "QATAR" ? "Doha, Qatar" : "Dubai, UAE"}
+            </span>
             <span className="w-1 h-1 rounded-full" style={{ background: "#9CA3AF" }} />
             <span className="w-2 h-2 rounded-full" style={{ background: "#00C896", animation: "livePulse 2s infinite" }} />
             <span className="text-sm font-medium" style={{ color: "#6B7280" }}>Live Operations</span>
@@ -3366,6 +3368,7 @@ function PaymentPill({ status }) {
 
 /* ---------------- Storefront: product landing page, cart, checkout ---------------- */
 const EMIRATES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al Khaimah", "Umm Al Quwain", "Al Ain"];
+const SAUDI_CITIES = ["Riyadh", "Jeddah", "Mecca", "Medina", "Dammam", "Khobar", "Jubail", "Taif", "Abha", "Tabuk", "Jizan"];
 // Flat delivery/handling charge added on top of the product's selling price.
 // This is collected from the customer on COD but is NOT part of the seller's profit.
 const DELIVERY_CHARGE = 18; // UAE delivery charge
@@ -3486,10 +3489,11 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
   const category = product.category || "Product";
   const currency = currencyForCountry(product.country);
   const deliveryCharge = deliveryChargeForCountry(product.country);
-  const description = product.description || `${product.name} is one of our best-selling ${category.toLowerCase()} items — carefully sourced, quality-checked, and shipped from our regional warehouse. It's fulfilled across every emirate with cash-on-delivery, so customers can pay when the order arrives at their door.`;
+  const isKSAProduct = product.country === "KSA";
+  const description = product.description || `${product.name} is one of our best-selling ${category.toLowerCase()} items — carefully sourced, quality-checked, and shipped from our regional warehouse. It's fulfilled across ${isKSAProduct ? "Saudi Arabia" : "every emirate"} with cash-on-delivery, so customers can pay when the order arrives at their door.`;
   const highlights = [
-    "Ships fast — dispatched within 24 hours from our UAE warehouse",
-    "Cash on Delivery available in every emirate",
+    `Ships fast — dispatched within 24 hours from our ${isKSAProduct ? "Saudi" : "UAE"} warehouse`,
+    `Cash on Delivery available ${isKSAProduct ? "across Saudi Arabia" : "in every emirate"}`,
     "Quality-checked before packing, easy 7-day returns",
   ];
   const deliveryDetails = [
@@ -4006,10 +4010,14 @@ function CodAmountRow({ it, baseTotal, initialCodAmount, onUpdateItemPrice }) {
 }
 
 function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
-  const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "", notes: "" });
-  const [busy, setBusy] = useState(false);
   // Cart items each carry their own country; in practice a checkout only
-  // ever holds one region's products, so we use that for currency/shipping.
+  // ever holds one region's products, so we use that for currency/shipping/
+  // the delivery-location list (Saudi cities vs. UAE emirates).
+  const isKSAOrder = items[0]?.country === "KSA";
+  const locationOptions = isKSAOrder ? SAUDI_CITIES : EMIRATES;
+  const locationLabel = isKSAOrder ? "City" : "Emirate";
+  const [form, setForm] = useState({ name: "", phone: "", emirate: locationOptions[0], address: "", notes: "" });
+  const [busy, setBusy] = useState(false);
   const currency = currencyForCountry(items[0]?.country);
   const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
   const deliveryTotal = items.reduce((s, it) => s + deliveryChargeForCountry(it.country), 0);
@@ -4049,9 +4057,9 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
             <input required type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05XXXXXXXX" className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
           </div>
           <div>
-            <label className="text-xs text-gray-500">Emirate <span className="text-red-500">*</span></label>
+            <label className="text-xs text-gray-500">{locationLabel} <span className="text-red-500">*</span></label>
             <select value={form.emirate} onChange={(e) => setForm({ ...form, emirate: e.target.value })} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle}>
-              {EMIRATES.map((em) => <option key={em} value={em}>{em}</option>)}
+              {locationOptions.map((em) => <option key={em} value={em}>{em}</option>)}
             </select>
           </div>
           <div>
