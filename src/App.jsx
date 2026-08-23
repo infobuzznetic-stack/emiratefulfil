@@ -3368,7 +3368,13 @@ function PaymentPill({ status }) {
 const EMIRATES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al Khaimah", "Umm Al Quwain", "Al Ain"];
 // Flat delivery/handling charge added on top of the product's selling price.
 // This is collected from the customer on COD but is NOT part of the seller's profit.
-const DELIVERY_CHARGE = 18;
+const DELIVERY_CHARGE = 18; // UAE delivery charge
+const KSA_DELIVERY_CHARGE = 25; // KSA delivery charge
+
+// Storefront currency + delivery charge follow the product's own country —
+// KSA products/orders show SAR everywhere (incl. delivery), UAE stays AED.
+function currencyForCountry(country) { return country === "KSA" ? "SAR" : "AED"; }
+function deliveryChargeForCountry(country) { return country === "KSA" ? KSA_DELIVERY_CHARGE : DELIVERY_CHARGE; }
 
 // Deterministic small "randomness" so the same product always shows the same
 // rating/review count/spec values instead of jumping around on every render.
@@ -3478,6 +3484,8 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
     return () => clearInterval(id);
   }, [galleryImages.length, galleryHover]);
   const category = product.category || "Product";
+  const currency = currencyForCountry(product.country);
+  const deliveryCharge = deliveryChargeForCountry(product.country);
   const description = product.description || `${product.name} is one of our best-selling ${category.toLowerCase()} items — carefully sourced, quality-checked, and shipped from our regional warehouse. It's fulfilled across every emirate with cash-on-delivery, so customers can pay when the order arrives at their door.`;
   const highlights = [
     "Ships fast — dispatched within 24 hours from our UAE warehouse",
@@ -3485,7 +3493,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
     "Quality-checked before packing, easy 7-day returns",
   ];
   const deliveryDetails = [
-    { icon: Truck, label: "Shipping Charges", value: `AED ${DELIVERY_CHARGE}` },
+    { icon: Truck, label: "Shipping Charges", value: `${currency} ${deliveryCharge}` },
     { icon: Clock, label: "Delivery Time", value: "1 – 3 days" },
     { icon: CreditCard, label: "Payment Mode", value: "Cash on delivery available" },
     { icon: RotateCcw, label: "Return Window", value: "Free within 7 days" },
@@ -3606,8 +3614,8 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
               </div>
             </div>
             <div className="mt-2 text-sm text-gray-500">
-              Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell * qty + DELIVERY_CHARGE}</b>
-              <span className="ml-1 text-xs text-gray-400">(incl. AED {DELIVERY_CHARGE} delivery)</span>
+              Total: <b style={{ color: "#0B1F3A", fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {product.sell * qty + deliveryCharge}</b>
+              <span className="ml-1 text-xs text-gray-400">(incl. {currency} {deliveryCharge} delivery)</span>
             </div>
 
             <div className="mt-5">
@@ -3657,8 +3665,8 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
           </div>
 
           <div className="mt-3 flex items-baseline gap-2 flex-wrap">
-            <span className="text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {product.sell}</span>
-            <span className="text-sm text-gray-300 line-through" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {Math.round(product.sell * 1.35)}</span>
+            <span className="text-3xl font-extrabold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {product.sell}</span>
+            <span className="text-sm text-gray-300 line-through" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {Math.round(product.sell * 1.35)}</span>
             <span className="text-xs font-bold px-2 py-1 rounded-full text-white" style={{ background: "linear-gradient(135deg,#F8B400,#e0a300)", animation: "goldPulseRing 2.4s ease-out infinite" }}>Save 26%</span>
             <span
               className="text-xs font-semibold px-2.5 py-1 rounded-full"
@@ -3898,7 +3906,7 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
                   <ProductThumb product={p} size={40} />
                 </div>
                 <div className="mt-3 text-sm font-semibold truncate" style={{ color: "#111827" }}>{p.name}</div>
-                <div className="mt-1 text-sm font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {p.sell}</div>
+                <div className="mt-1 text-sm font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{currencyForCountry(p.country)} {p.sell}</div>
               </button>
             ))}
           </div>
@@ -3909,6 +3917,10 @@ function ProductLandingPage({ product, onBack, onAddToCart, onBuyNow, catalog = 
 }
 
 function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
+  // Cart items each carry their own country (set when added), so the cart
+  // can show SAR for KSA products even if it happens to also hold AED items.
+  // In practice a cart only ever holds one region's products at a time.
+  const cartCurrency = currencyForCountry(items[0]?.country);
   return (
     <div style={{ animation: "dashTabIn 0.3s ease-out both" }}>
       <button onClick={onBack} className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1">
@@ -3927,21 +3939,21 @@ function CartView({ items, onUpdateQty, onRemove, onBack, onCheckout, total }) {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-semibold" style={{ color: "#111827" }}>{it.name}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">AED {it.sell} each</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{currencyForCountry(it.country)} {it.sell} each</div>
                 </div>
                 <div className="flex items-center rounded-full" style={{ border: "1px solid #E5E7EB" }}>
                   <button onClick={() => onUpdateQty(it.id, it.qty - 1)} className="w-8 h-8 text-sm font-bold text-gray-600">−</button>
                   <span className="w-7 text-center text-sm font-semibold">{it.qty}</span>
                   <button onClick={() => onUpdateQty(it.id, it.qty + 1)} className="w-8 h-8 text-sm font-bold text-gray-600">+</button>
                 </div>
-                <div className="w-20 text-right text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {it.sell * it.qty}</div>
+                <div className="w-20 text-right text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{currencyForCountry(it.country)} {it.sell * it.qty}</div>
                 <button onClick={() => onRemove(it.id)} className="text-gray-300 hover:text-red-500"><X className="w-4 h-4" /></button>
               </div>
             ))}
           </div>
           <div className="mt-6 flex items-center justify-between rounded-2xl p-5 bg-white" style={{ border: "1px solid #E5E7EB" }}>
             <div className="text-sm text-gray-500">Total</div>
-            <div className="text-xl font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {total}</div>
+            <div className="text-xl font-bold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{cartCurrency} {total}</div>
           </div>
           <button onClick={onCheckout} className="mt-5 w-full sm:w-auto text-sm font-semibold px-8 py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
             Proceed to checkout
@@ -3962,12 +3974,14 @@ function CodAmountRow({ it, baseTotal, initialCodAmount, onUpdateItemPrice }) {
   const [raw, setRaw] = useState(String(initialCodAmount));
   const parsed = raw === "" ? NaN : parseFloat(raw);
   const itemProfit = isNaN(parsed) ? null : parsed - baseTotal;
+  const currency = currencyForCountry(it.country);
+  const deliveryCharge = deliveryChargeForCountry(it.country);
 
   const commit = () => {
     let entered = parseFloat(raw);
     if (isNaN(entered) || entered < 0) entered = baseTotal;
     setRaw(String(entered));
-    onUpdateItemPrice(it.id, (entered - DELIVERY_CHARGE) / it.qty);
+    onUpdateItemPrice(it.id, (entered - deliveryCharge) / it.qty);
   };
 
   return (
@@ -3985,7 +3999,7 @@ function CodAmountRow({ it, baseTotal, initialCodAmount, onUpdateItemPrice }) {
       </div>
       <div className="mt-1.5 flex items-center justify-between text-xs font-semibold" style={{ color: "#00a67e" }}>
         <span>Your profit is</span>
-        <span>AED {itemProfit === null ? "—" : itemProfit.toFixed(2)}</span>
+        <span>{currency} {itemProfit === null ? "—" : itemProfit.toFixed(2)}</span>
       </div>
     </>
   );
@@ -3994,11 +4008,14 @@ function CodAmountRow({ it, baseTotal, initialCodAmount, onUpdateItemPrice }) {
 function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
   const [form, setForm] = useState({ name: "", phone: "", emirate: EMIRATES[0], address: "", notes: "" });
   const [busy, setBusy] = useState(false);
+  // Cart items each carry their own country; in practice a checkout only
+  // ever holds one region's products, so we use that for currency/shipping.
+  const currency = currencyForCountry(items[0]?.country);
   const itemsTotal = items.reduce((s, it) => s + it.sell * it.qty, 0);
-  const deliveryTotal = items.length * DELIVERY_CHARGE;
+  const deliveryTotal = items.reduce((s, it) => s + deliveryChargeForCountry(it.country), 0);
   const total = itemsTotal + deliveryTotal;
-  const baseTotal = items.reduce((s, it) => s + it.listSell * it.qty + DELIVERY_CHARGE, 0);
-  const profitTotal = items.reduce((s, it) => s + (it.sell * it.qty + DELIVERY_CHARGE) - (it.listSell * it.qty + DELIVERY_CHARGE), 0);
+  const baseTotal = items.reduce((s, it) => s + it.listSell * it.qty + deliveryChargeForCountry(it.country), 0);
+  const profitTotal = items.reduce((s, it) => s + (it.sell * it.qty + deliveryChargeForCountry(it.country)) - (it.listSell * it.qty + deliveryChargeForCountry(it.country)), 0);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -4046,7 +4063,7 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="e.g. call before delivery, gift wrap, deliver after 6pm…" rows={2} className="mt-1 w-full rounded-lg px-3 py-2 text-sm" style={inputStyle} />
           </div>
           <button disabled={busy} className="w-full mt-2 text-sm font-semibold py-3 rounded-full text-white transition-transform duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#00C896,#00a67e)" }}>
-            {busy ? "Placing order…" : `Place order — AED ${total}`}
+            {busy ? "Placing order…" : `Place order — ${currency} ${total}`}
           </button>
         </form>
 
@@ -4054,9 +4071,11 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
           <div className="font-bold text-sm" style={{ color: "#111827" }}>Order summary</div>
           <div className="mt-4 space-y-5">
             {items.map((it) => {
+              const itemDeliveryCharge = deliveryChargeForCountry(it.country);
+              const itemCurrency = currencyForCountry(it.country);
               const subtotal = it.listSell * it.qty;
-              const baseTotal = subtotal + DELIVERY_CHARGE;
-              const codAmount = it.sell * it.qty + DELIVERY_CHARGE;
+              const baseTotal = subtotal + itemDeliveryCharge;
+              const codAmount = it.sell * it.qty + itemDeliveryCharge;
               return (
                 <div key={it.id} className="text-sm">
                   <div className="flex items-center justify-between font-semibold" style={{ color: "#111827" }}>
@@ -4064,15 +4083,15 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
                   </div>
                   <div className="mt-2 flex items-center justify-between text-gray-500">
                     <span>Subtotal</span>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {subtotal}</span>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{itemCurrency} {subtotal}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between text-gray-500">
                     <span>Shipping</span>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {DELIVERY_CHARGE}</span>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{itemCurrency} {itemDeliveryCharge}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between font-semibold" style={{ color: "#0B1F3A" }}>
                     <span>Total (actual price)</span>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {baseTotal}</span>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{itemCurrency} {baseTotal}</span>
                   </div>
                   <CodAmountRow
                     key={it.id}
@@ -4088,11 +4107,11 @@ function CheckoutForm({ items, onBack, onSubmit, onUpdateItemPrice, notify }) {
           <div className="mt-4 pt-4 space-y-2 text-sm" style={{ borderTop: "1px solid #F3F4F6" }}>
             <div className="flex items-center justify-between font-bold" style={{ color: "#0B1F3A" }}>
               <span>Total (cash to collect)</span>
-              <span style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {total}</span>
+              <span style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {total}</span>
             </div>
             <div className="flex items-center justify-between text-xs" style={{ color: "#00a67e" }}>
               <span>Your total profit</span>
-              <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {profitTotal}</span>
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {profitTotal}</span>
             </div>
           </div>
           <div className="mt-3 text-xs text-gray-400">Cash on delivery — payment collected on arrival.</div>
@@ -4176,7 +4195,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     setCart((prev) => {
       const existing = prev.find((c) => c.id === product.id);
       if (existing) return prev.map((c) => (c.id === product.id ? { ...c, qty: c.qty + qty } : c));
-      return [...prev, { id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, qty }];
+      return [...prev, { id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, country: product.country, qty }];
     });
     notify && notify(`${qty > 1 ? qty + "x " : ""}Added to cart.`);
   };
@@ -4187,7 +4206,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 
   const openProduct = (p) => { setActiveProduct(p); setView("detail"); };
   const buyNow = (product, qty) => {
-    setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, qty }]);
+    setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, country: product.country, qty }]);
     setCheckoutFrom("detail");
     setView("checkout");
   };
@@ -4206,7 +4225,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     for (const item of checkoutItems) {
       const result = await onPlaceOrder({
         productId: item.id, productName: item.name, qty: item.qty,
-        sellPrice: item.sell, costPrice: item.cost, listPrice: item.listSell, deliveryCharge: DELIVERY_CHARGE,
+        sellPrice: item.sell, costPrice: item.cost, listPrice: item.listSell, deliveryCharge: deliveryChargeForCountry(item.country),
         buyer: customer.name, city: customer.emirate,
         customerPhone: customer.phone, customerAddress: customer.address, notes: customer.notes,
       });
@@ -4360,7 +4379,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                   </div>
                   <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} placeholder="Category" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                   {/* SELL PRICE ONLY — cost is admin-internal, not shown here */}
-                  <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder="Sell price (AED)" className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
+                  <input type="number" value={editForm.sell} onChange={(e) => setEditForm({ ...editForm, sell: e.target.value })} placeholder={`Sell price (${currencyForCountry(p.country)})`} className="w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
                   <div>
                     <label className="text-[11px] text-gray-400">Stock quantity (only you see this number — sellers just see In Stock / Out of Stock)</label>
                     <input type="number" min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} placeholder="Stock quantity" className="mt-1 w-full rounded-lg px-2 py-1.5 text-xs" style={{ border: "1px solid #E5E7EB" }} />
@@ -4451,7 +4470,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                   className="mt-2 text-xl font-extrabold"
                   style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#0B1F3A" }}
                 >
-                  AED {Number(p.sell).toLocaleString()}
+                  {currencyForCountry(p.country)} {Number(p.sell).toLocaleString()}
                 </div>
 
                 {/* ── Quantity counter ── */}
