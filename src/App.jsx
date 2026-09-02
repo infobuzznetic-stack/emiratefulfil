@@ -1447,7 +1447,7 @@ function Toast({ message }) {
 ============================================================ */
 function PremiumCelebration({ onClose }) {
   useEffect(() => {
-    const id = setTimeout(onClose, 4200);
+    const id = setTimeout(onClose, 9000);
     return () => clearTimeout(id);
   }, []); // eslint-disable-line
 
@@ -1484,6 +1484,14 @@ function PremiumCelebration({ onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-1.5 w-full absolute top-0 left-0" style={{ background: "linear-gradient(90deg, #F8B400, #FFE29A, #c98f00)" }} />
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+          style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)" }}
+        >
+          <X className="w-4 h-4" />
+        </button>
         <div
           className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
           style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", boxShadow: "0 12px 34px rgba(248,180,0,0.55)", animation: "premiumCrownDrop 0.6s ease-out 0.15s both" }}
