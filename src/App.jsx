@@ -1438,6 +1438,80 @@ function Toast({ message }) {
 }
 
 /* ============================================================
+   PREMIUM UPGRADE CELEBRATION
+   Full-screen gold moment shown once, the instant a seller's account
+   flips from Free to Premium (see Dashboard's applyPremiumStatus). Auto
+   dismisses on its own after a few seconds, or on tap. Reuses the same
+   navy/gold palette and keyframes as the rest of the dashboard so it
+   feels native rather than bolted on.
+============================================================ */
+function PremiumCelebration({ onClose }) {
+  useEffect(() => {
+    const id = setTimeout(onClose, 4200);
+    return () => clearTimeout(id);
+  }, []); // eslint-disable-line
+
+  const confetti = Array.from({ length: 22 }, (_, i) => ({
+    left: `${(i * 37) % 100}%`,
+    delay: `${(i % 7) * 0.18}s`,
+    duration: `${2.2 + (i % 5) * 0.3}s`,
+    color: ["#F8B400", "#FFE29A", "#00C896", "#ffffff"][i % 4],
+    size: 6 + (i % 3) * 3,
+  }));
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+      style={{ background: "rgba(11,31,58,0.82)", backdropFilter: "blur(6px)" }}
+      onClick={onClose}
+    >
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {confetti.map((c, i) => (
+          <span
+            key={i}
+            className="absolute top-0 rounded-sm"
+            style={{
+              left: c.left, width: c.size, height: c.size * 1.6, background: c.color,
+              animation: `confettiFall ${c.duration} ease-in ${c.delay} infinite`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div
+        className="relative w-full max-w-sm rounded-3xl overflow-hidden text-center px-8 pt-9 pb-8"
+        style={{ background: "#0B1F3A", border: "1px solid rgba(248,180,0,0.4)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)", animation: "premiumPopIn 0.45s cubic-bezier(0.34,1.56,0.64,1) both" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="h-1.5 w-full absolute top-0 left-0" style={{ background: "linear-gradient(90deg, #F8B400, #FFE29A, #c98f00)" }} />
+        <div
+          className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
+          style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", boxShadow: "0 12px 34px rgba(248,180,0,0.55)", animation: "premiumCrownDrop 0.6s ease-out 0.15s both" }}
+        >
+          <Crown className="w-10 h-10" style={{ color: "#3a2a0b" }} />
+        </div>
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-3" style={{ background: "rgba(248,180,0,0.18)", color: "#F8B400" }}>
+          <Sparkles className="w-3 h-3" /> Upgrade complete
+        </div>
+        <h2 className="text-xl font-extrabold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          You're a Premium Seller now! 👑
+        </h2>
+        <p className="mt-2.5 text-sm text-white/60 leading-relaxed">
+          Premium sourcing, winning products and private creatives are unlocked on your account starting now.
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-6 w-full text-sm font-bold py-3 rounded-xl transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+          style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f", boxShadow: "0 8px 20px rgba(248,180,0,0.4)" }}
+        >
+          Let's go 🚀
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    PWA INSTALL PROMPT
    Shows a small "Install EmirateFulfil" banner (matches the Toast style)
    once the browser signals the app is installable. Dismissal is
@@ -2057,6 +2131,22 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   // Whether Admin has marked this seller as "Premium" — just a badge/status,
   // doesn't change which products they see (that's the per-product "Visible to" list).
   const [isPremiumSeller, setIsPremiumSeller] = useState(() => readLocal(`ef_premium_${session.email}`, false));
+  // Tracks the last premium value we actually knew about (seeded from the
+  // same local cache as isPremiumSeller above), so we can tell an Admin
+  // upgrade apart from "was already Premium". Kept in a ref rather than
+  // state since it's bookkeeping, not something that should re-render on
+  // its own. When it flips false -> true we show a one-time celebration so
+  // the seller actually *feels* the upgrade happen, instead of the badge
+  // just silently appearing next time they look.
+  const wasPremiumRef = useRef(readLocal(`ef_premium_${session.email}`, false));
+  const [showPremiumCelebration, setShowPremiumCelebration] = useState(false);
+
+  const applyPremiumStatus = (premium) => {
+    if (premium && !wasPremiumRef.current) setShowPremiumCelebration(true);
+    wasPremiumRef.current = premium;
+    setIsPremiumSeller(premium);
+    writeLocal(`ef_premium_${session.email}`, premium);
+  };
 
   const reload = async () => {
     const rawCatalog = await fetchCatalog();
@@ -2065,15 +2155,27 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     setListings(await fetchListings(session.email));
     setOrders(await fetchOrders(session.email));
     const premiumEmails = await fetchPremiumSellerEmails();
-    const premium = premiumEmails.includes(session.email);
-    setIsPremiumSeller(premium);
-    writeLocal(`ef_premium_${session.email}`, premium);
+    applyPremiumStatus(premiumEmails.includes(session.email));
     if (isAdmin) {
       const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
       setSellerCount(count || 0);
     }
   };
   useEffect(() => { reload(); }, []); // eslint-disable-line
+
+  // Lightweight poll so a seller sitting on the dashboard sees the
+  // celebration fire the moment Admin flips their Premium switch, instead
+  // of only finding out after their next manual refresh/login.
+  useEffect(() => {
+    if (isAdmin) return;
+    const id = setInterval(async () => {
+      try {
+        const premiumEmails = await fetchPremiumSellerEmails();
+        applyPremiumStatus(premiumEmails.includes(session.email));
+      } catch (e) { /* non-fatal — try again next tick */ }
+    }, 40000);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line
 
   // Admin drags products into a new order in the "Reorder products" panel —
   // update on screen immediately (optimistic), then persist the new order so
@@ -2491,7 +2593,30 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           from { opacity: 0.4; transform: scale(1.02); }
           to { opacity: 1; transform: scale(1); }
         }
+        @keyframes premiumPopIn {
+          0% { opacity: 0; transform: scale(0.7) translateY(20px); }
+          60% { opacity: 1; transform: scale(1.05) translateY(0); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes premiumCrownDrop {
+          0% { opacity: 0; transform: translateY(-30px) rotate(-12deg) scale(0.6); }
+          60% { opacity: 1; transform: translateY(4px) rotate(6deg) scale(1.1); }
+          100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+        }
+        @keyframes confettiFall {
+          0% { transform: translateY(-40px) rotate(0deg); opacity: 0; }
+          10% { opacity: 1; }
+          100% { transform: translateY(420px) rotate(340deg); opacity: 0; }
+        }
       `}</style>
+
+      {/* Premium upgrade celebration — fires the moment Admin marks this
+          seller Premium (picked up by reload() or the background poll
+          above), so the upgrade is felt right away instead of just quietly
+          changing a badge somewhere. */}
+      {showPremiumCelebration && (
+        <PremiumCelebration onClose={() => setShowPremiumCelebration(false)} />
+      )}
 
       {/* Main */}
       <main className="flex-1 min-w-0 w-full px-6 md:px-10 py-8 md:py-8 pt-24 md:pt-8 max-w-6xl relative z-10 overflow-x-hidden">
