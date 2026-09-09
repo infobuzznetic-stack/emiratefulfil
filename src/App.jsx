@@ -4591,7 +4591,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             >
               {/* Gold lock overlay for non-premium sellers */}
               {isLocked && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl" style={{ background: "rgba(11,31,58,0.55)", backdropFilter: "blur(1.5px)" }}>
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl" style={{ background: "rgba(11,31,58,0.93)", backdropFilter: "blur(6px)" }}>
                   <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2" style={{ background: "linear-gradient(135deg,#F8B400,#c98f00)", boxShadow: "0 6px 20px rgba(248,180,0,0.5)" }}>
                     <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white"><path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6zm9 14H6V10h12v10zm-6-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
                   </div>
@@ -4606,7 +4606,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 
               {/* ── Image ── */}
               <div className="relative w-full aspect-square flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(160deg, ${color}14, ${color}05)` }}>
-                <div className={`transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full${isLocked ? " select-none pointer-events-none" : ""}`}>
+                <div className={`transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full${isLocked ? " blur-xl select-none pointer-events-none" : ""}`}>
                   <ProductThumb product={p} size={56} className="w-full h-full" />
                 </div>
                 {/* Diagonal shine sweep on hover */}
