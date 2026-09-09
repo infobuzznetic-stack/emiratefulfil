@@ -6932,6 +6932,136 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
       <h1 className="text-2xl font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Admin</h1>
       <p className="text-sm text-gray-500 mt-1">Manage the shared product catalog every seller sees, and track signups.</p>
 
+      {/* Sellers table: every signed-up seller, with contact details and signup date */}
+      <div className="mt-8 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+          <div>
+            <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Sellers ({sellers.length})</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Every account that has signed up, newest first.</p>
+          </div>
+          <input
+            value={sellerSearch}
+            onChange={(e) => setSellerSearch(e.target.value)}
+            placeholder="Search by name, email, or company…"
+            className="text-sm rounded-full px-4 py-2 w-full sm:w-72"
+            style={{ border: "1px solid #E5E7EB" }}
+          />
+        </div>
+        {sellersLoading ? (
+          <div className="p-8 text-center text-sm text-gray-400">Loading sellers…</div>
+        ) : filteredSellers.length === 0 ? (
+          <div className="p-8 text-center text-sm text-gray-400">No sellers found.</div>
+        ) : (
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+            <table className="w-full min-w-[900px] text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-400 uppercase tracking-wide" style={{ background: "#F8FAFC" }}>
+                  <th className="px-5 py-3">Seller</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Mobile</th>
+                  <th className="px-4 py-3">WhatsApp</th>
+                  <th className="px-4 py-3">Store</th>
+                  <th className="px-4 py-3">Country</th>
+                  <th className="px-4 py-3">Avg. orders/mo</th>
+                  <th className="px-4 py-3">Bank</th>
+                  <th className="px-4 py-3">Orders</th>
+                  <th className="px-4 py-3">Signed up</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Approval</th>
+                  <th className="px-4 py-3">Premium</th>
+                  <th className="px-4 py-3">Invoices</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "#F3F4F6" }}>
+                {filteredSellers.map((s) => (
+                  <tr key={s.id}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#0B1F3A,#00a67e)" }}>
+                          {(s.name || s.email || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-semibold" style={{ color: "#111827" }}>{s.name || "—"}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{s.email}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.phone || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.whatsapp || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.store_name || s.company || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.country || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.monthly_orders || "—"}</td>
+                    <td className="px-4 py-3">
+                      {s.bank_name || s.account_number || s.iban ? (
+                        <div className="text-xs text-gray-500 leading-tight" title={`IBAN: ${s.iban || "—"}`}>
+                          <div className="font-semibold" style={{ color: "#111827" }}>{s.bank_name || "—"}</div>
+                          <div>{s.account_title || "—"}</div>
+                          <div>{s.account_number || "—"}</div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{sellerOrderCount(s.email)}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {s.created_at ? new Date(s.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                        style={
+                          s.approval_status === "approved" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
+                          s.approval_status === "deactivated" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
+                          { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
+                        }
+                      >
+                        {s.approval_status === "approved" ? "Approved" : s.approval_status === "deactivated" ? "Deactivated" : "Pending"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.approval_status === "approved" ? (
+                        <button onClick={() => setSellerApproval(s.id, "deactivated")} className="text-xs font-semibold px-3 py-1.5 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button onClick={() => setSellerApproval(s.id, "approved")} className="text-xs font-semibold px-3 py-1.5 rounded-full text-white" style={{ background: "#00C896" }}>
+                          {s.approval_status === "deactivated" ? "Reactivate" : "Approve"}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => togglePremiumSeller(s.email)}
+                        disabled={premiumTogglingEmail === s.email}
+                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-60"
+                        style={
+                          premiumSellerEmails.includes(s.email)
+                            ? { background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f" }
+                            : { border: "1px solid #E5E7EB", color: "#6B7280" }
+                        }
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {premiumTogglingEmail === s.email ? "…" : premiumSellerEmails.includes(s.email) ? "Premium ✓" : "Make Premium"}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => setInvoiceManagerSeller(s)}
+                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full"
+                        style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}
+                      >
+                        <FileText className="w-3.5 h-3.5" /> Invoices
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {invoiceManagerSeller && (
+        <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
+      )}
       <div className="mt-6 rounded-2xl p-6" style={{ border: "1px solid #E5E7EB", background: "linear-gradient(135deg,#0B1F3A08,#00C89608)" }}>
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4" style={{ color: "#F8B400" }} />
@@ -7514,136 +7644,6 @@ function AdminTab({ catalog, sellerCount, notify, onCatalogChanged, onReorder })
         </button>
       </div>
 
-      {/* Sellers table: every signed-up seller, with contact details and signup date */}
-      <div className="mt-8 rounded-2xl bg-white overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-          <div>
-            <h2 className="text-base font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Sellers ({sellers.length})</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Every account that has signed up, newest first.</p>
-          </div>
-          <input
-            value={sellerSearch}
-            onChange={(e) => setSellerSearch(e.target.value)}
-            placeholder="Search by name, email, or company…"
-            className="text-sm rounded-full px-4 py-2 w-full sm:w-72"
-            style={{ border: "1px solid #E5E7EB" }}
-          />
-        </div>
-        {sellersLoading ? (
-          <div className="p-8 text-center text-sm text-gray-400">Loading sellers…</div>
-        ) : filteredSellers.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">No sellers found.</div>
-        ) : (
-          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
-            <table className="w-full min-w-[900px] text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-400 uppercase tracking-wide" style={{ background: "#F8FAFC" }}>
-                  <th className="px-5 py-3">Seller</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Mobile</th>
-                  <th className="px-4 py-3">WhatsApp</th>
-                  <th className="px-4 py-3">Store</th>
-                  <th className="px-4 py-3">Country</th>
-                  <th className="px-4 py-3">Avg. orders/mo</th>
-                  <th className="px-4 py-3">Bank</th>
-                  <th className="px-4 py-3">Orders</th>
-                  <th className="px-4 py-3">Signed up</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Approval</th>
-                  <th className="px-4 py-3">Premium</th>
-                  <th className="px-4 py-3">Invoices</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y" style={{ borderColor: "#F3F4F6" }}>
-                {filteredSellers.map((s) => (
-                  <tr key={s.id}>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "linear-gradient(135deg,#0B1F3A,#00a67e)" }}>
-                          {(s.name || s.email || "?").charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-semibold" style={{ color: "#111827" }}>{s.name || "—"}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{s.email}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.phone || "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.whatsapp || "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.store_name || s.company || "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.country || "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.monthly_orders || "—"}</td>
-                    <td className="px-4 py-3">
-                      {s.bank_name || s.account_number || s.iban ? (
-                        <div className="text-xs text-gray-500 leading-tight" title={`IBAN: ${s.iban || "—"}`}>
-                          <div className="font-semibold" style={{ color: "#111827" }}>{s.bank_name || "—"}</div>
-                          <div>{s.account_title || "—"}</div>
-                          <div>{s.account_number || "—"}</div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{sellerOrderCount(s.email)}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                      {s.created_at ? new Date(s.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                        style={
-                          s.approval_status === "approved" ? { background: "rgba(0,200,150,0.15)", color: "#00a67e" } :
-                          s.approval_status === "deactivated" ? { background: "rgba(239,68,68,0.12)", color: "#EF4444" } :
-                          { background: "rgba(248,180,0,0.15)", color: "#b07d00" }
-                        }
-                      >
-                        {s.approval_status === "approved" ? "Approved" : s.approval_status === "deactivated" ? "Deactivated" : "Pending"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {s.approval_status === "approved" ? (
-                        <button onClick={() => setSellerApproval(s.id, "deactivated")} className="text-xs font-semibold px-3 py-1.5 rounded-full text-red-500" style={{ border: "1px solid #FECACA" }}>
-                          Deactivate
-                        </button>
-                      ) : (
-                        <button onClick={() => setSellerApproval(s.id, "approved")} className="text-xs font-semibold px-3 py-1.5 rounded-full text-white" style={{ background: "#00C896" }}>
-                          {s.approval_status === "deactivated" ? "Reactivate" : "Approve"}
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => togglePremiumSeller(s.email)}
-                        disabled={premiumTogglingEmail === s.email}
-                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-60"
-                        style={
-                          premiumSellerEmails.includes(s.email)
-                            ? { background: "linear-gradient(135deg,#F8B400,#c98f00)", color: "#04140f" }
-                            : { border: "1px solid #E5E7EB", color: "#6B7280" }
-                        }
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {premiumTogglingEmail === s.email ? "…" : premiumSellerEmails.includes(s.email) ? "Premium ✓" : "Make Premium"}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => setInvoiceManagerSeller(s)}
-                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full"
-                        style={{ border: "1px solid #E5E7EB", color: "#0B1F3A" }}
-                      >
-                        <FileText className="w-3.5 h-3.5" /> Invoices
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {invoiceManagerSeller && (
-        <SellerInvoiceManager seller={invoiceManagerSeller} notify={notify} onClose={() => setInvoiceManagerSeller(null)} />
-      )}
 
       <div className="mt-8 flex items-center gap-2 flex-wrap">
         {PRODUCT_COUNTRIES.map((c) => (
