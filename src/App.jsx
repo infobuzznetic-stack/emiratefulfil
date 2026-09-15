@@ -82,7 +82,7 @@ function Logo({ box = "w-9 h-9", icon = "w-5 h-5" }) {
       style={{ background: "#0B1F3A" }}
     >
       {logoUrl ? (
-        <img src={logoUrl} alt="EmirateFulfil logo" className="w-full h-full object-contain p-1" />
+        <img src={logoUrl} alt="EmirateFulfil logo" className="w-full h-full object-cover" />
       ) : (
         <PackageCheck className={`${icon} text-white`} />
       )}
