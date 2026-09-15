@@ -711,11 +711,11 @@ function Hero({ onSignup }) {
 function TrustStrip() {
   const names = ["Noon Express", "Aramex", "Shopify", "Salla", "Zid", "SMSA"];
   return (
-    <div className="py-10" style={{ background: "#081221" }}>
-      <p className="text-center text-xs tracking-[0.2em] text-white/35 uppercase mb-6">Integrated with the platforms sellers already use</p>
+    <div className="py-10" style={{ background: "#0B1F3A", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <p className="text-center text-xs text-white/50 mb-6">Integrated with the platforms sellers already use</p>
       <div className="flex flex-wrap justify-center gap-x-12 gap-y-4 max-w-5xl mx-auto px-6">
         {names.map((n, i) => (
-          <span key={i} className="text-white/40 font-semibold text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{n}</span>
+          <span key={i} className="text-white/70 font-semibold text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{n}</span>
         ))}
       </div>
     </div>
@@ -1006,8 +1006,8 @@ function InAction() {
                 />
                 <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0) 40%, rgba(8,18,33,0.92) 100%)" }} />
                 <div className="absolute bottom-0 left-0 right-0 p-5">
-                  <div className="text-xs font-bold tracking-wide uppercase" style={{ color: "#F8B400" }}>{s.label}</div>
-                  <div className="mt-1 text-sm text-white/85">{s.caption}</div>
+                  <div className="text-sm font-bold text-white">{s.label}</div>
+                  <div className="mt-1 text-sm text-white/70">{s.caption}</div>
                 </div>
               </div>
             </Reveal>
