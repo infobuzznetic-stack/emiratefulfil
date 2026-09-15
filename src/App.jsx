@@ -5900,47 +5900,64 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
         ))}
       </div>
 
-      <div className="mt-4 rounded-2xl bg-white overflow-x-auto" style={{ border: "1px solid #E5E7EB", WebkitOverflowScrolling: "touch" }}>
-        {filteredOrders.length === 0 ? (
-          <div className="text-sm text-gray-400 py-10 text-center">
-            {orders.length === 0 ? "No orders yet — place one from the Products tab." : "No orders with this status."}
-          </div>
-        ) : (
-          <table className="w-full min-w-[950px] text-sm">
-            <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
-              <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
-              <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th><th className="px-4 py-3">WhatsApp Proof</th>
-            </tr></thead>
-            <tbody>
-              {filteredOrders.map((o, i) => (
-                <tr
-                  key={o.id}
-                  className="transition-colors duration-200 hover:bg-[#F5FBF9]"
-                  style={{ borderBottom: "1px solid #FAFAFA", animation: `dashTabIn 0.4s ease-out ${i * 60}ms both` }}
-                >
-                  <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
-                  <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
-                  <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
-                  <td className="px-4 py-3 text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</td>
-                  <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
-                  <td className="px-4 py-3"><StatusPill status={o.status} /></td>
-                  <td className="px-4 py-3 text-xs">
-                    {o.trackingNumber ? (
-                      buildTrackingLink(o) ? (
-                        <a href={buildTrackingLink(o)} target="_blank" rel="noreferrer" className="font-semibold" style={{ color: "#0284c7" }}>
-                          {o.trackingNumber} ↗
-                        </a>
+      {filteredOrders.length === 0 ? (
+        <div className="mt-4 rounded-2xl bg-white text-sm text-gray-400 py-10 text-center" style={{ border: "1px solid #E5E7EB" }}>
+          {orders.length === 0 ? "No orders yet — place one from the Products tab." : "No orders with this status."}
+        </div>
+      ) : (
+        <>
+          {/* Mobile: stacked cards — no sideways scrolling, no squinting at a 950px table on a 380px screen */}
+          <div className="mt-4 flex flex-col gap-3 md:hidden">
+            {filteredOrders.map((o, i) => (
+              <div
+                key={o.id}
+                className="rounded-2xl bg-white p-4"
+                style={{ border: "1px solid #E5E7EB", animation: `dashTabIn 0.4s ease-out ${i * 60}ms both` }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</div>
+                    <div className="font-semibold text-sm mt-0.5 break-words" style={{ color: "#0B1F3A" }}>
+                      {o.productName} <span className="text-gray-400 font-normal">×{o.qty}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</div>
+                  </div>
+                  <StatusPill status={o.status} />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+                  <div>
+                    <div className="text-[11px] text-gray-400">Sell</div>
+                    <div className="text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-400">Delivery</div>
+                    <div className="text-sm text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-400">Profit</div>
+                    <div className="text-sm font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</div>
+                  </div>
+                </div>
+
+                {(o.trackingNumber || o.whatsappProofUrl) && (
+                  <div className="flex items-center justify-between gap-3 mt-3 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+                    <div className="text-xs min-w-0">
+                      <span className="text-gray-400">Tracking: </span>
+                      {o.trackingNumber ? (
+                        buildTrackingLink(o) ? (
+                          <a href={buildTrackingLink(o)} target="_blank" rel="noreferrer" className="font-semibold" style={{ color: "#0284c7" }}>
+                            {o.trackingNumber} ↗
+                          </a>
+                        ) : (
+                          <span className="text-gray-500">{o.trackingNumber}</span>
+                        )
                       ) : (
-                        <span className="text-gray-500">{o.trackingNumber}</span>
-                      )
-                    ) : (
-                      <span className="text-gray-300">Not assigned yet</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {o.whatsappProofUrl ? (
-                      <a href={o.whatsappProofUrl} target="_blank" rel="noreferrer" title="View WhatsApp proof">
+                        <span className="text-gray-300">Not assigned yet</span>
+                      )}
+                    </div>
+                    {o.whatsappProofUrl && (
+                      <a href={o.whatsappProofUrl} target="_blank" rel="noreferrer" title="View WhatsApp proof" className="flex-shrink-0">
                         <img
                           src={o.whatsappProofUrl}
                           alt="WhatsApp proof"
@@ -5948,16 +5965,68 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
                           style={{ border: "1px solid #E5E7EB" }}
                         />
                       </a>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop/tablet: full table */}
+          <div className="mt-4 rounded-2xl bg-white overflow-x-auto hidden md:block" style={{ border: "1px solid #E5E7EB", WebkitOverflowScrolling: "touch" }}>
+            <table className="w-full min-w-[950px] text-sm">
+              <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
+                <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th><th className="px-4 py-3">WhatsApp Proof</th>
+              </tr></thead>
+              <tbody>
+                {filteredOrders.map((o, i) => (
+                  <tr
+                    key={o.id}
+                    className="transition-colors duration-200 hover:bg-[#F5FBF9]"
+                    style={{ borderBottom: "1px solid #FAFAFA", animation: `dashTabIn 0.4s ease-out ${i * 60}ms both` }}
+                  >
+                    <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
+                    <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
+                    <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
+                    <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
+                    <td className="px-4 py-3 text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</td>
+                    <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
+                    <td className="px-4 py-3"><StatusPill status={o.status} /></td>
+                    <td className="px-4 py-3 text-xs">
+                      {o.trackingNumber ? (
+                        buildTrackingLink(o) ? (
+                          <a href={buildTrackingLink(o)} target="_blank" rel="noreferrer" className="font-semibold" style={{ color: "#0284c7" }}>
+                            {o.trackingNumber} ↗
+                          </a>
+                        ) : (
+                          <span className="text-gray-500">{o.trackingNumber}</span>
+                        )
+                      ) : (
+                        <span className="text-gray-300">Not assigned yet</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {o.whatsappProofUrl ? (
+                        <a href={o.whatsappProofUrl} target="_blank" rel="noreferrer" title="View WhatsApp proof">
+                          <img
+                            src={o.whatsappProofUrl}
+                            alt="WhatsApp proof"
+                            className="w-9 h-9 rounded-lg object-cover"
+                            style={{ border: "1px solid #E5E7EB" }}
+                          />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
