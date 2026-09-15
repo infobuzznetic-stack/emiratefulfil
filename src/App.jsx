@@ -512,9 +512,14 @@ function Navbar({ session, onNav, onLogout }) {
               Go to dashboard
             </button>
           ) : (
-            <button onClick={() => onNav("signup")} className="mt-2 text-sm font-semibold px-5 py-2.5 rounded-full" style={{ background: "#00C896", color: "#04140f" }}>
-              Start free
-            </button>
+            <div className="flex flex-col gap-2 mt-2">
+              <button onClick={() => onNav("login")} className="text-sm font-semibold px-5 py-2.5 rounded-full border border-white/20 text-white">
+                Log in
+              </button>
+              <button onClick={() => onNav("signup")} className="text-sm font-semibold px-5 py-2.5 rounded-full" style={{ background: "#00C896", color: "#04140f" }}>
+                Start free
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -1700,7 +1705,7 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-16 relative overflow-hidden" style={{ background: "#081221", fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 py-10 sm:py-16 relative overflow-hidden" style={{ background: "#081221", fontFamily: "Inter, sans-serif" }}>
       {/* ambient glow blobs */}
       <div className="pointer-events-none absolute -top-24 -left-20 w-[380px] h-[380px] rounded-full opacity-[0.14] blur-3xl" style={{ background: "#00C896" }} />
       <div className="pointer-events-none absolute -bottom-32 -right-16 w-[420px] h-[420px] rounded-full opacity-[0.10] blur-3xl" style={{ background: "#F8B400" }} />
@@ -1764,7 +1769,7 @@ function AuthPage({ mode, onAuthed, onSwitch, notify }) {
         `}</style>
 
         <div
-          className="rounded-2xl p-8 auth-box"
+          className="rounded-2xl p-5 sm:p-8 auth-box"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", animationDelay: "0.05s" }}
         >
           <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -8964,6 +8969,13 @@ export default function EmirateFulfilApp() {
       <style>{`
         html, body { margin: 0; padding: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
         #root { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; text-align: ${dir === "rtl" ? "right" : "left"} !important; overflow-x: hidden !important; }
+        /* Any input/select/textarea under 16px makes iOS Safari auto-zoom the
+           whole page the moment someone taps it (login, signup, every form in
+           the dashboard) — this is the "screen jumps and everything looks
+           broken on mobile" bug. Force 16px on phones so nothing zooms. */
+        @media (max-width: 767px) {
+          input, select, textarea { font-size: 16px !important; }
+        }
       `}</style>
       <LanguageContext.Provider value={{ lang, setLang, t, dir }}>
       <LogoContext.Provider value={{ logoUrl, setLogoUrl }}>
