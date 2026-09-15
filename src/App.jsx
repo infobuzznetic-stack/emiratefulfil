@@ -79,7 +79,7 @@ function Logo({ box = "w-9 h-9", icon = "w-5 h-5" }) {
   return (
     <div
       className={`${box} rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden`}
-      style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}
+      style={{ background: "#0B1F3A" }}
     >
       {logoUrl ? (
         <img src={logoUrl} alt="EmirateFulfil logo" className="w-full h-full object-contain p-1" />
@@ -438,9 +438,6 @@ function Navbar({ session, onNav, onLogout }) {
         borderBottom: scrolled ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
       }}
     >
-      <div className="text-center text-xs py-1.5 tracking-wide" style={{ background: "linear-gradient(90deg,#00C896,#0B1F3A)", color: "#fff", display: scrolled ? "none" : "block" }}>
-        Now fulfilling across UAE · KSA · Qatar · Oman · Bahrain · Kuwait
-      </div>
       <nav className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <a href="#" className="flex items-center gap-2.5">
           <Logo />
@@ -561,8 +558,8 @@ function Hero({ onSignup }) {
         @keyframes shimmer { 0%{ background-position: -200% 0;} 100%{ background-position: 200% 0;} }
       `}</style>
 
-      <div className="absolute -top-40 -left-40 w-[520px] h-[520px] rounded-full opacity-30 blur-3xl" style={{ background: "#00C896", animation: "blobMove 14s ease-in-out infinite" }} />
-      <div className="absolute top-20 -right-40 w-[560px] h-[560px] rounded-full opacity-20 blur-3xl" style={{ background: "#F8B400", animation: "blobMove 18s ease-in-out infinite reverse" }} />
+      <div className="absolute -top-40 -left-40 w-[520px] h-[520px] rounded-full opacity-[0.12] blur-3xl" style={{ background: "#00C896", animation: "blobMove 14s ease-in-out infinite" }} />
+      <div className="absolute top-20 -right-40 w-[560px] h-[560px] rounded-full opacity-[0.10] blur-3xl" style={{ background: "#F8B400", animation: "blobMove 18s ease-in-out infinite reverse" }} />
 
       {icons.map((Icon, i) => (
         <div
