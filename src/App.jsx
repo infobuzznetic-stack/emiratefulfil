@@ -70,18 +70,22 @@ function useLang() { return useContext(LanguageContext); }
 
 function Logo({ box = "w-9 h-9", icon = "w-5 h-5" }) {
   const { logoUrl } = useContext(LogoContext);
-  if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt="EmirateFulfil logo"
-        className={`${box} rounded-xl object-cover flex-shrink-0`}
-      />
-    );
-  }
+  // Always render on the same brand-navy/emerald gradient tile, whether
+  // it's the fallback icon or an admin-uploaded picture. A raw <img> with
+  // no background would pick up whatever color sits behind it on each
+  // page (navy navbar, white card, light section…) and a white/transparent
+  // logo would vanish entirely on light backgrounds — this keeps the logo
+  // looking the same everywhere it appears.
   return (
-    <div className={`${box} rounded-xl flex items-center justify-center flex-shrink-0`} style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}>
-      <PackageCheck className={`${icon} text-white`} />
+    <div
+      className={`${box} rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden`}
+      style={{ background: "linear-gradient(135deg,#00C896,#0B1F3A)" }}
+    >
+      {logoUrl ? (
+        <img src={logoUrl} alt="EmirateFulfil logo" className="w-full h-full object-contain p-1" />
+      ) : (
+        <PackageCheck className={`${icon} text-white`} />
+      )}
     </div>
   );
 }
