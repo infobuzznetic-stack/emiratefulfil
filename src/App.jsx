@@ -409,6 +409,13 @@ function Navbar({ session, onNav, onLogout }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Lock page scroll while the mobile menu is open, and make sure it never
+  // stays open behind the scenes if the component unmounts.
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   const services = [
     { icon: Package, label: "Dropshipping", desc: "Ship without holding stock" },
     { icon: Warehouse, label: "Warehousing", desc: "Storage across the Gulf" },
@@ -496,17 +503,28 @@ function Navbar({ session, onNav, onLogout }) {
           )}
         </div>
 
-        <button className="lg:hidden text-white" onClick={() => setOpen(!open)}>
-          {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        <button className="lg:hidden text-white" onClick={() => setOpen(true)}>
+          <Menu className="w-6 h-6" />
         </button>
       </nav>
 
       {open && (
-        <div className="lg:hidden px-6 pb-6 flex flex-col gap-4 text-white/85 text-sm" style={{ background: "#0B1F3A" }}>
-          <a href="#services">Services</a>
-          <a href="#how">How it works</a>
-          <a href="#testimonials">Customers</a>
-          <a href="#faq">FAQ</a>
+        <div className="lg:hidden fixed inset-0 z-[60] flex flex-col px-6 pt-6 pb-8 gap-4 text-white/85 text-sm overflow-y-auto" style={{ background: "#0B1F3A" }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <Logo />
+              <span className="font-bold text-white text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Emirate<span style={{ color: "#00C896" }}>Fulfil</span>
+              </span>
+            </div>
+            <button className="text-white" onClick={() => setOpen(false)}>
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <a href="#services" onClick={() => setOpen(false)}>Services</a>
+          <a href="#how" onClick={() => setOpen(false)}>How it works</a>
+          <a href="#testimonials" onClick={() => setOpen(false)}>Customers</a>
+          <a href="#faq" onClick={() => setOpen(false)}>FAQ</a>
           {session ? (
             <button onClick={() => onNav("dashboard")} className="mt-2 text-sm font-semibold px-5 py-2.5 rounded-full" style={{ background: "#00C896", color: "#04140f" }}>
               Go to dashboard
@@ -770,8 +788,55 @@ function Features() {
         </Reveal>
 
         <Reveal delay={80}>
+          {/* Mobile: one stacked card per plan (label + value listed together) —
+              the wide grid below turns into unreadable, cut-off horizontal
+              scroll on a phone, so phones get their own layout instead. */}
+          <div className="mt-6 flex flex-col gap-4 md:hidden">
+            {plans.map((p, pi) => {
+              const s = FEATURES_TABLE_HEADER_STYLES[pi % FEATURES_TABLE_HEADER_STYLES.length];
+              return (
+                <div key={pi} className="rounded-2xl overflow-hidden" style={{ border: "1px solid #E5E7EB", boxShadow: "0 20px 50px rgba(11,31,58,0.08)" }}>
+                  <div className="p-5 text-center" style={{ background: s.bg }}>
+                    <span
+                      className="inline-block text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full"
+                      style={{ background: s.badgeBg, color: s.badgeColor }}
+                    >
+                      {p.badge}
+                    </span>
+                    <div className="mt-2 text-base font-extrabold" style={{ color: s.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{p.name}</div>
+                    <div className="text-xs font-semibold" style={{ color: s.sub }}>{p.subtitle}</div>
+                    <div className="mt-1 text-2xl font-extrabold" style={{ color: s.text, fontFamily: "'Space Grotesk', sans-serif" }}>{p.price}</div>
+                  </div>
+                  <div style={{ background: "#fff" }}>
+                    {rows.map((r, ri) => (
+                      <div
+                        key={ri}
+                        className="px-5 py-3 flex items-center justify-between gap-4 text-sm"
+                        style={{ background: ri % 2 === 0 ? "#fff" : "#F8FAFC", borderTop: "1px solid #EEF1F5" }}
+                      >
+                        <span className="font-semibold" style={{ color: "#111827" }}>{r.label}</span>
+                        {r.type === "text" ? (
+                          <span className="text-right font-semibold flex-shrink-0" style={{ color: "#374151" }}>{r.values?.[pi] ?? ""}</span>
+                        ) : r.values?.[pi] ? (
+                          <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#E6FBF4", color: "#00a67e" }}>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          </span>
+                        ) : (
+                          <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#F3F4F6", color: "#9CA3AF" }}>
+                            <X className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop/tablet: full comparison grid */}
           <div
-            className="mt-6 rounded-2xl overflow-hidden"
+            className="mt-6 rounded-2xl overflow-hidden hidden md:block"
             style={{ border: "1px solid #E5E7EB", boxShadow: "0 20px 50px rgba(11,31,58,0.08)" }}
           >
             <div className="overflow-x-auto">
