@@ -138,11 +138,11 @@ async function uploadTicketImage(file) {
 // Used for two events: seller portal approval, and Gold Plan upgrade.
 // Failures here are swallowed on purpose — email delivery should never block
 // the actual approve/upgrade action; the seller just won't get the email.
-async function sendSellerEmail(type, seller) {
+async function sendSellerEmail(type, seller, extra = {}) {
   if (!seller?.email) return;
   try {
     await supabase.functions.invoke("notify-seller", {
-      body: { type, email: seller.email, name: seller.name || seller.email },
+      body: { type, email: seller.email, name: seller.name || seller.email, ...extra },
     });
   } catch (e) {
     // non-fatal
@@ -8703,6 +8703,15 @@ function AdminTicketsPanel({
       [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: senderDisplayName, body: reply.trim(), createdAt: new Date().toISOString() }],
     }));
     setReply("");
+    // Let the seller know a reply is waiting — non-fatal if it fails, the
+    // reply itself is already saved above.
+    if (selectedTicket) {
+      sendSellerEmail(
+        "ticket_reply",
+        { email: selectedTicket.sellerEmail, name: selectedTicket.sellerName },
+        { subject: selectedTicket.subject, category, senderName: senderDisplayName }
+      );
+    }
   };
 
   const sendImage = async (file) => {
@@ -8719,6 +8728,13 @@ function AdminTicketsPanel({
       ...prev,
       [selectedId]: [...(prev[selectedId] || []), { id: "local-" + Date.now(), ticketId: selectedId, sender: "admin", senderName: senderDisplayName, body: "", imageUrl: url, createdAt: new Date().toISOString() }],
     }));
+    if (selectedTicket) {
+      sendSellerEmail(
+        "ticket_reply",
+        { email: selectedTicket.sellerEmail, name: selectedTicket.sellerName },
+        { subject: selectedTicket.subject, category, senderName: senderDisplayName }
+      );
+    }
   };
 
   const toggleResolve = async (id, currentStatus) => {
