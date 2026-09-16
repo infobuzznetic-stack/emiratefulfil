@@ -2206,6 +2206,72 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     ].slice(0, 30));
   };
   const markNotificationsRead = () => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const pushTicketNotification = (ticketId, message) => {
+    setNotifications((prev) => [
+      { id: `${ticketId}-reply-${Date.now()}`, orderId: null, status: "ticket_reply", message, createdAt: new Date().toISOString(), read: false },
+      ...prev,
+    ].slice(0, 30));
+  };
+
+  // --- Ticket / Product Request reply badges ---------------------------
+  // Puts an unread-count badge on the "Tickets" and "Product Requests"
+  // sidebar items (same style as the Orders count) whenever Admin/Support
+  // has replied since the seller last opened that section, and drops a
+  // matching bell notification the first time each reply is seen. "Seen"
+  // state (for the badge) and "notified" state (for the bell, so the same
+  // reply never pings twice) both persist per-seller in localStorage.
+  const seenTicketsRef = useRef(readLocal(`ef_ticket_seen_${session.email}`, {}));
+  const notifiedRepliesRef = useRef(readLocal(`ef_ticket_notified_${session.email}`, []));
+  const [ticketBadges, setTicketBadges] = useState({ support: 0, product_request: 0 });
+  const CATEGORY_LABEL = { support: "ticket", product_request: "product request" };
+
+  const loadTicketBadges = async () => {
+    if (isAdmin) return; // Admin works from its own open-tickets queue, not a personal badge.
+    const seen = seenTicketsRef.current;
+    const alreadyNotified = new Set(notifiedRepliesRef.current);
+    const newlyNotified = [];
+
+    const countUnread = async (category) => {
+      const list = await fetchTickets(session.email, category);
+      let unread = 0;
+      for (const tkt of list) {
+        const msgs = await fetchTicketMessages(tkt.id);
+        const last = msgs[msgs.length - 1];
+        if (!last || last.sender !== "admin") continue;
+        if (new Date(last.createdAt) > new Date(seen[tkt.id] || 0)) unread++;
+        if (!alreadyNotified.has(last.id)) {
+          newlyNotified.push(last.id);
+          pushTicketNotification(tkt.id, `New reply on your ${CATEGORY_LABEL[category]} "${tkt.subject}".`);
+        }
+      }
+      return unread;
+    };
+
+    const [supportUnread, requestUnread] = await Promise.all([countUnread("support"), countUnread("product_request")]);
+    setTicketBadges({ support: supportUnread, product_request: requestUnread });
+    if (newlyNotified.length) {
+      notifiedRepliesRef.current = [...notifiedRepliesRef.current, ...newlyNotified].slice(-200);
+      writeLocal(`ef_ticket_notified_${session.email}`, notifiedRepliesRef.current);
+    }
+  };
+  useEffect(() => { loadTicketBadges(); }, []); // eslint-disable-line
+
+  // Opening the Tickets / Product Requests tab marks everything in that
+  // category as seen, clearing its badge right away.
+  const markTicketsSeen = async (category) => {
+    const list = await fetchTickets(session.email, category);
+    const now = new Date().toISOString();
+    const seen = { ...seenTicketsRef.current };
+    list.forEach((tkt) => { seen[tkt.id] = now; });
+    seenTicketsRef.current = seen;
+    writeLocal(`ef_ticket_seen_${session.email}`, seen);
+    setTicketBadges((prev) => ({ ...prev, [category]: 0 }));
+  };
+  useEffect(() => {
+    if (isAdmin) return;
+    if (tab === "tickets") markTicketsSeen("support");
+    if (tab === "requests") markTicketsSeen("product_request");
+  }, [tab]); // eslint-disable-line
 
   // Whether Admin has marked this seller as "Premium" — just a badge/status,
   // doesn't change which products they see (that's the per-product "Visible to" list).
@@ -2447,10 +2513,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     { id: "orders", label: t("nav_orders"), icon: Truck, count: orders.length },
     { id: "invoices", label: t("nav_invoices"), icon: Receipt },
     { id: "settings", label: t("nav_settings"), icon: Sparkles },
-    { id: "requests", label: t("nav_requests"), icon: Package },
+    { id: "requests", label: t("nav_requests"), icon: Package, count: ticketBadges.product_request },
     { id: "plans", label: t("nav_plans"), icon: Crown },
     { id: "support", label: t("nav_support"), icon: LifeBuoy },
-    { id: "tickets", label: t("nav_tickets"), icon: MessageCircle },
+    { id: "tickets", label: t("nav_tickets"), icon: MessageCircle, count: ticketBadges.support },
     ...(isAdmin ? [{ id: "admin", label: t("nav_admin"), icon: Globe2 }] : []),
   ];
 
