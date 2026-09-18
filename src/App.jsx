@@ -8077,6 +8077,7 @@ const PLAN_DATA = [
       { label: "Priority Response Time", on: false },
       { label: "KSA Products Access", on: false },
       { label: "Return charges — AED 5", on: false },
+      { label: "Dedicated Account Manager", on: false },
     ],
   },
   {
@@ -8101,6 +8102,7 @@ const PLAN_DATA = [
       { label: "Priority Response Time", on: true },
       { label: "KSA Products Access", on: true },
       { label: "Return charges — Free", on: true },
+      { label: "Dedicated Account Manager", on: true },
     ],
   },
 ];
