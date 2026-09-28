@@ -5,7 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText, Bell, Crown, Download,
+  Eye, Printer, FileText, Bell, Crown, Download, Copy, Check,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -87,6 +87,53 @@ function Logo({ box = "w-9 h-9", icon = "w-5 h-5" }) {
         <PackageCheck className={`${icon} text-white`} />
       )}
     </div>
+  );
+}
+
+// One-click copy: renders the text itself as a button. Click anywhere on it
+// (or the little copy icon) and the value goes to the clipboard, icon turns
+// into a green tick for ~1.5s. `value` is what gets copied; children is what
+// is shown. Used in the Admin orders table for name / phone / address.
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) { return false; }
+}
+
+function CopyText({ value, children, className = "", title = "Click to copy" }) {
+  const [done, setDone] = useState(false);
+  const text = value == null ? "" : String(value).trim();
+  if (!text) return <span className={className}>{children}</span>;
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={async (e) => {
+        e.stopPropagation();
+        const ok = await copyToClipboard(text);
+        if (ok) { setDone(true); setTimeout(() => setDone(false), 1500); }
+      }}
+      className={`group inline-flex items-start gap-1.5 text-left rounded-md px-1 -mx-1 transition-colors hover:bg-emerald-50 cursor-pointer ${className}`}
+    >
+      <span className="break-words">{children}</span>
+      {done
+        ? <Check className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "#00C896" }} />
+        : <Copy className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 opacity-40 group-hover:opacity-100" />}
+    </button>
   );
 }
 
@@ -5645,14 +5692,26 @@ function AdminOrdersPanel({ notify }) {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-gray-700 font-medium">{o.buyer || "—"}</td>
+                          <td className="px-4 py-3 text-gray-700 font-medium">
+                            <CopyText value={o.buyer} title="Copy name">{o.buyer || "—"}</CopyText>
+                          </td>
                           <td className="px-4 py-3 text-gray-500 text-xs">
                             <div>{o.customer_email || "—"}</div>
-                            <div className="text-gray-400">{o.customer_phone || ""}</div>
+                            {o.customer_phone ? (
+                              <CopyText value={o.customer_phone} title="Copy phone number" className="mt-0.5 text-sm font-semibold text-gray-700">
+                                <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.customer_phone}</span>
+                              </CopyText>
+                            ) : null}
                           </td>
                           <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
                             <div className="text-gray-700 font-medium">{o.city || "—"}</div>
-                            <div className="text-gray-400 whitespace-normal break-words">{o.customer_address || "—"}</div>
+                            <CopyText
+                              value={[o.customer_address, o.city].filter(Boolean).join(", ")}
+                              title="Copy address"
+                              className="text-gray-400 whitespace-normal break-words"
+                            >
+                              {o.customer_address || "—"}
+                            </CopyText>
                           </td>
                           <td className="px-4 py-3 text-xs min-w-[160px] max-w-[220px] whitespace-normal break-words" style={{ color: o.notes ? "#0B1F3A" : "#9CA3AF" }}>
                             {o.notes || "—"}
