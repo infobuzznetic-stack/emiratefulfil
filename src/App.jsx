@@ -114,6 +114,60 @@ async function copyToClipboard(text) {
   } catch (e) { return false; }
 }
 
+// Turns a customer phone into the digits-only international form WhatsApp
+// needs. UAE is assumed when there's no country code: 0585662273 ->
+// 971585662273, 585662273 -> 971585662273. +971… / 00971… / 971… are kept.
+function toWhatsAppNumber(raw) {
+  let d = String(raw || "").replace(/[^\d+]/g, "");
+  if (!d) return "";
+  if (d.startsWith("+")) return d.slice(1).replace(/\D/g, "");
+  d = d.replace(/\D/g, "");
+  if (d.startsWith("00")) return d.slice(2);
+  if (d.startsWith("971")) return d;
+  if (d.startsWith("0")) return "971" + d.slice(1);
+  if (d.length === 9 && d.startsWith("5")) return "971" + d;
+  return d;
+}
+
+// Phone cell for the Admin orders table: click the number to open a chat
+// with that customer in WhatsApp Web (new tab); the small icon next to it
+// copies the number (no spaces).
+function PhoneActions({ phone }) {
+  const [done, setDone] = useState(false);
+  const clean = String(phone || "").replace(/[\s\-().]/g, "");
+  const wa = toWhatsAppNumber(phone);
+  if (!clean) return null;
+  return (
+    <span className="inline-flex items-start gap-1.5 mt-0.5">
+      <a
+        href={`https://web.whatsapp.com/send?phone=${wa}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Open chat in WhatsApp Web"
+        onClick={(e) => e.stopPropagation()}
+        className="text-sm font-semibold hover:underline"
+        style={{ color: "#128C7E", fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {phone}
+      </a>
+      <button
+        type="button"
+        title="Copy phone number"
+        onClick={async (e) => {
+          e.stopPropagation();
+          const ok = await copyToClipboard(clean);
+          if (ok) { setDone(true); setTimeout(() => setDone(false), 1500); }
+        }}
+        className="mt-0.5 flex-shrink-0 rounded-md p-0.5 hover:bg-emerald-50 cursor-pointer"
+      >
+        {done
+          ? <Check className="w-3.5 h-3.5" style={{ color: "#00C896" }} />
+          : <Copy className="w-3.5 h-3.5 text-gray-400 hover:text-gray-700" />}
+      </button>
+    </span>
+  );
+}
+
 function CopyText({ value, children, className = "", title = "Click to copy" }) {
   const [done, setDone] = useState(false);
   const text = value == null ? "" : String(value).trim();
@@ -5697,11 +5751,7 @@ function AdminOrdersPanel({ notify }) {
                           </td>
                           <td className="px-4 py-3 text-gray-500 text-xs">
                             <div>{o.customer_email || "—"}</div>
-                            {o.customer_phone ? (
-                              <CopyText value={String(o.customer_phone).replace(/[\s\-().]/g, "")} title="Copy phone number" className="mt-0.5 text-sm font-semibold text-gray-700">
-                                <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.customer_phone}</span>
-                              </CopyText>
-                            ) : null}
+                            <div><PhoneActions phone={o.customer_phone} /></div>
                           </td>
                           <td className="px-4 py-3 text-gray-500 text-xs min-w-[200px] max-w-[260px]">
                             <div className="text-gray-700 font-medium">{o.city || "—"}</div>
