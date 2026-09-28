@@ -129,10 +129,9 @@ function toWhatsAppNumber(raw) {
   return d;
 }
 
-// Phone cell for the Admin orders table: click the number to open a chat
-// with that customer in WhatsApp Web. The named target ("whatsapp_web") makes
-// every click reuse the same tab instead of opening a new one each time (no
-// rel=noopener on purpose — it would force a fresh tab per click); the small icon next to it
+// Phone cell for the Admin orders table: click the number to open that
+// customer's chat in the WhatsApp desktop app (whatsapp:// link) — no new
+// browser tab, the app just switches to the chat. The small icon next to it
 // copies the number (no spaces).
 function PhoneActions({ phone }) {
   const [done, setDone] = useState(false);
@@ -142,9 +141,8 @@ function PhoneActions({ phone }) {
   return (
     <span className="inline-flex items-start gap-1.5 mt-0.5">
       <a
-        href={`https://web.whatsapp.com/send?phone=${wa}`}
-        target="whatsapp_web"
-        title="Open chat in WhatsApp Web"
+        href={`whatsapp://send?phone=${wa}`}
+        title="Open chat in WhatsApp (desktop app)"
         onClick={(e) => e.stopPropagation()}
         className="text-sm font-semibold hover:underline"
         style={{ color: "#128C7E", fontFamily: "'Space Grotesk', sans-serif" }}
