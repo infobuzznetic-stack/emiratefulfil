@@ -5698,7 +5698,7 @@ function AdminOrdersPanel({ notify }) {
                           <td className="px-4 py-3 text-gray-500 text-xs">
                             <div>{o.customer_email || "—"}</div>
                             {o.customer_phone ? (
-                              <CopyText value={o.customer_phone} title="Copy phone number" className="mt-0.5 text-sm font-semibold text-gray-700">
+                              <CopyText value={String(o.customer_phone).replace(/[\s\-().]/g, "")} title="Copy phone number" className="mt-0.5 text-sm font-semibold text-gray-700">
                                 <span style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.customer_phone}</span>
                               </CopyText>
                             ) : null}
