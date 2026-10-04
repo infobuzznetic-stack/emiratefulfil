@@ -8268,7 +8268,7 @@ function PlansTab({ session, isPremiumSeller, notify, setTab }) {
                   style={{ color: "#3a2a0b", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                 >
                   <Crown className="w-3.5 h-3.5 flex-shrink-0" />
-                  From Monday, the Gold Plan rate will be AED 350
+                  From Friday, the Gold Plan rate will be AED 350
                 </span>
               ))}
             </div>
