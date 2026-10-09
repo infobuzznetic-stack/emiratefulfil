@@ -5,7 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText, Bell, Crown, Download, Copy, Check,
+  Eye, Printer, FileText, Bell, Crown, Download, Copy, Check, Trash2,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -2499,6 +2499,17 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     setListings(listings.filter((x) => x !== id));
   };
   const addOrder = async (order) => {
+    // Authoritative stock check against the DATABASE, not the in-memory
+    // catalog (which can be stale) or the cart (which can hold items added
+    // back when the product was still in stock).
+    const { data: freshProduct } = await supabase.from("products").select("stock").eq("id", order.productId).maybeSingle();
+    const freshStock = Number(freshProduct?.stock ?? 0);
+    if (!freshProduct || freshStock < Number(order.qty || 0)) {
+      notify(freshStock <= 0
+        ? `"${order.productName}" is out of stock — order not placed.`
+        : `Only ${freshStock} of "${order.productName}" left in stock — order not placed.`);
+      return null;
+    }
     const newOrder = { ...order, id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10), status: "pending", paymentStatus: "unpaid", deliveryCharge: order.deliveryCharge ?? DELIVERY_CHARGE };
     const { error } = await supabase.from("orders").insert({
       id: newOrder.id, seller_email: session.email, product_id: newOrder.productId, product_name: newOrder.productName,
@@ -2507,15 +2518,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       notes: newOrder.notes || null,
       status: "pending", payment_status: "unpaid", delivery_charge: newOrder.deliveryCharge,
     });
-    if (error) { notify("Could not save order."); return null; }
+    if (error) { notify(/stock/i.test(error.message || "") ? error.message : "Could not save order."); return null; }
     setOrders([newOrder, ...orders]);
 
     // Every order pulls straight from stock, so once enough orders land the
     // product flips to Out of Stock on its own — Admin never has to zero it
     // out by hand.
-    const product = catalog.find((p) => p.id === newOrder.productId);
-    if (product) {
-      const newStock = Math.max(0, (Number(product.stock) || 0) - Number(newOrder.qty || 0));
+    {
+      const newStock = Math.max(0, freshStock - Number(newOrder.qty || 0));
       const { error: stockError } = await supabase.from("products").update({ stock: newStock }).eq("id", newOrder.productId);
       if (!stockError) setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
     }
@@ -2536,12 +2546,19 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     const stockDelta = {};
     const inserted = [];
     let skippedNoStock = 0;
+    // Fresh stock straight from the DB (the in-memory catalog may be stale).
+    const wantedIds = [...new Set(rows.map((r) => r.productId).filter(Boolean))];
+    const freshStock = {};
+    if (wantedIds.length) {
+      const { data: freshRows } = await supabase.from("products").select("id,stock").in("id", wantedIds);
+      (freshRows || []).forEach((r) => { freshStock[r.id] = Number(r.stock) || 0; });
+    }
     for (const row of rows) {
       const product = catalog.find((p) => p.id === row.productId);
       if (!product) continue;
       // Stock check: product must have enough units left after the rows
       // already accepted in this same batch.
-      const available = (Number(product.stock) || 0) - (stockDelta[product.id] || 0);
+      const available = (freshStock[product.id] ?? 0) - (stockDelta[product.id] || 0);
       if (available < Number(row.qty || 0)) { skippedNoStock++; continue; }
       const newOrder = {
         id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10) + inserted.length,
@@ -2586,14 +2603,12 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     setOrders((prev) => [...inserted.map((o) => ({ ...o, status: "pending", paymentStatus: "unpaid" })), ...prev]);
 
     const updatedCatalog = catalog.map((p) =>
-      stockDelta[p.id] ? { ...p, stock: Math.max(0, (Number(p.stock) || 0) - stockDelta[p.id]) } : p
+      stockDelta[p.id] ? { ...p, stock: Math.max(0, (freshStock[p.id] ?? 0) - stockDelta[p.id]) } : p
     );
     setCatalog(updatedCatalog);
     await Promise.all(
       Object.entries(stockDelta).map(([productId, qty]) => {
-        const p = catalog.find((x) => x.id === productId);
-        if (!p) return null;
-        const newStock = Math.max(0, (Number(p.stock) || 0) - qty);
+        const newStock = Math.max(0, (freshStock[productId] ?? 0) - qty);
         return supabase.from("products").update({ stock: newStock }).eq("id", productId);
       })
     );
@@ -4626,6 +4641,9 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   useEffect(() => { writeLocal(`ef_cart_${sellerEmail}`, cart); }, [cart, sellerEmail]);
 
   const addToCart = (product, qty) => {
+    const st = Number(product.stock) || 0;
+    if (st <= 0) { notify && notify("This product is out of stock."); return; }
+    qty = Math.min(qty, st);
     setCart((prev) => {
       const existing = prev.find((c) => c.id === product.id);
       if (existing) return prev.map((c) => (c.id === product.id ? { ...c, qty: c.qty + qty } : c));
@@ -4638,15 +4656,35 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
   const cartTotal = cart.reduce((s, c) => s + c.sell * c.qty, 0);
 
-  const openProduct = (p) => { setActiveProduct(p); setView("detail"); };
+  // Out-of-stock products can't be opened by sellers at all (the card just
+  // shows "Out of Stock"). Admin can still open them to manage the product.
+  const openProduct = (p) => {
+    if ((Number(p.stock) || 0) <= 0 && !isAdmin) { notify && notify("This product is out of stock."); return; }
+    setActiveProduct(p); setView("detail");
+  };
   const buyNow = (product, qty) => {
+    const st = Number(product.stock) || 0;
+    if (st <= 0) { notify && notify("This product is out of stock."); return; }
+    qty = Math.min(qty, st);
     setCheckoutItems([{ id: product.id, name: product.name, sell: product.sell, listSell: product.sell, cost: product.cost, emoji: product.emoji, image_url: product.image_url, country: product.country, qty }]);
     setCheckoutFrom("detail");
     setView("checkout");
   };
   const goToCartCheckout = () => {
     if (cart.length === 0) { notify && notify("Your cart is empty."); return; }
-    setCheckoutItems(cart);
+    // Drop sold-out items and cap quantities to what's left, so an old cart
+    // can't be used to order a product that has since gone out of stock.
+    const live = cart
+      .map((c) => {
+        const p = catalog.find((x) => x.id === c.id);
+        if (!p) return c; // not in this view's catalog — the server check will still catch it
+        return { ...c, qty: Math.min(c.qty, Number(p.stock) || 0) };
+      })
+      .filter((c) => c.qty > 0);
+    const changed = live.length !== cart.length || live.some((c) => c.qty !== (cart.find((x) => x.id === c.id) || {}).qty);
+    if (changed) { setCart(live); notify && notify("Some cart items were out of stock or reduced to available stock."); }
+    if (live.length === 0) return;
+    setCheckoutItems(live);
     setCheckoutFrom("cart");
     setView("checkout");
   };
@@ -4840,8 +4878,9 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             <div
               key={p.id}
               onClick={() => isLocked ? setShowGoldModal(true) : openProduct(p)}
-              className="group relative rounded-2xl bg-white transition-all duration-300 ease-out hover:-translate-y-1.5 cursor-pointer overflow-hidden flex flex-col"
+              className={`group relative rounded-2xl bg-white transition-all duration-300 ease-out ${(!inStock && !isAdmin) ? "cursor-not-allowed" : "hover:-translate-y-1.5 cursor-pointer"} overflow-hidden flex flex-col`}
               style={{
+                filter: (!inStock && !isAdmin) ? "grayscale(0.7)" : "none",
                 border: isLocked ? "1px solid #F8B400" : "1px solid #E5E7EB",
                 animation: `dashTabIn 0.35s ease-out ${i * 40}ms both`,
                 boxShadow: isLocked ? "0 2px 12px rgba(248,180,0,0.18)" : "0 1px 2px rgba(16,24,40,0.04)",
@@ -4940,9 +4979,11 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                     {inStock ? "Buy Now" : "Unavailable"}
                   </button>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1 text-center transition-colors" style={{ color: "#9CA3AF" }}>
-                  View full details →
-                </button>
+                {(inStock || isAdmin) && (
+                  <button onClick={(e) => { e.stopPropagation(); openProduct(p); }} className="mt-2 w-full text-xs font-semibold py-1 text-center transition-colors" style={{ color: "#9CA3AF" }}>
+                    View full details →
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -5574,6 +5615,19 @@ function AdminOrdersPanel({ notify }) {
     await supabase.from("orders").update({ status }).eq("id", id);
     setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
   };
+  // Permanently deletes an order. It disappears from the seller's dashboard
+  // too, because sellers read from the same `orders` table. .select() lets us
+  // detect the case where Supabase (RLS) silently deletes 0 rows.
+  const deleteAdminOrder = async (o) => {
+    if (!window.confirm(`Delete order ${o.id}? It will also disappear from the seller's dashboard. This cannot be undone.`)) return;
+    const { data, error } = await supabase.from("orders").delete().eq("id", o.id).select();
+    if (error || !data || data.length === 0) {
+      notify && notify("Could not delete order — check the admin delete policy in Supabase.");
+      return;
+    }
+    setAllOrders((prev) => prev.filter((x) => x.id !== o.id));
+    notify && notify("Order deleted.");
+  };
   const setAdminPaymentStatus = async (id, payment_status) => {
     await supabase.from("orders").update({ payment_status }).eq("id", id);
     setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, payment_status } : o)));
@@ -5859,6 +5913,7 @@ function AdminOrdersPanel({ notify }) {
                               )}
                               <div className="flex items-center gap-1.5">
                                 <button onClick={() => saveTracking(o.id)} className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ background: "#0B1F3A", color: "#fff" }}>Save</button>
+                                <button onClick={() => deleteAdminOrder(o)} title="Delete order" className="p-1.5 rounded-lg hover:bg-red-50" style={{ border: "1px solid #FECACA", color: "#EF4444" }}><Trash2 className="w-3.5 h-3.5" /></button>
                                 {buildTrackingLink(o) && (
                                   <a href={buildTrackingLink(o)} target="_blank" rel="noreferrer" className="text-xs font-semibold px-2 py-1.5 rounded-lg" style={{ border: "1px solid #E5E7EB", color: "#0284c7" }}>Track ↗</a>
                                 )}
