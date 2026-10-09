@@ -9269,7 +9269,18 @@ export default function EmirateFulfilApp() {
     }
     supabase.auth.getSession().then(async ({ data }) => {
       try {
-        const authUser = data.session?.user;
+        let authUser = data.session?.user;
+        if (authUser) {
+          // getSession() only reads the token saved in this browser and never
+          // asks the server, so a session that was revoked (password change,
+          // admin deleted sessions) still looked "logged in". getUser() asks
+          // the server, so a revoked session is signed out on refresh.
+          const { data: verified, error: verifyError } = await supabase.auth.getUser();
+          if (verifyError || !verified?.user) {
+            await supabase.auth.signOut({ scope: "local" });
+            authUser = null;
+          }
+        }
         if (authUser) {
           const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
           const approval = profile?.approval_status || "pending";
