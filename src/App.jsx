@@ -3729,29 +3729,39 @@ function OverviewTab({
 const ORDER_STATUS_STYLES = {
   pending: { background: "rgba(248,180,0,0.15)", color: "#b07d00" },
   confirmation_pending: { background: "rgba(234,88,12,0.12)", color: "#c2410c" },
+  in_progress: { background: "rgba(99,102,241,0.12)", color: "#4f46e5" },
   confirmed: { background: "rgba(14,165,233,0.12)", color: "#0284c7" },
   customer_not_replying: { background: "rgba(217,119,6,0.12)", color: "#b45309" },
   customer_not_picking_call: { background: "rgba(202,138,4,0.12)", color: "#a16207" },
   wrong_number: { background: "rgba(107,114,128,0.15)", color: "#4B5563" },
   customer_cancelled_confirmation: { background: "rgba(244,63,94,0.12)", color: "#e11d48" },
+  on_hold: { background: "rgba(124,58,237,0.12)", color: "#6d28d9" },
+  product_not_available: { background: "rgba(239,68,68,0.10)", color: "#dc2626" },
+  duplicate_order: { background: "rgba(107,114,128,0.15)", color: "#4B5563" },
   dispatched: { background: "rgba(139,92,246,0.14)", color: "#7c3aed" },
   shipped: { background: "rgba(59,130,246,0.12)", color: "#3B82F6" },
   delivered: { background: "rgba(0,200,150,0.15)", color: "#00a67e" },
   returned: { background: "rgba(239,68,68,0.12)", color: "#EF4444" },
+  product_shipped_by_customer: { background: "rgba(13,148,136,0.12)", color: "#0f766e" },
   cancelled: { background: "rgba(156,163,175,0.18)", color: "#6B7280" },
 };
 const ORDER_STATUS_LABELS = {
   pending: "Pending",
   confirmation_pending: "Order confirmation pending",
+  in_progress: "In progress",
   confirmed: "Order confirmed",
   customer_not_replying: "Customer not replying",
   customer_not_picking_call: "Customer not picking call",
   wrong_number: "Wrong number",
   customer_cancelled_confirmation: "Customer cancel on confirmation",
+  on_hold: "On hold",
+  product_not_available: "Product not available",
+  duplicate_order: "Duplicate order",
   dispatched: "Order dispatched",
   shipped: "Shipped",
   delivered: "Delivered",
   returned: "Returned",
+  product_shipped_by_customer: "Product shipped by customer",
   cancelled: "Cancelled",
 };
 
@@ -5619,7 +5629,8 @@ function AdminOrdersPanel({ notify }) {
   useEffect(() => { loadAllOrders(); }, []); // eslint-disable-line
 
   const setAdminOrderStatus = async (id, status) => {
-    await supabase.from("orders").update({ status }).eq("id", id);
+    const { error } = await supabase.from("orders").update({ status }).eq("id", id);
+    if (error) { notify && notify(`Could not change status: ${error.message}`); return; }
     setAllOrders(allOrders.map((o) => (o.id === id ? { ...o, status } : o)));
   };
   // Permanently deletes an order. It disappears from the seller's dashboard
@@ -5862,15 +5873,20 @@ function AdminOrdersPanel({ notify }) {
                             >
                               <option value="pending">Pending</option>
                               <option value="confirmation_pending">Order confirmation pending</option>
+                              <option value="in_progress">In progress</option>
                               <option value="confirmed">Order confirmed</option>
                               <option value="customer_not_replying">Customer not replying</option>
                               <option value="customer_not_picking_call">Customer not picking call</option>
                               <option value="wrong_number">Wrong number</option>
                               <option value="customer_cancelled_confirmation">Customer cancel on confirmation</option>
+                              <option value="on_hold">On hold</option>
+                              <option value="product_not_available">Product not available</option>
+                              <option value="duplicate_order">Duplicate order</option>
                               <option value="dispatched">Order dispatched</option>
                               <option value="shipped">Shipped</option>
                               <option value="delivered">Delivered</option>
                               <option value="returned">Returned</option>
+                              <option value="product_shipped_by_customer">Product shipped by customer</option>
                               <option value="cancelled">Cancelled</option>
                             </select>
                           </td>
@@ -6178,7 +6194,7 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
   const [importOpen, setImportOpen] = useState(false);
   const deliveredCount = orders.filter((o) => o.status === "delivered").length;
   const deliveryRate = orders.length ? Math.round((deliveredCount / orders.length) * 100) : 0;
-  const FILTER_OPTIONS = ["all", "pending", "confirmation_pending", "confirmed", "customer_not_replying", "customer_not_picking_call", "wrong_number", "customer_cancelled_confirmation", "dispatched", "shipped", "delivered", "returned", "cancelled"];
+  const FILTER_OPTIONS = ["all", "pending", "confirmation_pending", "in_progress", "confirmed", "customer_not_replying", "customer_not_picking_call", "wrong_number", "customer_cancelled_confirmation", "on_hold", "product_not_available", "duplicate_order", "dispatched", "shipped", "delivered", "returned", "product_shipped_by_customer", "cancelled"];
   const filteredOrders = filter === "all" ? orders : orders.filter((o) => o.status === filter);
 
   return (
