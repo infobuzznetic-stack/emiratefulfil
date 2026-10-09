@@ -362,11 +362,26 @@ function buildImportRows(csvRows, catalog) {
   const groups = groupShopifyRows(csvRows);
   const out = [];
   for (const [orderName, lineRows] of groups) {
+    // "Lineitem price" is the pre-discount UNIT price, so qty × it ignores any
+    // order-level discount (e.g. 2 × 79 = 158 even though the customer paid 99).
+    // Shopify puts the real order Total on the first row only, so use that as the
+    // COD amount and split it across line items in proportion to their gross value.
+    const num = (v) => Number(String(v ?? "").replace(/,/g, "")) || 0;
+    const orderTotal = lineRows.map((x) => num(x["Total"])).find((v) => v > 0) || 0;
+    const sumGross = lineRows.reduce((a, x) => a + num(x["Lineitem price"]) * (num(x["Lineitem quantity"]) || 1), 0);
     for (const r of lineRows) {
       const lineItemName = r["Lineitem name"] || "";
       if (!lineItemName) continue;
       const qty = Number(r["Lineitem quantity"] || 1) || 1;
-      const price = Number(r["Lineitem price"] || 0) || 0;
+      const unitList = Number(r["Lineitem price"] || 0) || 0;
+      const lineGross = unitList * qty;
+      // COD the customer pays for this line (falls back to list price if no Total column)
+      const codTotal = orderTotal > 0 && sumGross > 0
+        ? Math.round((orderTotal * lineGross / sumGross) * 100) / 100
+        : lineGross;
+      // Same rule as manually placed orders: entered COD total minus delivery, per unit,
+      // so sell × qty + delivery = codTotal (e.g. 99 → 81 + 18).
+      const price = Math.round(((codTotal - DELIVERY_CHARGE) / qty) * 100) / 100;
       const buyer = r["Shipping Name"] || r["Billing Name"] || "";
       const phone = r["Shipping Phone"] || r["Billing Phone"] || r["Phone"] || "";
       const city = r["Shipping City"] || r["Billing City"] || "";
@@ -376,7 +391,7 @@ function buildImportRows(csvRows, catalog) {
         key: `${orderName}::${lineItemName}`,
         shopifyOrder: orderName,
         lineItemName,
-        qty, price,
+        qty, price, codTotal,
         buyer, phone, city,
         address: addressParts.join(", "),
         email: r["Email"] || "",
@@ -2538,7 +2553,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         // catalog Sell price, i.e. what this product costs the seller) −
         // delivery. This is the seller-facing "cost" — not Admin's internal
         // wholesale Cost field, which stays untouched in cost_price below.
-        sellPrice: row.price || product.sell, costPrice: product.cost, listPrice: product.sell + DELIVERY_CHARGE,
+        sellPrice: row.price || product.sell, costPrice: product.cost, listPrice: product.sell,
         buyer: row.buyer, city: row.city,
         customerEmail: row.email || null, customerPhone: row.phone || null, customerAddress: row.address || null,
         notes: `Imported from Shopify order ${row.shopifyOrder}`,
@@ -5991,7 +6006,7 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
                       <th className="px-3 py-2">Line item</th>
                       <th className="px-3 py-2">Match to product</th>
                       <th className="px-3 py-2">Qty</th>
-                      <th className="px-3 py-2">Price</th>
+                      <th className="px-3 py-2">COD total</th>
                       <th className="px-3 py-2">Buyer</th>
                     </tr>
                   </thead>
@@ -6015,7 +6030,7 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
                           </select>
                         </td>
                         <td className="px-3 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{r.qty}</td>
-                        <td className="px-3 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{r.price}</td>
+                        <td className="px-3 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{r.codTotal ?? r.price}</td>
                         <td className="px-3 py-2 text-gray-500">{r.buyer || "—"}</td>
                       </tr>
                     ))}
