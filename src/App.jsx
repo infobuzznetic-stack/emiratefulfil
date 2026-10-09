@@ -2521,13 +2521,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     if (error) { notify(/stock/i.test(error.message || "") ? error.message : "Could not save order."); return null; }
     setOrders([newOrder, ...orders]);
 
-    // Every order pulls straight from stock, so once enough orders land the
-    // product flips to Out of Stock on its own — Admin never has to zero it
-    // out by hand.
+    // Stock is now deducted INSIDE the database (trigger on the orders
+    // table), atomically with the insert. The browser must never write
+    // `stock` itself — a stale page used to overwrite the real value and
+    // silently "restock" a product Admin had marked out of stock. Here we
+    // only refresh the on-screen copy.
     {
       const newStock = Math.max(0, freshStock - Number(newOrder.qty || 0));
-      const { error: stockError } = await supabase.from("products").update({ stock: newStock }).eq("id", newOrder.productId);
-      if (!stockError) setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
+      setCatalog((prev) => prev.map((p) => (p.id === newOrder.productId ? { ...p, stock: newStock } : p)));
     }
 
     notify("Order added — tracking as Pending.");
@@ -2606,12 +2607,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       stockDelta[p.id] ? { ...p, stock: Math.max(0, (freshStock[p.id] ?? 0) - stockDelta[p.id]) } : p
     );
     setCatalog(updatedCatalog);
-    await Promise.all(
-      Object.entries(stockDelta).map(([productId, qty]) => {
-        const newStock = Math.max(0, (freshStock[productId] ?? 0) - qty);
-        return supabase.from("products").update({ stock: newStock }).eq("id", productId);
-      })
-    );
+    // (Stock is deducted by the database trigger — no stock write from here.)
 
     notify(`Imported ${inserted.length} order${inserted.length === 1 ? "" : "s"} from Shopify.`);
     return inserted.length;
