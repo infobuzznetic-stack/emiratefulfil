@@ -6172,11 +6172,11 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
 
                 <div className="grid grid-cols-3 gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
                   <div>
-                    <div className="text-[11px] text-gray-400">Sell</div>
-                    <div className="text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</div>
+                    <div className="text-[11px] text-gray-400">Sell (COD total)</div>
+                    <div className="text-sm font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty + (o.deliveryCharge || 0)}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-gray-400">Delivery</div>
+                    <div className="text-[11px] text-gray-400">Delivery (incl.)</div>
                     <div className="text-sm text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</div>
                   </div>
                   <div>
@@ -6222,7 +6222,7 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
             <table className="w-full min-w-[950px] text-sm">
               <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
                 <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
-                <th className="px-4 py-3">Sell</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th><th className="px-4 py-3">WhatsApp Proof</th>
+                <th className="px-4 py-3">Sell (COD total)</th><th className="px-4 py-3">Delivery (incl.)</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th><th className="px-4 py-3">WhatsApp Proof</th>
               </tr></thead>
               <tbody>
                 {filteredOrders.map((o, i) => (
@@ -6234,7 +6234,7 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
                     <td className="px-4 py-3 text-xs text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{o.id}</td>
                     <td className="px-4 py-3">{o.productName} <span className="text-gray-400">×{o.qty}</span></td>
                     <td className="px-4 py-3 text-gray-500">{o.buyer || "—"}{o.city ? ", " + o.city : ""}</td>
-                    <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty}</td>
+                    <td className="px-4 py-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.sellPrice * o.qty + (o.deliveryCharge || 0)}</td>
                     <td className="px-4 py-3 text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AED {o.deliveryCharge || 0}</td>
                     <td className="px-4 py-3 font-semibold" style={{ color: "#00C896", fontFamily: "'Space Grotesk', sans-serif" }}>AED {(o.sellPrice - o.listPrice) * o.qty}</td>
                     <td className="px-4 py-3"><StatusPill status={o.status} /></td>
