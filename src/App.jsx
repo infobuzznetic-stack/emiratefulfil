@@ -8460,7 +8460,7 @@ function PlansTab({ session, isPremiumSeller, notify, setTab }) {
 }
 
 function SupportTab({ session }) {
-  const email = "info.buzznetic@gmail.com";
+  const email = "help.emiratefulfil@gmail.com";
   const address = "99 Al Waha St - Al Qouz Third - Al Quoz - Dubai - United Arab Emirates";
   return (
     <div>
