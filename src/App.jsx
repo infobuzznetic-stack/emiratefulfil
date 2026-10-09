@@ -324,6 +324,8 @@ function guessProductMatch(lineItemName, catalog) {
   if (!target || !catalog.length) return null;
   let best = null, bestScore = -1;
   for (const p of catalog) {
+    // Out-of-stock products are never auto-suggested.
+    if ((Number(p.stock) || 0) <= 0) continue;
     const name = normalizeForMatch(p.name);
     let score = 0;
     if (name === target) score = 1000;
@@ -2533,9 +2535,14 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   const importOrders = async (rows) => {
     const stockDelta = {};
     const inserted = [];
+    let skippedNoStock = 0;
     for (const row of rows) {
       const product = catalog.find((p) => p.id === row.productId);
       if (!product) continue;
+      // Stock check: product must have enough units left after the rows
+      // already accepted in this same batch.
+      const available = (Number(product.stock) || 0) - (stockDelta[product.id] || 0);
+      if (available < Number(row.qty || 0)) { skippedNoStock++; continue; }
       const newOrder = {
         id: "ORD" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10) + inserted.length,
         productId: product.id, productName: product.name, qty: row.qty,
@@ -2562,6 +2569,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       inserted.push(newOrder);
       stockDelta[product.id] = (stockDelta[product.id] || 0) + Number(row.qty || 0);
     }
+    if (skippedNoStock) notify(`${skippedNoStock} row${skippedNoStock === 1 ? "" : "s"} skipped — product out of stock / not enough stock.`);
     if (!inserted.length) return 0;
 
     const { error } = await supabase.from("orders").insert(
@@ -5952,11 +5960,22 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
   };
 
   const includedRows = rows.filter((r) => r.include);
-  const readyCount = includedRows.filter((r) => r.productId).length;
+  const stockOf = (id) => Number((catalog.find((p) => p.id === id) || {}).stock) || 0;
+  // Total qty requested per product across all included rows.
+  const requestedByProduct = {};
+  includedRows.forEach((r) => { if (r.productId) requestedByProduct[r.productId] = (requestedByProduct[r.productId] || 0) + Number(r.qty || 0); });
+  const stockProblem = (r) => {
+    if (!r.productId) return "";
+    const st = stockOf(r.productId);
+    if (st <= 0) return "Out of stock";
+    if (r.include && requestedByProduct[r.productId] > st) return `Only ${st} in stock`;
+    return "";
+  };
+  const readyCount = includedRows.filter((r) => r.productId && !stockProblem(r)).length;
 
   const handleImport = async () => {
     setStage("importing");
-    const toImport = rows.filter((r) => r.include && r.productId);
+    const toImport = rows.filter((r) => r.include && r.productId && !stockProblem(r));
     const count = await onImport(toImport);
     setImportedCount(count || 0);
     setStage("done");
@@ -6026,8 +6045,12 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
                             style={{ border: r.productId ? "1px solid #E5E7EB" : "1px solid #EF4444", maxWidth: 180 }}
                           >
                             <option value="">— no match, pick one —</option>
-                            {catalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            {catalog.map((p) => {
+                              const out = (Number(p.stock) || 0) <= 0;
+                              return <option key={p.id} value={p.id} disabled={out}>{p.name}{out ? " — Out of Stock" : ""}</option>;
+                            })}
                           </select>
+                          {stockProblem(r) && <div className="text-[10px] font-semibold mt-1" style={{ color: "#EF4444" }}>{stockProblem(r)}</div>}
                         </td>
                         <td className="px-3 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{r.qty}</td>
                         <td className="px-3 py-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{r.codTotal ?? r.price}</td>
