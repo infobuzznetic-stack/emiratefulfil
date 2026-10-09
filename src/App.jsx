@@ -4908,6 +4908,17 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                 <div className={`transition-transform duration-500 ease-out group-hover:scale-110 flex items-center justify-center w-full h-full${isLocked ? " blur-lg select-none pointer-events-none" : ""}`}>
                   <ProductThumb product={p} size={56} className="w-full h-full" />
                 </div>
+                {/* Big "OUT OF STOCK" banner across the picture */}
+                {!inStock && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ background: "rgba(11,31,58,0.62)" }}>
+                    <span
+                      className="text-white font-extrabold uppercase text-center px-4 py-2 rounded-xl"
+                      style={{ fontSize: "clamp(18px, 2.4vw, 28px)", letterSpacing: "0.08em", background: "rgba(239,68,68,0.92)", transform: "rotate(-12deg)", boxShadow: "0 8px 24px rgba(0,0,0,0.35)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                    >
+                      Out of Stock
+                    </span>
+                  </div>
+                )}
                 {/* Diagonal shine sweep on hover */}
                 <div
                   className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
