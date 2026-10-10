@@ -2213,7 +2213,7 @@ function writeLocal(key, value) {
 // Shopify integration is still being finished — while this is true every seller
 // sees an "In process" badge on the Shopify button and the tab can't be opened.
 // Set to false when the integration is ready to go live.
-const SHOPIFY_IN_PROCESS = true;
+const SHOPIFY_IN_PROCESS = false;
 const DASHBOARD_TABS = ["overview", "products", "orders", "shopify", "invoices", "settings", "requests", "support", "tickets", "admin"];
 
 function pathToRoute(pathname) {
@@ -5198,7 +5198,7 @@ function ShopifyConnectTab({ session, notify }) {
   const connect = async () => {
     const d = normalizeShop(shopInput);
     if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(d)) {
-      notify("Enter your store's myshopify address, e.g. my-store.myshopify.com");
+      notify("Use your store's .myshopify.com address (not your custom domain), e.g. my-store.myshopify.com");
       return;
     }
     setBusy(true);
@@ -5255,7 +5255,19 @@ function ShopifyConnectTab({ session, notify }) {
       {!conn && (
         <div className="rounded-2xl p-6" style={card}>
           <div className="font-bold text-gray-900">Step 1 — Your Shopify store address</div>
-          <p className="text-sm text-gray-500 mt-1">It looks like <b>my-store.myshopify.com</b> (you can see it in your Shopify admin web address).</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Enter your store's <b>.myshopify.com</b> address, like <b>my-store.myshopify.com</b>.
+            Do <b>not</b> enter your own domain (like mystore.com or thegulf.shop) — that will not work.
+          </p>
+          <div className="mt-3 rounded-xl p-4 text-sm" style={{ background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
+            <div className="font-semibold text-gray-800">Where do I find it? (works even if you have your own domain)</div>
+            <ol className="list-decimal pl-5 mt-2 space-y-1.5 text-gray-600">
+              <li>Log in to your <b>Shopify admin</b>.</li>
+              <li>Look at the web address at the top of your browser. It looks like <b>admin.shopify.com/store/<u>my-store</u></b>.</li>
+              <li>Take the part after <b>/store/</b> (here: <b>my-store</b>) and add <b>.myshopify.com</b> to it → <b>my-store.myshopify.com</b>.</li>
+              <li>Or: go to <b>Settings → Domains</b>. Your <b>.myshopify.com</b> address is listed there.</li>
+            </ol>
+          </div>
           <div className="mt-4 flex flex-col sm:flex-row gap-2">
             <input
               value={shopInput} onChange={(e) => setShopInput(e.target.value)}
