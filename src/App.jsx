@@ -2210,6 +2210,10 @@ function writeLocal(key, value) {
    page/tab (e.g. /dashboard/products) instead of always staying
    on "/", so refreshing or sharing a link lands on the right page.
 ============================================================ */
+// Shopify integration is still being finished — while this is true every seller
+// sees an "In process" badge on the Shopify button and the tab can't be opened.
+// Set to false when the integration is ready to go live.
+const SHOPIFY_IN_PROCESS = true;
 const DASHBOARD_TABS = ["overview", "products", "orders", "shopify", "invoices", "settings", "requests", "support", "tickets", "admin"];
 
 function pathToRoute(pathname) {
@@ -2659,7 +2663,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     { id: "overview", label: t("nav_dashboard"), icon: Boxes },
     { id: "products", label: t("nav_products"), icon: Package },
     { id: "orders", label: t("nav_orders"), icon: Truck, count: orders.length },
-    ...(!isAdmin ? [{ id: "shopify", label: "Shopify", icon: Link2 }] : []),
+    ...(!isAdmin ? [{ id: "shopify", label: "Shopify", icon: Link2, inProcess: SHOPIFY_IN_PROCESS }] : []),
     { id: "invoices", label: t("nav_invoices"), icon: Receipt },
     { id: "settings", label: t("nav_settings"), icon: Sparkles },
     { id: "requests", label: t("nav_requests"), icon: Package, count: ticketBadges.product_request },
@@ -2695,8 +2699,12 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
         <div className="mt-8 space-y-1">
           {NAV.map((n) => (
             <button
-              key={n.id} onClick={() => { if (n.id === "orders") setOrdersStatusFilter("all"); setTab(n.id); }}
-              className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out hover:scale-[1.03] hover:translate-x-1 active:scale-95"
+              key={n.id} onClick={() => {
+                if (n.inProcess) { notify("Shopify integration is in process — coming soon."); return; }
+                if (n.id === "orders") setOrdersStatusFilter("all"); setTab(n.id);
+              }}
+              aria-disabled={n.inProcess ? true : undefined}
+              className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out active:scale-95 ${n.inProcess ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.03] hover:translate-x-1"}`}
               style={
                 tab === n.id
                   ? (isPremiumSeller
@@ -2716,6 +2724,11 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                   style={tab === n.id ? { background: "#00C896", color: "#04140f" } : { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
                 >
                   {n.count}
+                </span>
+              )}
+              {n.inProcess && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "rgba(248,180,0,0.18)", color: "#F8B400" }}>
+                  In process
                 </span>
               )}
             </button>
@@ -2802,8 +2815,12 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           {NAV.map((n, i) => (
             <button
               key={n.id}
-              onClick={() => { if (n.id === "orders") setOrdersStatusFilter("all"); setTab(n.id); setMobileNavOpen(false); }}
-              className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/80 transition-all duration-300 ease-out hover:scale-[1.02] hover:translate-x-1 active:scale-95"
+              onClick={() => {
+                if (n.inProcess) { notify("Shopify integration is in process — coming soon."); return; }
+                if (n.id === "orders") setOrdersStatusFilter("all"); setTab(n.id); setMobileNavOpen(false);
+              }}
+              aria-disabled={n.inProcess ? true : undefined}
+              className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/80 transition-all duration-300 ease-out active:scale-95 ${n.inProcess ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.02] hover:translate-x-1"}`}
               style={{
                 animation: `dashFadeIn 0.35s ease-out ${i * 60}ms both`,
                 ...(tab === n.id ? { background: "rgba(0,200,150,0.15)", color: "#00C896" } : {}),
@@ -2817,6 +2834,11 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                   style={tab === n.id ? { background: "#00C896", color: "#04140f" } : { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
                 >
                   {n.count}
+                </span>
+              )}
+              {n.inProcess && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "rgba(248,180,0,0.18)", color: "#F8B400" }}>
+                  In process
                 </span>
               )}
             </button>
@@ -3087,7 +3109,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                   ? <AdminOrdersPanel notify={notify} />
                   : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} initialStatusFilter={ordersStatusFilter} catalog={catalog} onImportOrders={importOrders} />
               )}
-              {tab === "shopify" && <ShopifyConnectTab session={session} notify={notify} />}
+              {tab === "shopify" && (SHOPIFY_IN_PROCESS ? <ShopifyInProcess onBack={() => setTab("overview")} /> : <ShopifyConnectTab session={session} notify={notify} />)}
               {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
               {tab === "requests" && (
@@ -5117,6 +5139,23 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 // points at the URL shown here; the Supabase Edge Function `shopify-webhook`
 // matches each line item to a catalog product by SKU (EM09-xxxx).
 // ---------------------------------------------------------------------------
+function ShopifyInProcess({ onBack }) {
+  return (
+    <div className="rounded-2xl p-10 text-center" style={{ border: "1px solid #E5E7EB", background: "#fff" }}>
+      <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center" style={{ background: "rgba(248,180,0,0.15)" }}>
+        <Clock className="w-7 h-7" style={{ color: "#F8B400" }} />
+      </div>
+      <h2 className="mt-4 text-2xl font-extrabold text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Shopify integration — In process</h2>
+      <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
+        We are still setting this up. Automatic Shopify orders will be available very soon. Until then, you can add your Shopify orders from the Orders tab (CSV import).
+      </p>
+      <button onClick={onBack} className="mt-5 text-sm font-semibold px-5 py-2.5 rounded-xl" style={{ background: "#00C896", color: "#04140f" }}>
+        Back to Dashboard
+      </button>
+    </div>
+  );
+}
+
 function ShopifyConnectTab({ session, notify }) {
   const [loading, setLoading] = useState(true);
   const [conn, setConn] = useState(null);
