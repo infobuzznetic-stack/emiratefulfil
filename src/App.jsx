@@ -315,6 +315,12 @@ function normalizeForMatch(str) {
   return (str || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// SKUs look like EM09-0001. Compare them ignoring case, spaces and dashes so
+// "em09-0001", "EM090001" and " EM09 0001 " all match the same product.
+function normalizeSku(v) {
+  return String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
 // Best-guess catalog match for a Shopify line-item name: exact normalized
 // match first, then "does one contain the other", then a shared-word score.
 // Always returns a match (falls back to the closest score) so every row has
@@ -388,8 +394,16 @@ function buildImportRows(csvRows, catalog) {
       const phone = r["Shipping Phone"] || r["Billing Phone"] || r["Phone"] || "";
       const city = r["Shipping City"] || r["Billing City"] || "";
       const addressParts = [r["Shipping Address1"], r["Shipping Address2"], r["Shipping City"], r["Shipping Province"], r["Shipping Country"]].filter(Boolean);
-      const match = guessProductMatch(lineItemName, catalog);
+      // 1) Exact SKU match ("Lineitem sku" column in the Shopify export) wins —
+      //    it is the reliable way to tell products apart.
+      // 2) Otherwise fall back to guessing from the product name.
+      const lineSku = String(r["Lineitem sku"] ?? "").trim();
+      const skuKey = normalizeSku(lineSku);
+      const skuMatch = skuKey ? catalog.find((p) => p.sku && normalizeSku(p.sku) === skuKey) : null;
+      const match = skuMatch || guessProductMatch(lineItemName, catalog);
       out.push({
+        sku: lineSku,
+        matchedBySku: !!skuMatch,
         key: `${orderName}::${lineItemName}`,
         shopifyOrder: orderName,
         lineItemName,
@@ -1491,7 +1505,7 @@ function Footer() {
 async function fetchCatalog() {
   const { data, error } = await supabase.from("products").select("*").order("created_at");
   if (error) { console.error(error); return []; }
-  return data.map((p) => ({ id: p.id, name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [], isPremium: !!p.is_premium, sourceUrl: p.source_url || null, country: p.country || "UAE" }));
+  return data.map((p) => ({ id: p.id, sku: p.sku || "", name: p.name, category: p.category, cost: Number(p.cost), sell: Number(p.sell), emoji: p.emoji, description: p.description, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], stock: Number(p.stock ?? 0), assignedSellerEmails: Array.isArray(p.assigned_seller_emails) ? p.assigned_seller_emails : [], isPremium: !!p.is_premium, sourceUrl: p.source_url || null, country: p.country || "UAE" }));
 }
 // Which sellers Admin has marked as "Premium" — just a list of emails, stored
 // as JSON in app_settings (same chunked mechanism as the homepage content).
@@ -4965,6 +4979,17 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
               <div className="p-4 flex flex-col flex-1">
                 <span className="inline-block w-fit text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color, background: color + "16" }}>{p.category}</span>
                 <div className="mt-2 font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]" style={{ color: "#111827" }}>{p.name}</div>
+                {p.sku && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); try { navigator.clipboard.writeText(p.sku); notify && notify(`SKU ${p.sku} copied — paste it in your Shopify listing.`); } catch (err) {} }}
+                    title="Click to copy this SKU, then paste it in your Shopify product"
+                    className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md"
+                    style={{ background: "#F3F4F6", color: "#4B5563", fontFamily: "'Space Grotesk', sans-serif" }}
+                  >
+                    SKU: {p.sku} <Copy className="w-3 h-3" />
+                  </button>
+                )}
                 <div
                   className="mt-2 text-xl font-extrabold"
                   style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#0B1F3A" }}
@@ -6114,7 +6139,12 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
                           <input type="checkbox" checked={r.include} onChange={(e) => updateRow(r.key, { include: e.target.checked })} />
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-500">{r.shopifyOrder}{r.duplicate && <div className="text-[10px]" style={{ color: "#F59E0B" }}>already imported</div>}</td>
-                        <td className="px-3 py-2 text-gray-600">{truncateWords(r.lineItemName, 6)}</td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {truncateWords(r.lineItemName, 6)}
+                          {r.matchedBySku && <div className="text-[10px] font-semibold" style={{ color: "#00a67e" }}>✓ SKU {r.sku}</div>}
+                          {!r.matchedBySku && r.sku && <div className="text-[10px] font-semibold" style={{ color: "#F59E0B" }}>SKU {r.sku} not found — matched by name</div>}
+                          {!r.matchedBySku && !r.sku && <div className="text-[10px]" style={{ color: "#9CA3AF" }}>No SKU in CSV — matched by name</div>}
+                        </td>
                         <td className="px-3 py-2">
                           <select
                             value={r.productId}
