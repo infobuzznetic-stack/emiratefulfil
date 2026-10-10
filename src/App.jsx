@@ -5,7 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText, Bell, Crown, Download, Copy, Check, Trash2,
+  Eye, Printer, FileText, Bell, Crown, Download, Copy, Check, Trash2, Link2,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -2210,7 +2210,7 @@ function writeLocal(key, value) {
    page/tab (e.g. /dashboard/products) instead of always staying
    on "/", so refreshing or sharing a link lands on the right page.
 ============================================================ */
-const DASHBOARD_TABS = ["overview", "products", "orders", "invoices", "settings", "requests", "support", "tickets", "admin"];
+const DASHBOARD_TABS = ["overview", "products", "orders", "shopify", "invoices", "settings", "requests", "support", "tickets", "admin"];
 
 function pathToRoute(pathname) {
   const parts = pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
@@ -2659,6 +2659,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     { id: "overview", label: t("nav_dashboard"), icon: Boxes },
     { id: "products", label: t("nav_products"), icon: Package },
     { id: "orders", label: t("nav_orders"), icon: Truck, count: orders.length },
+    ...(!isAdmin ? [{ id: "shopify", label: "Shopify", icon: Link2 }] : []),
     { id: "invoices", label: t("nav_invoices"), icon: Receipt },
     { id: "settings", label: t("nav_settings"), icon: Sparkles },
     { id: "requests", label: t("nav_requests"), icon: Package, count: ticketBadges.product_request },
@@ -3075,10 +3076,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           {/* Settings, Product Requests, Support, Tickets, Admin, and Products aren't
               gated by region — Products shows each country's own catalog instead.
               KSA is now live alongside UAE; only Qatar still shows Coming Soon. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && tab !== "products" && region === "QATAR" && (
+          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && tab !== "products" && tab !== "shopify" && region === "QATAR" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || region !== "QATAR") && (
+          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || tab === "shopify" || region !== "QATAR") && (
             <>
               {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
@@ -3086,6 +3087,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
                   ? <AdminOrdersPanel notify={notify} />
                   : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} initialStatusFilter={ordersStatusFilter} catalog={catalog} onImportOrders={importOrders} />
               )}
+              {tab === "shopify" && <ShopifyConnectTab session={session} notify={notify} />}
               {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
               {tab === "requests" && (
@@ -5109,6 +5111,229 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
     </div>
   );
 }
+// ---------------------------------------------------------------------------
+// Connect Shopify — orders arrive automatically (no CSV).
+// The seller adds one "Order creation" webhook in their Shopify admin that
+// points at the URL shown here; the Supabase Edge Function `shopify-webhook`
+// matches each line item to a catalog product by SKU (EM09-xxxx).
+// ---------------------------------------------------------------------------
+function ShopifyConnectTab({ session, notify }) {
+  const [loading, setLoading] = useState(true);
+  const [conn, setConn] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [shopInput, setShopInput] = useState("");
+  const [secretInput, setSecretInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState("");
+
+  const baseUrl = String(supabase.supabaseUrl || "https://pmkithjmvontogoqbbvp.supabase.co").replace(/\/$/, "");
+  const webhookUrl = conn ? `${baseUrl}/functions/v1/shopify-webhook?t=${conn.token}` : "";
+
+  const load = async () => {
+    const { data: c } = await supabase
+      .from("shopify_connections")
+      .select("id,shop_domain,token,webhook_secret,last_event_at,last_error,created_at")
+      .eq("seller_email", session.email)
+      .maybeSingle();
+    if (c) {
+      setConn({ id: c.id, shop_domain: c.shop_domain, token: c.token, hasSecret: !!c.webhook_secret, last_event_at: c.last_event_at, last_error: c.last_error });
+      const { data: ev } = await supabase
+        .from("shopify_events").select("*").eq("connection_id", c.id).neq("status", "dismissed")
+        .order("created_at", { ascending: false }).limit(30);
+      setEvents(ev || []);
+    } else { setConn(null); setEvents([]); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  const copy = async (text, what) => {
+    try { await navigator.clipboard.writeText(text); setCopied(what); setTimeout(() => setCopied(""), 1800); } catch (e) { notify("Could not copy — select and copy it manually."); }
+  };
+
+  const normalizeShop = (v) => {
+    let d = String(v || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (d && !d.includes(".")) d = `${d}.myshopify.com`;
+    return d;
+  };
+
+  const connect = async () => {
+    const d = normalizeShop(shopInput);
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(d)) {
+      notify("Enter your store's myshopify address, e.g. my-store.myshopify.com");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.from("shopify_connections").insert({ seller_email: session.email, shop_domain: d });
+    setBusy(false);
+    if (error) { notify(/duplicate|unique/i.test(error.message || "") ? "This Shopify store is already connected to an account." : "Could not create the connection."); return; }
+    setShopInput("");
+    await load();
+  };
+
+  const saveSecret = async () => {
+    const v = secretInput.trim();
+    if (v.length < 16) { notify("Paste the full signing secret from Shopify."); return; }
+    setBusy(true);
+    const { error } = await supabase.from("shopify_connections").update({ webhook_secret: v, last_error: null }).eq("id", conn.id);
+    setBusy(false);
+    if (error) { notify("Could not save the secret."); return; }
+    setSecretInput("");
+    notify("Signing secret saved.");
+    await load();
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm("Disconnect this Shopify store? New Shopify orders will stop arriving. Existing orders stay.")) return;
+    const { error } = await supabase.from("shopify_connections").delete().eq("id", conn.id);
+    if (error) { notify("Could not disconnect."); return; }
+    await load();
+  };
+
+  const dismiss = async (id) => {
+    await supabase.from("shopify_events").update({ status: "dismissed" }).eq("id", id);
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const card = { border: "1px solid #E5E7EB", background: "#fff" };
+  const stepNum = (n) => (
+    <span className="w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "#0B1F3A", color: "#fff" }}>{n}</span>
+  );
+
+  if (loading) return <div className="text-sm text-gray-400 py-10 text-center">Loading…</div>;
+
+  const needsAttention = events.filter((e) => e.status === "needs_attention");
+  const importedCount = events.filter((e) => e.status === "imported").length;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl p-6" style={{ background: "linear-gradient(135deg,#0B1F3A,#12385c)" }}>
+        <h2 className="text-white text-2xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Connect Shopify</h2>
+        <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>
+          Orders from your Shopify store arrive here automatically — no CSV needed. Just put the product's EmirateFulfil SKU (like <b>EM09-0001</b>) in your Shopify listing.
+        </p>
+      </div>
+
+      {!conn && (
+        <div className="rounded-2xl p-6" style={card}>
+          <div className="font-bold text-gray-900">Step 1 — Your Shopify store address</div>
+          <p className="text-sm text-gray-500 mt-1">It looks like <b>my-store.myshopify.com</b> (you can see it in your Shopify admin web address).</p>
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <input
+              value={shopInput} onChange={(e) => setShopInput(e.target.value)}
+              placeholder="my-store.myshopify.com"
+              className="flex-1 text-sm rounded-xl px-4 py-2.5" style={{ border: "1px solid #E5E7EB" }}
+            />
+            <button onClick={connect} disabled={busy} className="text-sm font-semibold px-5 py-2.5 rounded-xl" style={{ background: "#00C896", color: "#04140f", opacity: busy ? 0.6 : 1 }}>
+              {busy ? "Connecting…" : "Connect"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {conn && (
+        <>
+          <div className="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3" style={card}>
+            <div>
+              <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Store</div>
+              <div className="font-bold text-gray-900">{conn.shop_domain}</div>
+            </div>
+            <div className="flex items-center gap-3">
+              {!conn.hasSecret
+                ? <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "rgba(245,158,11,0.12)", color: "#b45309" }}>Setup not finished</span>
+                : conn.last_event_at
+                  ? <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "rgba(0,200,150,0.12)", color: "#00a67e" }}>Connected · last order {new Date(conn.last_event_at).toLocaleString()}</span>
+                  : <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "rgba(59,130,246,0.12)", color: "#2563eb" }}>Ready — waiting for the first order</span>}
+              <button onClick={disconnect} className="text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50" style={{ border: "1px solid #FECACA", color: "#EF4444" }}>Disconnect</button>
+            </div>
+          </div>
+
+          {conn.last_error && (
+            <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "rgba(239,68,68,0.08)", color: "#b91c1c", border: "1px solid #FECACA" }}>
+              Last problem: {conn.last_error}
+            </div>
+          )}
+
+          <div className="rounded-2xl p-6 space-y-6" style={card}>
+            <div className="flex gap-3">
+              {stepNum(1)}
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-gray-900">Create a webhook in Shopify</div>
+                <p className="text-sm text-gray-500 mt-1">
+                  Shopify admin → <b>Settings</b> → <b>Notifications</b> → scroll down to <b>Webhooks</b> → <b>Create webhook</b>.
+                  Choose Event: <b>Order creation</b>, Format: <b>JSON</b>, and paste this URL:
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <input readOnly value={webhookUrl} onFocus={(e) => e.target.select()} className="flex-1 min-w-0 text-xs rounded-xl px-3 py-2.5 bg-gray-50" style={{ border: "1px solid #E5E7EB", fontFamily: "'Space Grotesk', sans-serif" }} />
+                  <button onClick={() => copy(webhookUrl, "url")} className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-3 py-2 rounded-xl" style={{ background: "#0B1F3A", color: "#fff" }}>
+                    {copied === "url" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied === "url" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">Keep this URL private — it is unique to your store.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              {stepNum(2)}
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-gray-900">Paste Shopify's signing secret</div>
+                <p className="text-sm text-gray-500 mt-1">
+                  After saving the webhook, Shopify shows a <b>signing secret</b> on that same Webhooks page. Copy it and paste it here. This proves the orders really come from your store.
+                </p>
+                <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="password" value={secretInput} onChange={(e) => setSecretInput(e.target.value)}
+                    placeholder={conn.hasSecret ? "Secret saved ✓ — paste a new one to replace it" : "Paste signing secret"}
+                    className="flex-1 min-w-0 text-sm rounded-xl px-4 py-2.5" style={{ border: "1px solid #E5E7EB" }}
+                  />
+                  <button onClick={saveSecret} disabled={busy || !secretInput.trim()} className="text-sm font-semibold px-5 py-2.5 rounded-xl" style={{ background: "#00C896", color: "#04140f", opacity: busy || !secretInput.trim() ? 0.5 : 1 }}>
+                    Save secret
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              {stepNum(3)}
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-gray-900">Add the SKU to your Shopify product</div>
+                <p className="text-sm text-gray-500 mt-1">
+                  In Shopify open the product → <b>Variants</b> → <b>SKU</b>, and enter the SKU shown on the product card here in <b>Products</b> (like <b>EM09-0001</b>). Every order for that product will then land here by itself as <b>Pending</b>.
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  To test: in Shopify's webhook list click <b>Send test notification</b>. It will appear below as "needs attention" (the test order has no real SKU) — that means the connection works.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl p-6" style={card}>
+            <div className="flex items-center justify-between">
+              <div className="font-bold text-gray-900">Needs your attention</div>
+              <span className="text-xs text-gray-400">{importedCount} imported recently</span>
+            </div>
+            {needsAttention.length === 0 ? (
+              <p className="text-sm text-gray-400 mt-3">Nothing here — every Shopify order so far was imported.</p>
+            ) : (
+              <div className="mt-3 divide-y" style={{ borderColor: "#F3F4F6" }}>
+                {needsAttention.map((e) => (
+                  <div key={e.id} className="py-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-800 truncate">{e.shopify_order} · {e.title || "item"} × {e.qty}</div>
+                      <div className="text-xs mt-0.5" style={{ color: "#b45309" }}>{e.reason}</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5">{new Date(e.created_at).toLocaleString()} — fix the SKU in Shopify, then add this order with the CSV import.</div>
+                    </div>
+                    <button onClick={() => dismiss(e.id)} className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50" style={{ border: "1px solid #E5E7EB", color: "#6B7280" }}>Dismiss</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function InvoicesTab({ session }) {
   return (
     <div>
