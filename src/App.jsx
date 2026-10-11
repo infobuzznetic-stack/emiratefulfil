@@ -3119,7 +3119,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               {tab === "requests" && (
                 isAdmin
                   ? <AdminTicketsPanel notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests — all sellers" subheading={(openCount) => `${openCount} open request${openCount === 1 ? "" : "s"} waiting on a reply.`} emptyText="No product requests here." replyPlaceholder="Reply as Admin…" senderDisplayName="Admin" />
-                  : <TicketsTab session={session} notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests" subheading="Can't find a product in the catalog? Tell Admin what you're after and they'll source it." newButtonLabel="+ New request" listLabel="Your requests" emptyText="No product requests yet — ask for something not in the catalog." subjectLabel="Product name" subjectPlaceholder="e.g. Wireless earbuds with charging case" bodyLabel="Details" bodyPlaceholder="Quantity, budget, a reference link or photo, target price…" createdMsg="Request sent — Admin will reply here." adminDisplayName="Admin" />
+                  : <TicketsTab session={session} notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests" subheading="Request any product from Temu, Noon or Amazon — Admin will source it for you." newButtonLabel="Source from Temu, Noon & Amazon only" listLabel="Your requests" emptyText="No product requests yet — ask for something not in the catalog." subjectLabel="Product name" subjectPlaceholder="e.g. Wireless earbuds with charging case" bodyLabel="Product link & details" bodyPlaceholder="Paste the Temu / Noon / Amazon product link, quantity, target price…" createdMsg="Request sent — Admin will reply here." adminDisplayName="Admin" formTitle="Request a product" formNotice="You can request any product — but only from Temu, Noon or Amazon. Paste the product link below so Admin can source it for you." requireSourcePattern={/temu|noon|amazon|amzn/i} requireSourceMsg="Please paste a Temu, Noon or Amazon product link — other sources are not accepted." />
               )}
               {tab === "plans" && <PlansTab session={session} isPremiumSeller={isPremiumSeller} notify={notify} setTab={setTab} />}
               {tab === "support" && <SupportTab session={session} />}
@@ -9060,6 +9060,7 @@ function TicketsTab({
   subjectLabel = "Subject", subjectPlaceholder = "e.g. Payout for order ORD123456 is late",
   bodyLabel = "Message", bodyPlaceholder = "Describe the issue in detail…",
   createdMsg = "Ticket created — Customer Support will reply here.", adminDisplayName = "Customer Support",
+  formTitle = null, formNotice = null, requireSourcePattern = null, requireSourceMsg = "Please add a product link.",
 }) {
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(true);
@@ -9105,6 +9106,7 @@ function TicketsTab({
 
   const createTicket = async () => {
     if (!newSubject.trim() || !newBody.trim()) { notify && notify(`Add a ${subjectLabel.toLowerCase()} and a message.`); return; }
+    if (requireSourcePattern && !requireSourcePattern.test(newSubject + " " + newBody)) { notify && notify(requireSourceMsg); return; }
     setCreating(true);
     let imageUrl = null;
     if (newImageFile) {
@@ -9209,8 +9211,13 @@ function TicketsTab({
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,200,150,0.12)" }}>
               <Sparkles className="w-[18px] h-[18px]" style={{ color: "#00a67e" }} />
             </div>
-            <div className="font-bold text-sm" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{newButtonLabel.replace("+ New ", "Raise a new ").replace(/^./, (c) => c.toUpperCase())}</div>
+            <div className="font-bold text-sm" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{formTitle || newButtonLabel.replace("+ New ", "Raise a new ").replace(/^./, (c) => c.toUpperCase())}</div>
           </div>
+          {formNotice && (
+            <div className="rounded-xl px-4 py-3 mb-4 text-xs leading-relaxed" style={{ background: "rgba(248,180,0,0.12)", border: "1px solid rgba(248,180,0,0.4)", color: "#7a5a0a" }}>
+              {formNotice}
+            </div>
+          )}
           <div className="space-y-3.5">
             <div>
               <label className="text-xs font-semibold text-gray-500">{subjectLabel}</label>
