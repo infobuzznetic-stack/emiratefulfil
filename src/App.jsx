@@ -5,7 +5,7 @@ import {
   MapPin, PackageCheck, ScanBarcode, PlaneTakeoff, CheckCircle2, Sparkles,
   Receipt, Clock, CreditCard, LifeBuoy,
   User, Store, Phone, MessageCircle, Landmark, Hash, TrendingUp, Mail, BadgeCheck, ImagePlus,
-  Eye, Printer, FileText, Bell, Crown, Download, Copy, Check, Trash2, Link2,
+  Eye, Printer, FileText, Bell, Crown, Download, Copy, Check, Trash2, Link2, Trophy,
 } from "lucide-react";
 import { supabase, ADMIN_EMAILS } from "./supabaseClient.js";
 
@@ -37,28 +37,28 @@ const RTL_LANGS = ["ar", "ur"];
 const TRANSLATIONS = {
   en: {
     nav_dashboard: "Dashboard", nav_products: "Products", nav_orders: "Orders", nav_invoices: "Invoices",
-    nav_settings: "Seller Details", nav_requests: "Product Requests", nav_plans: "Plans", nav_support: "Customer Support",
+    nav_settings: "Seller Details", nav_winning: "Winning Products Request", nav_requests: "Product Requests", nav_plans: "Plans", nav_support: "Customer Support",
     nav_tickets: "Tickets", nav_admin: "Admin",
     greeting_morning: "Good Morning", greeting_afternoon: "Good Afternoon", greeting_evening: "Good Evening",
     language: "Language",
   },
   ar: {
     nav_dashboard: "لوحة التحكم", nav_products: "المنتجات", nav_orders: "الطلبات", nav_invoices: "الفواتير",
-    nav_settings: "بيانات البائع", nav_requests: "طلبات المنتجات", nav_plans: "الباقات", nav_support: "دعم العملاء",
+    nav_settings: "بيانات البائع", nav_winning: "طلب المنتجات الرابحة", nav_requests: "طلبات المنتجات", nav_plans: "الباقات", nav_support: "دعم العملاء",
     nav_tickets: "التذاكر", nav_admin: "الإدارة",
     greeting_morning: "صباح الخير", greeting_afternoon: "مساء الخير", greeting_evening: "مساء الخير",
     language: "اللغة",
   },
   ur: {
     nav_dashboard: "ڈیش بورڈ", nav_products: "پروڈکٹس", nav_orders: "آرڈرز", nav_invoices: "انوائسز",
-    nav_settings: "سیلر تفصیلات", nav_requests: "پروڈکٹ ریکویسٹس", nav_plans: "پلانز", nav_support: "کسٹمر سپورٹ",
+    nav_settings: "سیلر تفصیلات", nav_winning: "وننگ پروڈکٹس ریکویسٹ", nav_requests: "پروڈکٹ ریکویسٹس", nav_plans: "پلانز", nav_support: "کسٹمر سپورٹ",
     nav_tickets: "ٹکٹس", nav_admin: "ایڈمن",
     greeting_morning: "صبح بخیر", greeting_afternoon: "دن بخیر", greeting_evening: "شام بخیر",
     language: "زبان",
   },
   hi: {
     nav_dashboard: "डैशबोर्ड", nav_products: "प्रोडक्ट्स", nav_orders: "ऑर्डर्स", nav_invoices: "इनवॉइस",
-    nav_settings: "सेलर विवरण", nav_requests: "प्रोडक्ट रिक्वेस्ट", nav_plans: "प्लान्स", nav_support: "कस्टमर सपोर्ट",
+    nav_settings: "सेलर विवरण", nav_winning: "विनिंग प्रोडक्ट रिक्वेस्ट", nav_requests: "प्रोडक्ट रिक्वेस्ट", nav_plans: "प्लान्स", nav_support: "कस्टमर सपोर्ट",
     nav_tickets: "टिकट", nav_admin: "एडमिन",
     greeting_morning: "सुप्रभात", greeting_afternoon: "शुभ दोपहर", greeting_evening: "शुभ संध्या",
     language: "भाषा",
@@ -2214,7 +2214,7 @@ function writeLocal(key, value) {
 // sees an "In process" badge on the Shopify button and the tab can't be opened.
 // Set to false when the integration is ready to go live.
 const SHOPIFY_IN_PROCESS = false;
-const DASHBOARD_TABS = ["overview", "products", "orders", "shopify", "invoices", "settings", "requests", "support", "tickets", "admin"];
+const DASHBOARD_TABS = ["overview", "products", "orders", "shopify", "invoices", "settings", "winning", "requests", "support", "tickets", "admin"];
 
 function pathToRoute(pathname) {
   const parts = pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
@@ -2666,6 +2666,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
     ...(!isAdmin ? [{ id: "shopify", label: "Shopify", icon: Link2, inProcess: SHOPIFY_IN_PROCESS }] : []),
     { id: "invoices", label: t("nav_invoices"), icon: Receipt },
     { id: "settings", label: t("nav_settings"), icon: Sparkles },
+    { id: "winning", label: t("nav_winning"), icon: Trophy },
     { id: "requests", label: t("nav_requests"), icon: Package, count: ticketBadges.product_request },
     { id: "plans", label: t("nav_plans"), icon: Crown },
     { id: "support", label: t("nav_support"), icon: LifeBuoy },
@@ -3060,6 +3061,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
             {profileOpen && (
               <div className="absolute right-0 top-14 w-60 rounded-2xl bg-white shadow-xl z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
                 {[
+                  { icon: Trophy, label: "Winning Products Request", tab: "winning" },
                   { icon: Package, label: "Product Requests", tab: "requests" },
                   { icon: LifeBuoy, label: "Customer Support", tab: "support" },
                   { icon: FileText, label: "Tickets", tab: "tickets" },
@@ -3098,10 +3100,10 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           {/* Settings, Product Requests, Support, Tickets, Admin, and Products aren't
               gated by region — Products shows each country's own catalog instead.
               KSA is now live alongside UAE; only Qatar still shows Coming Soon. */}
-          {tab !== "overview" && tab !== "settings" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && tab !== "products" && tab !== "shopify" && region === "QATAR" && (
+          {tab !== "overview" && tab !== "settings" && tab !== "winning" && tab !== "requests" && tab !== "plans" && tab !== "support" && tab !== "tickets" && tab !== "admin" && tab !== "products" && tab !== "shopify" && region === "QATAR" && (
             <ComingSoonPanel region={region} />
           )}
-          {(tab === "settings" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || tab === "shopify" || region !== "QATAR") && (
+          {(tab === "settings" || tab === "winning" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || tab === "shopify" || region !== "QATAR") && (
             <>
               {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
@@ -3112,6 +3114,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               {tab === "shopify" && (SHOPIFY_IN_PROCESS ? <ShopifyInProcess onBack={() => setTab("overview")} /> : <ShopifyConnectTab session={session} notify={notify} />)}
               {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
+              {tab === "winning" && <WinningRequestsTab session={session} isAdmin={isAdmin} notify={notify} />}
               {tab === "requests" && (
                 isAdmin
                   ? <AdminTicketsPanel notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests — all sellers" subheading={(openCount) => `${openCount} open request${openCount === 1 ? "" : "s"} waiting on a reply.`} emptyText="No product requests here." replyPlaceholder="Reply as Admin…" senderDisplayName="Admin" />
@@ -9685,6 +9688,168 @@ export default function EmirateFulfilApp() {
         <FloatingWhatsApp />
       </LogoContext.Provider>
       </LanguageContext.Provider>
+    </div>
+  );
+}
+
+/* ============================================================
+   WINNING PRODUCTS REQUEST
+   Sellers submit a request (no chat). Admin approves/rejects.
+   On approval the seller gets an email (notify-seller type
+   "winning_approved"). Table: winning_product_requests.
+============================================================ */
+function WinningRequestsTab({ session, isAdmin, notify }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ name: "", link: "", details: "" });
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const [filter, setFilter] = useState("pending");
+
+  const load = async () => {
+    setLoading(true);
+    let q = supabase.from("winning_product_requests").select("*").order("created_at", { ascending: false });
+    if (!isAdmin) q = q.eq("seller_email", session.email);
+    const { data, error } = await q;
+    if (error) notify && notify("Could not load winning product requests.");
+    setRows(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []); // eslint-disable-line
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) { notify && notify("Please enter the product name."); return; }
+    setSaving(true);
+    const { data, error } = await supabase.from("winning_product_requests").insert({
+      seller_email: session.email,
+      seller_name: session.name || session.email,
+      product_name: form.name.trim(),
+      product_link: form.link.trim() || null,
+      details: form.details.trim() || null,
+      status: "pending",
+    }).select().single();
+    setSaving(false);
+    if (error) { notify && notify("Could not send your request. Please try again."); return; }
+    setRows((prev) => [data, ...prev]);
+    setForm({ name: "", link: "", details: "" });
+    notify && notify("Request sent — Admin will review it.");
+  };
+
+  const setStatus = async (r, status) => {
+    setBusyId(r.id);
+    const { error } = await supabase.from("winning_product_requests")
+      .update({ status, reviewed_at: new Date().toISOString() }).eq("id", r.id);
+    setBusyId(null);
+    if (error) { notify && notify("Could not update this request."); return; }
+    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, status } : x)));
+    notify && notify(status === "approved" ? "Approved — seller has been emailed." : "Request rejected.");
+    // Email the seller only when approved (non-fatal if it fails).
+    if (status === "approved") {
+      sendSellerEmail("winning_approved", { email: r.seller_email, name: r.seller_name }, { productName: r.product_name });
+    }
+  };
+
+  const STATUS = {
+    pending:  { label: "Pending",  bg: "rgba(248,180,0,0.14)", fg: "#9a6f00" },
+    approved: { label: "Approved", bg: "rgba(0,200,150,0.14)", fg: "#00855f" },
+    rejected: { label: "Rejected", bg: "rgba(239,68,68,0.12)", fg: "#b91c1c" },
+  };
+  const pill = (st) => {
+    const c = STATUS[st] || STATUS.pending;
+    return <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: c.bg, color: c.fg }}>{c.label}</span>;
+  };
+  const shown = isAdmin ? rows.filter((r) => (filter === "all" ? true : r.status === filter)) : rows;
+  const pendingCount = rows.filter((r) => r.status === "pending").length;
+
+  return (
+    <div>
+      <div className="relative overflow-hidden rounded-3xl px-5 py-6 sm:px-6 sm:py-8 mb-4 text-white"
+        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#7a5a0a 150%)", boxShadow: "0 30px 60px -22px rgba(11,31,58,0.55)" }}>
+        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#F8B400" }} />
+        <div className="relative">
+          <Trophy className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: "#F8B400" }} />
+          <h1 className="mt-2 sm:mt-3 text-xl sm:text-3xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            {isAdmin ? "Winning Products Request — all sellers" : "Winning Products Request"}
+          </h1>
+          <p className="text-xs sm:text-sm text-white/60 mt-1 sm:mt-1.5 max-w-md">
+            {isAdmin
+              ? `${pendingCount} request${pendingCount === 1 ? "" : "s"} waiting for approval.`
+              : "Want access to a winning product? Send a request and Admin will approve it — you'll get an email."}
+          </p>
+        </div>
+      </div>
+
+      {!isAdmin && (
+        <form onSubmit={submit} className="bg-white rounded-2xl p-5 mb-4 space-y-3" style={{ border: "1px solid #E5E7EB" }}>
+          <div>
+            <label className="text-xs font-bold text-gray-600">Product name *</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Portable neck fan" className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ border: "1px solid #E5E7EB" }} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-600">Product link (optional)</label>
+            <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })}
+              placeholder="https://…" className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ border: "1px solid #E5E7EB" }} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-600">Details (optional)</label>
+            <textarea value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} rows={3}
+              placeholder="Expected daily orders, target country, anything Admin should know…" className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ border: "1px solid #E5E7EB" }} />
+          </div>
+          <button type="submit" disabled={saving} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer disabled:opacity-60" style={{ background: "#0B1F3A" }}>
+            {saving ? "Sending…" : "Send request"}
+          </button>
+        </form>
+      )}
+
+      {isAdmin && (
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {["pending", "approved", "rejected", "all"].map((f) => (
+            <button key={f} onClick={() => setFilter(f)} className="px-3.5 py-1.5 rounded-full text-xs font-bold capitalize cursor-pointer"
+              style={{ background: filter === f ? "#0B1F3A" : "#fff", color: filter === f ? "#fff" : "#0B1F3A", border: "1px solid #E5E7EB" }}>
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+        <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: "1px solid #F1F5F9" }}>
+          <span className="text-sm font-extrabold" style={{ color: "#0B1F3A" }}>{isAdmin ? "Requests" : "Your requests"}</span>
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(11,31,58,0.06)", color: "#0B1F3A" }}>{shown.length}</span>
+        </div>
+        {loading ? (
+          <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
+        ) : shown.length === 0 ? (
+          <div className="p-6 text-center text-sm text-gray-400">{isAdmin ? "No requests here." : "No requests yet — send your first one above."}</div>
+        ) : (
+          shown.map((r) => (
+            <div key={r.id} className="px-5 py-4 flex items-start justify-between gap-3 flex-wrap" style={{ borderBottom: "1px solid #F1F5F9" }}>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold" style={{ color: "#0B1F3A" }}>{r.product_name}</span>
+                  {pill(r.status)}
+                </div>
+                {isAdmin && <div className="text-xs text-gray-500 mt-0.5">{r.seller_name} · {r.seller_email}</div>}
+                {r.product_link && (
+                  <a href={r.product_link} target="_blank" rel="noreferrer" className="text-xs font-semibold hover:underline break-all" style={{ color: "#128C7E" }}>{r.product_link}</a>
+                )}
+                {r.details && <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{r.details}</p>}
+                <div className="text-[11px] text-gray-400 mt-1">{new Date(r.created_at).toLocaleString()}</div>
+              </div>
+              {isAdmin && r.status === "pending" && (
+                <div className="flex gap-2 flex-shrink-0">
+                  <button disabled={busyId === r.id} onClick={() => setStatus(r, "approved")}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-white cursor-pointer disabled:opacity-60" style={{ background: "#00C896" }}>Approve</button>
+                  <button disabled={busyId === r.id} onClick={() => setStatus(r, "rejected")}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60" style={{ background: "#fff", color: "#b91c1c", border: "1px solid #FCA5A5" }}>Reject</button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
