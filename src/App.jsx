@@ -250,6 +250,18 @@ async function sendSellerEmail(type, seller, extra = {}) {
   }
 }
 
+// Asks the "whatsapp-confirm" Edge Function to send the CUSTOMER an order
+// confirmation on WhatsApp (official WhatsApp Business Cloud API). Fire-and-
+// forget: a failure here must never block or undo the order itself.
+async function sendCustomerWhatsApp(orderIds) {
+  if (!orderIds || !orderIds.length) return;
+  try {
+    await supabase.functions.invoke("whatsapp-confirm", { body: { orderIds } });
+  } catch (e) {
+    // non-fatal
+  }
+}
+
 // Shortens a product title to its first N words for tight table cells (the
 // full title is still available via a `title` tooltip on the element that
 // uses this, so nothing is actually lost — just not shown inline).
@@ -2538,6 +2550,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       status: "pending", payment_status: "unpaid", delivery_charge: newOrder.deliveryCharge,
     });
     if (error) { notify(/stock/i.test(error.message || "") ? error.message : "Could not save order."); return null; }
+    if (newOrder.customerPhone) sendCustomerWhatsApp([newOrder.id]);
     setOrders([newOrder, ...orders]);
 
     // Stock is now deducted INSIDE the database (trigger on the orders
@@ -2619,6 +2632,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
       }))
     );
     if (error) { notify("Could not save imported orders."); return 0; }
+    sendCustomerWhatsApp(inserted.filter((o) => o.customerPhone).map((o) => o.id));
 
     setOrders((prev) => [...inserted.map((o) => ({ ...o, status: "pending", paymentStatus: "unpaid" })), ...prev]);
 
