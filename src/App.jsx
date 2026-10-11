@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useContext, createContext } from "react";
+import { createPortal } from "react-dom";
 import {
   Package, Warehouse, Truck, ClipboardCheck, RotateCcw, Boxes, ShieldCheck,
   Zap, Globe2, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, Star,
@@ -6789,8 +6790,8 @@ function OrderTicketModal({ order, session, notify, onClose, onCreated }) {
     onCreated && onCreated(id);
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "rgba(11,31,58,0.55)" }} onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4" style={{ background: "rgba(11,31,58,0.55)", position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }} onClick={onClose}>
       <div className="w-full max-w-md bg-white rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -6828,7 +6829,8 @@ function OrderTicketModal({ order, session, notify, onClose, onCreated }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
