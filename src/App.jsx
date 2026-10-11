@@ -3120,8 +3120,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           )}
           {(tab === "settings" || tab === "winning" || tab === "requests" || tab === "plans" || tab === "support" || tab === "tickets" || tab === "products" || tab === "shopify" || region !== "QATAR") && (
             <>
-              {tab === "products" && !isAdmin && !isPremiumSeller && <ProductsGoldGate onUpgrade={() => setTab("plans")} />}
-              {tab === "products" && (isAdmin || isPremiumSeller) && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
+              {tab === "products" && <CatalogTab catalog={visibleCatalog} onAdd={addListing} onPlaceOrder={addOrder} notify={notify} onViewOrders={() => setTab("orders")} sellerEmail={session.email} isAdmin={isAdmin} isPremiumSeller={isPremiumSeller} onCatalogChanged={reload} />}
               {tab === "orders" && (
                 isAdmin
                   ? <AdminOrdersPanel notify={notify} />
@@ -4800,7 +4799,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
 
   if (view === "detail" && activeProduct) {
     const openRelated = (prod) => {
-      const locked = (prod.isPremium || prod.country === "KSA") && !isPremiumSeller && !isAdmin;
+      const locked = !isPremiumSeller && !isAdmin;
       if (locked) { setShowGoldModal(true); return; }
       openProduct(prod);
     };
@@ -4934,9 +4933,9 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
             );
           }
           const inStock = (p.stock ?? 0) > 0;
-          // KSA's whole catalog is Gold-Plan only — locked for every seller until
-          // they're Premium, same overlay/treatment as a per-product Premium lock.
-          const isLocked = (p.isPremium || p.country === "KSA") && !isPremiumSeller && !isAdmin;
+          // Every product is Gold-Plan only — blurred + locked for every non-Gold
+          // seller (click opens the Gold upgrade modal).
+          const isLocked = !isPremiumSeller && !isAdmin;
           return (
             <div
               key={p.id}
@@ -4959,7 +4958,7 @@ function CatalogTab({ catalog, onAdd, onPlaceOrder, notify, onViewOrders, seller
                   </div>
                   <div className="text-white font-bold text-xs text-center px-3" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Gold Plan Only</div>
                   <div className="mt-1.5 text-[10px] text-white/60 text-center px-4">
-                    {p.country === "KSA" && !p.isPremium ? "KSA products are Gold Plan only" : "Tap to unlock this premium product"}
+                    Tap to unlock — upgrade to Gold
                   </div>
                 </div>
               )}
@@ -10027,34 +10026,6 @@ function WinningRequestsTab({ session, isAdmin, notify, isPremiumSeller = false,
         )}
       </div>
       </div>
-      </div>
-    </div>
-  );
-}
-
-// Products are Gold-Plan only: a free / newly signed-up seller never gets the
-// real catalog rendered (nothing to inspect or click) — just this upgrade card.
-function ProductsGoldGate({ onUpgrade }) {
-  return (
-    <div>
-      <div className="relative overflow-hidden rounded-3xl px-5 py-6 sm:px-6 sm:py-8 mb-4 text-white"
-        style={{ background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#7a5a0a 150%)", boxShadow: "0 30px 60px -22px rgba(11,31,58,0.55)" }}>
-        <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full opacity-30 blur-3xl" style={{ background: "#F8B400" }} />
-        <div className="relative">
-          <Package className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: "#F8B400" }} />
-          <h1 className="mt-2 sm:mt-3 text-xl sm:text-3xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Products</h1>
-          <p className="text-xs sm:text-sm text-white/60 mt-1 sm:mt-1.5 max-w-md">Our product catalog is available to Gold Plan sellers.</p>
-        </div>
-      </div>
-      <div className="max-w-sm mx-auto rounded-2xl p-6 text-center text-white" style={{ background: "linear-gradient(145deg,#0B1F3A,#2a1f06)", border: "1px solid rgba(248,180,0,0.5)", boxShadow: "0 24px 60px rgba(11,31,58,0.45)" }}>
-        <div className="w-12 h-12 mx-auto rounded-2xl flex items-center justify-center" style={{ background: "rgba(248,180,0,0.18)" }}>
-          <Crown className="w-6 h-6" style={{ color: "#F8B400" }} />
-        </div>
-        <h3 className="mt-3 text-lg font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Gold Plan feature</h3>
-        <p className="text-xs text-white/70 mt-1.5">Upgrade to Gold to unlock the product catalog, premium sourcing and winning products.</p>
-        <button type="button" onClick={() => onUpgrade && onUpgrade()} className="mt-4 w-full py-2.5 rounded-xl text-sm font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#0B1F3A" }}>
-          Upgrade to Gold
-        </button>
       </div>
     </div>
   );
