@@ -3109,7 +3109,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               {tab === "orders" && (
                 isAdmin
                   ? <AdminOrdersPanel notify={notify} />
-                  : <OrdersTab orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} initialStatusFilter={ordersStatusFilter} catalog={catalog} onImportOrders={importOrders} />
+                  : <OrdersTab session={session} notify={notify} onOpenTickets={() => setTab("tickets")} orders={orders} confirmedProfit={confirmedProfit} deliveredRevenue={paidInvoice} returnedCount={returned.length} initialStatusFilter={ordersStatusFilter} catalog={catalog} onImportOrders={importOrders} />
               )}
               {tab === "shopify" && (SHOPIFY_IN_PROCESS ? <ShopifyInProcess onBack={() => setTab("overview")} /> : <ShopifyConnectTab session={session} notify={notify} />)}
               {tab === "invoices" && <InvoicesTab session={session} />}
@@ -6495,12 +6495,13 @@ function ShopifyImportModal({ catalog, existingOrders, onClose, onImport }) {
   );
 }
 
-function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, initialStatusFilter = "all", catalog = [], onImportOrders }) {
+function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, initialStatusFilter = "all", catalog = [], onImportOrders, session, notify, onOpenTickets }) {
   // Seeded from the dashboard card that was clicked (e.g. "Delivered" opens
   // here pre-filtered to delivered). Local state after that so the pills
   // below can change it without needing to talk back to the Dashboard.
   const [filter, setFilter] = useState(initialStatusFilter);
   const [importOpen, setImportOpen] = useState(false);
+  const [ticketOrder, setTicketOrder] = useState(null); // order the seller is raising a ticket for
   const deliveredCount = orders.filter((o) => o.status === "delivered").length;
   const deliveryRate = orders.length ? Math.round((deliveredCount / orders.length) * 100) : 0;
   const FILTER_OPTIONS = ["all", "pending", "confirmation_pending", "in_progress", "confirmed", "customer_not_replying", "customer_not_picking_call", "wrong_number", "customer_cancelled_confirmation", "on_hold", "product_not_available", "duplicate_order", "dispatched", "shipped", "delivered", "returned", "product_shipped_by_customer", "cancelled"];
@@ -6536,6 +6537,15 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
         </div>
       </div>
 
+      {ticketOrder && session && (
+        <OrderTicketModal
+          order={ticketOrder}
+          session={session}
+          notify={notify}
+          onClose={() => setTicketOrder(null)}
+          onCreated={() => { setTicketOrder(null); onOpenTickets && onOpenTickets(); }}
+        />
+      )}
       {importOpen && (
         <ShopifyImportModal
           catalog={catalog}
@@ -6610,6 +6620,17 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
                   </div>
                 </div>
 
+                <div className="mt-3 pt-3 flex justify-end" style={{ borderTop: "1px solid #F3F4F6" }}>
+                  <button
+                    type="button"
+                    onClick={() => setTicketOrder(o)}
+                    className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer"
+                    style={{ background: "rgba(11,31,58,0.06)", color: "#0B1F3A" }}
+                  >
+                    <LifeBuoy className="w-3.5 h-3.5" /> Raise ticket
+                  </button>
+                </div>
+
                 {(o.trackingNumber || o.whatsappProofUrl) && (
                   <div className="flex items-center justify-between gap-3 mt-3 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
                     <div className="text-xs min-w-0">
@@ -6644,10 +6665,10 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
 
           {/* Desktop/tablet: full table */}
           <div className="mt-4 rounded-2xl bg-white overflow-x-auto hidden md:block" style={{ border: "1px solid #E5E7EB", WebkitOverflowScrolling: "touch" }}>
-            <table className="w-full min-w-[950px] text-sm">
+            <table className="w-full min-w-[1050px] text-sm">
               <thead><tr className="text-left text-xs text-gray-400" style={{ borderBottom: "1px solid #F3F4F6" }}>
                 <th className="px-4 py-3">Order</th><th className="px-4 py-3">Product</th><th className="px-4 py-3">Buyer/City</th>
-                <th className="px-4 py-3">Sell (COD total)</th><th className="px-4 py-3">Delivery (incl.)</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th><th className="px-4 py-3">WhatsApp Proof</th>
+                <th className="px-4 py-3">Sell (COD total)</th><th className="px-4 py-3">Delivery (incl.)</th><th className="px-4 py-3">Profit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Tracking #</th><th className="px-4 py-3">WhatsApp Proof</th><th className="px-4 py-3">Ticket</th>
               </tr></thead>
               <tbody>
                 {filteredOrders.map((o, i) => (
@@ -6690,6 +6711,17 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
                         <span className="text-xs text-gray-300">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => setTicketOrder(o)}
+                        title="Raise a ticket for this order"
+                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+                        style={{ background: "rgba(11,31,58,0.06)", color: "#0B1F3A" }}
+                      >
+                        <LifeBuoy className="w-3.5 h-3.5" /> Raise ticket
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -6697,6 +6729,105 @@ function OrdersTab({ orders, confirmedProfit, deliveredRevenue, returnedCount, i
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   RAISE A TICKET FROM AN ORDER
+   Seller picks the problem type, adds a message (+ optional photo).
+   Creates a normal "support" ticket whose subject carries the order
+   number, so it lands in Admin's Tickets queue.
+============================================================ */
+const ORDER_ISSUE_TYPES = [
+  "Order number issue",
+  "Wrong order status",
+  "Delivery delayed",
+  "Customer not receiving / refused",
+  "Wrong or damaged product",
+  "Tracking problem",
+  "Payment / profit issue",
+  "Other",
+];
+
+function OrderTicketModal({ order, session, notify, onClose, onCreated }) {
+  const [issue, setIssue] = useState(ORDER_ISSUE_TYPES[0]);
+  const [body, setBody] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const pickImage = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { notify && notify("Please choose an image file."); return; }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const submit = async () => {
+    if (!body.trim()) { notify && notify("Please describe the problem."); return; }
+    setSaving(true);
+    let imageUrl = null;
+    if (imageFile) {
+      const { url, error: imgErr } = await uploadTicketImage(imageFile);
+      if (imgErr) { setSaving(false); notify && notify(imgErr); return; }
+      imageUrl = url;
+    }
+    const id = "TCK" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 90 + 10);
+    const subject = `Order ${order.id} — ${issue}`;
+    const { error } = await supabase.from("tickets").insert({
+      id, seller_email: session.email, seller_name: session.name || session.email, subject, status: "open", category: "support",
+    });
+    if (error) { setSaving(false); notify && notify("Could not create the ticket — please try again."); return; }
+    const details = `Order: ${order.id}\nProduct: ${order.productName} ×${order.qty}\nStatus: ${order.status}\nIssue: ${issue}\n\n${body.trim()}`;
+    const { error: msgError } = await supabase.from("ticket_messages").insert({
+      ticket_id: id, sender: "seller", sender_name: session.name || session.email, body: details, image_url: imageUrl,
+    });
+    setSaving(false);
+    if (msgError) notify && notify("Ticket created, but the message failed to attach.");
+    else notify && notify("Ticket created — Customer Support will reply in Tickets.");
+    onCreated && onCreated(id);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "rgba(11,31,58,0.55)" }} onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-extrabold" style={{ color: "#0B1F3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Raise a ticket</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Order <span className="font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{order.id}</span> · {order.productName} ×{order.qty}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="text-xs font-bold text-gray-600">What is the problem?</label>
+            <select value={issue} onChange={(e) => setIssue(e.target.value)} className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none bg-white" style={{ border: "1px solid #E5E7EB" }}>
+              {ORDER_ISSUE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-600">Details</label>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="Explain the issue so Support can fix it quickly…"
+              className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ border: "1px solid #E5E7EB" }} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-600">Picture (optional)</label>
+            <input type="file" accept="image/*" onChange={(e) => pickImage(e.target.files?.[0])} className="mt-1 block w-full text-xs" />
+            {imagePreview && <img src={imagePreview} alt="Preview" className="mt-2 w-20 h-20 rounded-lg object-cover" style={{ border: "1px solid #E5E7EB" }} />}
+          </div>
+        </div>
+
+        <div className="mt-5 flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-bold cursor-pointer" style={{ background: "#F3F4F6", color: "#0B1F3A" }}>Cancel</button>
+          <button type="button" onClick={submit} disabled={saving} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer disabled:opacity-60" style={{ background: "#0B1F3A" }}>
+            {saving ? "Sending…" : "Create ticket"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
