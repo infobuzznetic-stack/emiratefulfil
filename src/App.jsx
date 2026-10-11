@@ -3115,7 +3115,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
               {tab === "shopify" && (SHOPIFY_IN_PROCESS ? <ShopifyInProcess onBack={() => setTab("overview")} /> : <ShopifyConnectTab session={session} notify={notify} />)}
               {tab === "invoices" && <InvoicesTab session={session} />}
               {tab === "settings" && <SettingsTab session={session} notify={notify} />}
-              {tab === "winning" && <WinningRequestsTab session={session} isAdmin={isAdmin} notify={notify} />}
+              {tab === "winning" && <WinningRequestsTab session={session} isAdmin={isAdmin} notify={notify} isPremiumSeller={isPremiumSeller} onUpgrade={() => setTab("plans")} />}
               {tab === "requests" && (
                 isAdmin
                   ? <AdminTicketsPanel notify={notify} category="product_request" icon={Package} idPrefix="PRQ" heading="Product Requests — all sellers" subheading={(openCount) => `${openCount} open request${openCount === 1 ? "" : "s"} waiting on a reply.`} emptyText="No product requests here." replyPlaceholder="Reply as Admin…" senderDisplayName="Admin" />
@@ -8734,6 +8734,7 @@ const PLAN_DATA = [
       { label: "Product Requests", on: false },
       { label: "Product Sourcing — No Inventory Cost", on: false },
       { label: "Hunt Temu, Noon & Amazon Products", on: false },
+      { label: "Store Integration — Shopify", on: false },
       { label: "Free Order Confirmation", on: false },
       { label: "Free Inventory Cost", on: false },
       { label: "Exclusive Winning Products", on: false },
@@ -8759,6 +8760,7 @@ const PLAN_DATA = [
       { label: "Product Requests", on: true },
       { label: "Product Sourcing — No Inventory Cost", on: true },
       { label: "Hunt Temu, Noon & Amazon Products", on: true },
+      { label: "Store Integration — Shopify", on: true },
       { label: "Free Order Confirmation", on: true },
       { label: "Free Inventory Cost", on: true },
       { label: "Exclusive Winning Products", on: true },
@@ -9838,7 +9840,9 @@ export default function EmirateFulfilApp() {
    On approval the seller gets an email (notify-seller type
    "winning_approved"). Table: winning_product_requests.
 ============================================================ */
-function WinningRequestsTab({ session, isAdmin, notify }) {
+function WinningRequestsTab({ session, isAdmin, notify, isPremiumSeller = false, onUpgrade }) {
+  // Free sellers see this page blurred with an upgrade prompt; only Gold members (and Admin) can request.
+  const locked = !isAdmin && !isPremiumSeller;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: "", link: "", details: "" });
@@ -9859,6 +9863,7 @@ function WinningRequestsTab({ session, isAdmin, notify }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (locked) { notify && notify("Winning Products Request is a Gold Plan feature."); return; }
     if (!form.name.trim()) { notify && notify("Please enter the product name."); return; }
     setSaving(true);
     const { data, error } = await supabase.from("winning_product_requests").insert({
@@ -9920,6 +9925,22 @@ function WinningRequestsTab({ session, isAdmin, notify }) {
         </div>
       </div>
 
+      <div className="relative" style={locked ? { minHeight: 380 } : undefined}>
+      {locked && (
+        <div className="absolute inset-0 z-10 flex items-start justify-center pt-10 sm:pt-16 px-4">
+          <div className="max-w-sm w-full rounded-2xl p-6 text-center text-white" style={{ background: "linear-gradient(145deg,#0B1F3A,#2a1f06)", border: "1px solid rgba(248,180,0,0.5)", boxShadow: "0 24px 60px rgba(11,31,58,0.45)" }}>
+            <div className="w-12 h-12 mx-auto rounded-2xl flex items-center justify-center" style={{ background: "rgba(248,180,0,0.18)" }}>
+              <Crown className="w-6 h-6" style={{ color: "#F8B400" }} />
+            </div>
+            <h3 className="mt-3 text-lg font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Gold Plan feature</h3>
+            <p className="text-xs text-white/70 mt-1.5">Request exclusive winning products with a Gold membership. Upgrade to unlock this page.</p>
+            <button type="button" onClick={() => onUpgrade && onUpgrade()} className="mt-4 w-full py-2.5 rounded-xl text-sm font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)", color: "#0B1F3A" }}>
+              Upgrade to Gold
+            </button>
+          </div>
+        </div>
+      )}
+      <div style={locked ? { filter: "blur(6px)", pointerEvents: "none", userSelect: "none", opacity: 0.7 } : undefined} aria-hidden={locked}>
       {!isAdmin && (
         <form onSubmit={submit} className="bg-white rounded-2xl p-5 mb-4 space-y-3" style={{ border: "1px solid #E5E7EB" }}>
           <div>
@@ -9989,6 +10010,8 @@ function WinningRequestsTab({ session, isAdmin, notify }) {
             </div>
           ))
         )}
+      </div>
+      </div>
       </div>
     </div>
   );
