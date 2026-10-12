@@ -3529,7 +3529,7 @@ function OverviewTab({
               </h1>
               {(region === "UAE" || region === "KSA") && (
                 <div
-                  className="mt-1 text-xl sm:text-2xl font-bold"
+                  className="mt-1 text-lg sm:text-xl font-bold sm:whitespace-nowrap"
                   dir="rtl"
                   style={{ color: isPremiumSeller ? "#FFE29A" : "#7FE8C9", fontFamily: "'Noto Kufi Arabic', sans-serif", opacity: 0.85 }}
                 >
@@ -3565,7 +3565,7 @@ function OverviewTab({
             </div>
             {region !== "QATAR" && (
               <div
-                className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto"
+                className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto sm:flex-shrink-0 whitespace-nowrap"
                 style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", backdropFilter: "blur(6px)" }}
               >
                 <div className="relative w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isPremiumSeller ? "linear-gradient(135deg,#F8B400,#c98f00)" : "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: isPremiumSeller ? "0 6px 16px rgba(248,180,0,0.5)" : "0 6px 16px rgba(0,200,150,0.4)", animation: "livePulse 2.4s infinite" }}>
@@ -3576,6 +3576,11 @@ function OverviewTab({
                 <div className="text-right flex-1 sm:flex-initial">
                   <div className="text-[11px] font-medium text-white/50 uppercase tracking-wide">Confirmed profit</div>
                   <div className="text-2xl font-extrabold" style={{ color: isPremiumSeller ? "#FFE29A" : "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {regionConfirmedProfit.toLocaleString()}</div>
+                  {regionOrders.length > 0 && (
+                    <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] font-semibold" style={{ color: "#7FE8C9" }}>
+                      <TrendingUp className="w-3 h-3" /> {Math.round(((Array.isArray(regionDelivered) ? regionDelivered.length : Number(regionDelivered) || 0) / regionOrders.length) * 100)}% delivered
+                    </div>
+                  )}
                 </div>
               </div>
             )}
