@@ -2690,7 +2690,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   ];
 
   return (
-    <div style={{ fontFamily: "Inter, sans-serif", background: isPremiumSeller ? "linear-gradient(180deg,#FDF3DA 0%,#FFFBF1 320px,#FFFBF1 100%)" : "linear-gradient(180deg,#EEF2F8 0%,#F8FAFC 320px,#F8FAFC 100%)", position: "relative", overflow: "hidden" }} className="min-h-screen flex">
+    <div style={{ fontFamily: "Inter, sans-serif", background: isPremiumSeller ? "radial-gradient(900px 520px at 5% 0%, #FFD36B 0%, transparent 62%), radial-gradient(800px 520px at 100% 28%, #9DE9D0 0%, transparent 62%), radial-gradient(800px 560px at 25% 100%, #CDBBFF 0%, transparent 62%), #FFEFC8" : "radial-gradient(900px 520px at 5% 0%, #A5C8FF 0%, transparent 62%), radial-gradient(800px 520px at 100% 28%, #8FEBD6 0%, transparent 62%), radial-gradient(800px 560px at 25% 100%, #D2C2FF 0%, transparent 62%), #E6F0FF", position: "relative", overflow: "hidden" }} className="min-h-screen flex">
       <div className="pointer-events-none absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full opacity-[0.10] blur-3xl" style={{ background: isPremiumSeller ? "#F8B400" : "#00C896" }} />
       <div className="pointer-events-none absolute top-40 -right-32 w-[380px] h-[380px] rounded-full opacity-[0.08] blur-3xl" style={{ background: "#F8B400" }} />
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-72" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0.04), transparent)" }} />
