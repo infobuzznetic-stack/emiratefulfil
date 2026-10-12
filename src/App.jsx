@@ -3228,7 +3228,7 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = 
           </div>
         )}
       </div>
-      <div className="relative text-xl sm:text-[28px] leading-tight font-extrabold mt-2 sm:mt-3 tracking-tight truncate" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
+      <div className="relative text-2xl sm:text-[28px] leading-tight font-extrabold mt-2 sm:mt-3 tracking-tight truncate" style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}>
         {prefix}{display.toLocaleString()}{suffix}
       </div>
       {sub && <div className="relative text-xs text-gray-400 mt-1">{sub}</div>}
@@ -3497,9 +3497,9 @@ function OverviewTab({
             {/* Initials avatar — a small "who's logged in" touch that reads as a proper
                 premium dashboard rather than a plain admin panel. Ring color follows
                 Premium status, same as everywhere else. */}
-            <div className="relative hidden sm:flex flex-shrink-0">
+            <div className="relative flex flex-shrink-0">
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-extrabold"
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-lg font-extrabold"
                 style={{
                   background: isPremiumSeller ? "linear-gradient(135deg,#FFE29A,#F8B400,#c98f00)" : "linear-gradient(135deg,#00C896,#0B7A5E)",
                   color: isPremiumSeller ? "#3a2a0b" : "#fff",
@@ -3566,7 +3566,7 @@ function OverviewTab({
             {region !== "QATAR" && (
               <div
                 className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto sm:flex-shrink-0 whitespace-nowrap"
-                style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", backdropFilter: "blur(6px)" }}
+                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04))", border: `1px solid ${isPremiumSeller ? "rgba(248,180,0,0.55)" : "rgba(127,232,201,0.45)"}`, backdropFilter: "blur(8px)", boxShadow: `0 14px 36px -12px ${isPremiumSeller ? "rgba(248,180,0,0.55)" : "rgba(0,200,150,0.5)"}` }}
               >
                 <div className="relative w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isPremiumSeller ? "linear-gradient(135deg,#F8B400,#c98f00)" : "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: isPremiumSeller ? "0 6px 16px rgba(248,180,0,0.5)" : "0 6px 16px rgba(0,200,150,0.4)", animation: "livePulse 2.4s infinite" }}>
                   <Sparkles className="w-5 h-5 text-white" style={{ animation: "sparkleTwinkle 2.2s ease-in-out infinite" }} />
@@ -3575,7 +3575,7 @@ function OverviewTab({
                 </div>
                 <div className="text-right flex-1 sm:flex-initial">
                   <div className="text-[11px] font-medium text-white/50 uppercase tracking-wide">Confirmed profit</div>
-                  <div className="text-2xl font-extrabold" style={{ color: isPremiumSeller ? "#FFE29A" : "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {regionConfirmedProfit.toLocaleString()}</div>
+                  <div className="text-3xl sm:text-2xl font-extrabold" style={{ color: isPremiumSeller ? "#FFE29A" : "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>{currency} {regionConfirmedProfit.toLocaleString()}</div>
                   {regionOrders.length > 0 && (
                     <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] font-semibold" style={{ color: "#7FE8C9" }}>
                       <TrendingUp className="w-3 h-3" /> {Math.round(((Array.isArray(regionDelivered) ? regionDelivered.length : Number(regionDelivered) || 0) / regionOrders.length) * 100)}% delivered
@@ -3623,6 +3623,26 @@ function OverviewTab({
               <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, rgba(248,180,0,0.4), transparent)" }} />
             </div>
           )}
+          {(() => {
+            const dCount = Array.isArray(regionDelivered) ? regionDelivered.length : Number(regionDelivered) || 0;
+            const rate = regionOrders.length ? Math.round((dCount / regionOrders.length) * 100) : 0;
+            const chip = (bg, glow, Ic, big, small) => (
+              <div className="flex-shrink-0 flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-2xl text-white" style={{ background: bg, boxShadow: `0 12px 24px -10px ${glow}` }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.22)" }}><Ic className="w-4 h-4" /></div>
+                <div className="leading-tight">
+                  <div className="text-base font-extrabold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{big}</div>
+                  <div className="text-[10px] font-semibold opacity-80 uppercase tracking-wide">{small}</div>
+                </div>
+              </div>
+            );
+            return (
+              <div className="sm:hidden -mx-1 px-1 mb-4 flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                {chip("linear-gradient(135deg,#00C896,#0B7A5E)", "rgba(0,200,150,0.6)", CheckCircle2, dCount.toLocaleString(), "Delivered")}
+                {chip("linear-gradient(135deg,#F8B400,#c98f00)", "rgba(248,180,0,0.6)", TrendingUp, `${rate}%`, "Delivery rate")}
+                {chip("linear-gradient(135deg,#3B82F6,#1D4ED8)", "rgba(59,130,246,0.6)", Truck, regionOrders.length.toLocaleString(), "Total orders")}
+              </div>
+            );
+          })()}
           <div key={region} className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4" style={{ animation: "dashTabIn 0.35s ease-out both" }}>
             {cards.map((c, i) => (
               <StatCard
