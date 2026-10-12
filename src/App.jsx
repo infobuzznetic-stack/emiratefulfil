@@ -2889,6 +2889,9 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes auroraA { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,30px) scale(1.25); } }
+        @keyframes auroraB { 0%,100% { transform: translate(0,0) scale(1.1); } 50% { transform: translate(-50px,-20px) scale(0.9); } }
+        @keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
         @keyframes livePulse {
           0% { box-shadow: 0 0 0 0 rgba(0,200,150,0.55); }
           70% { box-shadow: 0 0 0 8px rgba(0,200,150,0); }
@@ -3232,6 +3235,7 @@ function StatCard({ label, value, color = "#0B1F3A", sub, prefix = "", suffix = 
         {prefix}{display.toLocaleString()}{suffix}
       </div>
       {sub && <div className="relative text-xs text-gray-400 mt-1">{sub}</div>}
+      <div className="absolute inset-y-0 w-1/3 pointer-events-none" style={{ background: `linear-gradient(90deg, transparent, ${color}22, transparent)`, animation: `goldShimmer 5s ease-in-out ${(delay / 1000) + 1}s infinite` }} />
       {/* thin decorative progress-style underline for extra visual weight */}
       <div className="relative mt-3.5 h-[3px] w-full rounded-full overflow-hidden" style={{ background: `${color}14` }}>
         <div
@@ -3404,7 +3408,10 @@ function OverviewTab({
   ];
 
   return (
-    <div>
+    <div className="relative isolate">
+      <div className="pointer-events-none absolute -top-16 -left-16 w-72 h-72 sm:w-[420px] sm:h-[420px] rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(248,180,0,0.40), transparent 70%)", animation: "auroraA 9s ease-in-out infinite" }} />
+      <div className="pointer-events-none absolute top-1/3 -right-20 w-72 h-72 sm:w-[420px] sm:h-[420px] rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(0,200,150,0.30), transparent 70%)", animation: "auroraB 11s ease-in-out infinite" }} />
+      <div className="pointer-events-none absolute bottom-0 left-1/4 w-72 h-72 rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(139,92,246,0.22), transparent 70%)", animation: "auroraA 13s ease-in-out infinite" }} />
       <MarqueeTicker
         text={
           region === "KSA"
@@ -3422,6 +3429,9 @@ function OverviewTab({
             : { background: "linear-gradient(120deg,#0B1F3A 0%,#0F2E52 55%,#0B7A5E 130%)", boxShadow: "0 0 0 1px rgba(0,200,150,0.10), 0 30px 60px -22px rgba(11,31,58,0.55)" }
         }
       >
+        <div className="absolute -top-20 -right-10 w-64 h-64 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,226,154,0.35), transparent 65%)", animation: "auroraA 7s ease-in-out infinite" }} />
+        <div className="absolute -bottom-24 left-10 w-72 h-72 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,200,150,0.30), transparent 65%)", animation: "auroraB 8s ease-in-out infinite" }} />
+        <div className="absolute inset-y-0 w-1/4 pointer-events-none" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)", animation: "goldShimmer 6s ease-in-out infinite" }} />
         {/* Background texture — Islamic geometric star (UAE), Najdi sadu-weave diamonds (KSA), or a plain dot-grid (Qatar) */}
         {region === "UAE" ? (
           <svg className="absolute inset-0 w-full h-full opacity-[0.10] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
@@ -3565,8 +3575,8 @@ function OverviewTab({
             </div>
             {region !== "QATAR" && (
               <div
-                className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl w-full sm:w-auto sm:flex-shrink-0 whitespace-nowrap"
-                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04))", border: `1px solid ${isPremiumSeller ? "rgba(248,180,0,0.55)" : "rgba(127,232,201,0.45)"}`, backdropFilter: "blur(8px)", boxShadow: `0 14px 36px -12px ${isPremiumSeller ? "rgba(248,180,0,0.55)" : "rgba(0,200,150,0.5)"}` }}
+                className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl relative overflow-hidden w-full sm:w-auto sm:flex-shrink-0 whitespace-nowrap"
+                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04))", border: `1px solid ${isPremiumSeller ? "rgba(248,180,0,0.55)" : "rgba(127,232,201,0.45)"}`, backdropFilter: "blur(8px)", animation: "floatY 4s ease-in-out infinite", boxShadow: `0 14px 36px -12px ${isPremiumSeller ? "rgba(248,180,0,0.55)" : "rgba(0,200,150,0.5)"}` }}
               >
                 <div className="relative w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isPremiumSeller ? "linear-gradient(135deg,#F8B400,#c98f00)" : "linear-gradient(135deg,#00C896,#00a67e)", boxShadow: isPremiumSeller ? "0 6px 16px rgba(248,180,0,0.5)" : "0 6px 16px rgba(0,200,150,0.4)", animation: "livePulse 2.4s infinite" }}>
                   <Sparkles className="w-5 h-5 text-white" style={{ animation: "sparkleTwinkle 2.2s ease-in-out infinite" }} />
