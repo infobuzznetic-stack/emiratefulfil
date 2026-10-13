@@ -2690,7 +2690,7 @@ function Dashboard({ session, onLogout, notify, initialTab, onTabChange }) {
   ];
 
   return (
-    <div style={{ fontFamily: "Inter, sans-serif", background: isPremiumSeller ? "radial-gradient(900px 520px at 5% 0%, #FFD36B 0%, transparent 62%), radial-gradient(800px 520px at 100% 28%, #9DE9D0 0%, transparent 62%), radial-gradient(800px 560px at 25% 100%, #CDBBFF 0%, transparent 62%), #FFEFC8" : "radial-gradient(900px 520px at 5% 0%, #A5C8FF 0%, transparent 62%), radial-gradient(800px 520px at 100% 28%, #8FEBD6 0%, transparent 62%), radial-gradient(800px 560px at 25% 100%, #D2C2FF 0%, transparent 62%), #E6F0FF", position: "relative", overflow: "hidden" }} className="min-h-screen flex">
+    <div style={{ fontFamily: "Inter, sans-serif", background: isPremiumSeller ? "linear-gradient(180deg,#EFE6D3 0%,#F4EEE2 360px,#F5F1E8 100%)" : "linear-gradient(180deg,#E3EAF3 0%,#EEF2F8 360px,#F1F5F9 100%)", position: "relative", overflow: "hidden" }} className="min-h-screen flex">
       <div className="pointer-events-none absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full opacity-[0.10] blur-3xl" style={{ background: isPremiumSeller ? "#F8B400" : "#00C896" }} />
       <div className="pointer-events-none absolute top-40 -right-32 w-[380px] h-[380px] rounded-full opacity-[0.08] blur-3xl" style={{ background: "#F8B400" }} />
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-72" style={{ background: "linear-gradient(180deg, rgba(11,31,58,0.04), transparent)" }} />
@@ -3409,9 +3409,9 @@ function OverviewTab({
 
   return (
     <div className="relative isolate">
-      <div className="pointer-events-none absolute -top-16 -left-16 w-72 h-72 sm:w-[420px] sm:h-[420px] rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(248,180,0,0.40), transparent 70%)", animation: "auroraA 9s ease-in-out infinite" }} />
-      <div className="pointer-events-none absolute top-1/3 -right-20 w-72 h-72 sm:w-[420px] sm:h-[420px] rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(0,200,150,0.30), transparent 70%)", animation: "auroraB 11s ease-in-out infinite" }} />
-      <div className="pointer-events-none absolute bottom-0 left-1/4 w-72 h-72 rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(139,92,246,0.22), transparent 70%)", animation: "auroraA 13s ease-in-out infinite" }} />
+      <div className="pointer-events-none absolute -top-16 -left-16 w-72 h-72 sm:w-[420px] sm:h-[420px] rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(248,180,0,0.16), transparent 70%)", animation: "auroraA 9s ease-in-out infinite" }} />
+      <div className="pointer-events-none absolute top-1/3 -right-20 w-72 h-72 sm:w-[420px] sm:h-[420px] rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(0,200,150,0.12), transparent 70%)", animation: "auroraB 11s ease-in-out infinite" }} />
+      <div className="pointer-events-none absolute bottom-0 left-1/4 w-72 h-72 rounded-full blur-3xl" style={{ zIndex: -1, background: "radial-gradient(circle, rgba(139,92,246,0), transparent 70%)", animation: "auroraA 13s ease-in-out infinite" }} />
       <MarqueeTicker
         text={
           region === "KSA"
